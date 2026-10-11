@@ -192,6 +192,26 @@
   .sc-ctl{ display:flex; align-items:center; gap:8px; height:30px; }
   .sc-ctl label{ width:30px; font-size:8px; color:var(--dim); flex:none; letter-spacing:.06em; }
   .sc-ctl span{ width:40px; text-align:right; font-size:9px; color:var(--text); flex:none; font-variant-numeric:tabular-nums; }
+
+  /* TUNE rack — 6 boombox sliders per loop */
+  .opt.open{ max-height:560px; }
+  .opt-tabs{ display:flex; gap:6px; margin:4px 0 8px; }
+  .opt-tabs button{ border:none; border-radius:7px; background:var(--panel-2); color:var(--dim); font-weight:700; font-size:10px; line-height:1; font-family:inherit; letter-spacing:.14em; padding:8px 12px; cursor:pointer; }
+  .opt-tabs button.on{ background:var(--red); color:#fff; }
+  .tune{ display:flex; gap:10px; height:200px; padding:2px 2px 0; position:relative; }
+  .tsl{ flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0; }
+  .ttrack{ flex:1; width:34px; max-width:100%; background:#060504; border:1px solid var(--border); border-radius:6px; position:relative; display:flex; flex-direction:column-reverse; gap:2px; padding:3px; box-sizing:border-box; touch-action:none; cursor:ns-resize; }
+  .tseg{ flex:1; border-radius:2px; background:#1d1712; }
+  .tseg.on{ background:var(--red); box-shadow:0 0 6px rgba(211,47,47,.65); }
+  .tseg.on.hot{ background:var(--amber); box-shadow:0 0 6px rgba(255,150,0,.65); }
+  .tseg.ctr{ background:#3a3024; }
+  .tcap{ position:absolute; left:50%; transform:translateX(-50%); width:44px; height:14px; border-radius:4px; background:linear-gradient(#f2ede2,#9c9284); box-shadow:0 2px 6px #000,0 0 0 1px #000; pointer-events:none; }
+  .tcap::after{ content:''; position:absolute; left:4px; right:4px; top:6px; height:2px; background:var(--red); }
+  .tname{ font-size:9px; font-weight:700; letter-spacing:.1em; color:var(--text); white-space:nowrap; }
+  .tname.eq{ color:var(--amber); }
+  .tune-ctl{ display:flex; gap:8px; margin-top:10px; }
+  .tune-ctl button{ flex:1; height:38px; border:none; border-radius:10px; background:var(--panel-2); color:var(--text); font-weight:700; font-size:11px; font-family:inherit; letter-spacing:.14em; cursor:pointer; }
+  .tune-ctl button:active{ background:var(--red); }
 </style>
 </head>
 <body>
@@ -226,11 +246,15 @@
   <div class="opt" id="optPanel">
     <div class="opt-in">
       <div class="opt-head"><strong id="optName"></strong><button id="optClose">✕</button></div>
+      <div class="opt-tabs"><button id="tabTune" class="on">TUNE</button><button id="tabClip">CLIP</button></div>
+      <div id="paneTune"><div class="tune" id="tuneRack"></div><div class="tune-ctl"><button id="tuneRand">🎲 RANDOM</button><button id="tuneFlat">FLAT</button></div></div>
+      <div id="paneClip" style="display:none">
       <div class="row"><label>VOL</label><input type="range" id="optVol" min="0" max="100"><span class="val" id="optVolVal"></span></div>
       <div class="row"><label>FILTER</label><input type="range" id="optFilt" min="-100" max="100"><span class="val" id="optFiltVal"></span></div>
       <div class="row"><label>PITCH</label><input type="range" id="optPitch" min="-12" max="12"><span class="val" id="optPitchVal"></span></div>
       <div class="row"><label>SC</label><button class="toggle-btn" id="optSCTrigger">TRIGGER</button><button class="toggle-btn" id="optSCDuck">DUCK</button><button class="toggle-btn" id="optMute">MUTE</button></div>
       <div class="opt-actions"><button class="btn-ghost" id="optRemoveClip">remove clip</button><button class="btn-ghost" id="optRemove">remove loop</button></div>
+      </div>
     </div>
   </div>
 
@@ -289,7 +313,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v9.1';
+const APP_VERSION = 'v9.2';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    Where the shared library comes from. Two options, both can be on at once:
    1. local:  files in this site's /samples folder (+ optional samples/index.json)
@@ -357,9 +381,9 @@ let autosaveTimer = null;
 function scheduleAutosave(){ if(!currentProjectId) return; clearTimeout(autosaveTimer); autosaveTimer = setTimeout(()=>saveCurrentProject({silent:true}), 1200); }
 async function saveSampleAudio(sample, arrayBuf, mime){ const payload = { name:sample.name, mime:mime||'audio/wav', bpm:sample.bpm, key:sample.key }; if(Store.mode === 'idb') payload.buf = arrayBuf; else payload.base64 = abToB64(arrayBuf); await Store.set('sample:'+sample.id, payload); }
 
-function clearChannels(){ stopSources(); channels.forEach(ch=>{ try{ ch.gainNode.disconnect(); }catch(e){} }); channels = []; sidechainTrigger = null; closeOptions(); }
+function clearChannels(){ stopSources(); channels.forEach(ch=>{ try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} }); channels = []; sidechainTrigger = null; closeOptions(); }
 async function getProjectIndex(){ if(Store.mode==='none') return []; const idx = await Store.get('projects'); return Array.isArray(idx) ? idx : []; }
-function channelMeta(){ return channels.map(ch=>({ id:ch.id, sampleId:ch.sample.id, clips:ch.clips.map(c=>({start:c.start,len:c.len,off:c.off,mute:!!c.mute})), volume:ch.volume, filterVal:ch.filterVal, pitchSemitones:ch.pitchSemitones, scTrigger:ch.scTrigger, scDuck:ch.scDuck, mute:!!ch.mute })); }
+function channelMeta(){ return channels.map(ch=>({ id:ch.id, sampleId:ch.sample.id, clips:ch.clips.map(c=>({start:c.start,len:c.len,off:c.off,mute:!!c.mute})), volume:ch.volume, filterVal:ch.filterVal, pitchSemitones:ch.pitchSemitones, scTrigger:ch.scTrigger, scDuck:ch.scDuck, mute:!!ch.mute, tune:ch.tune.slice() })); }
 function settingsMeta(){ return { bpm, zoomX, zoomY, master:masterGain.gain.value, limiterOn, sc:{ depth:scDepth, thr:scThreshold, rel:scRelease, curve:scCurve } }; }
 function buildProjectPayload(name, forceB64){
   const usedIds = [...new Set(channels.map(c=>c.sample.id))], sampleList = [];
@@ -367,7 +391,7 @@ function buildProjectPayload(name, forceB64){
   return Object.assign({ v:4, app:'THREAT', name, channels:channelMeta(), samples:sampleList }, settingsMeta());
 }
 function applySettings(o){
-  bpm = typeof o.bpm==='number' ? o.bpm : DEFAULTS.bpm; $('bpmInput').value = bpm;
+  bpm = typeof o.bpm==='number' ? o.bpm : DEFAULTS.bpm; $('bpmInput').value = bpm; channels.forEach(applyTune);
   const mv = typeof o.master==='number' ? o.master : DEFAULTS.master; masterGain.gain.setTargetAtTime(mv, ctx.currentTime, 0.02); $('masterVol').value = Math.round(mv*100); $('masterVolVal').textContent = Math.round(mv*100)+'%'; const ms = strips.get('__master'); if(ms) ms.setVal(mv);
   const lim = typeof o.limiterOn==='boolean' ? o.limiterOn : DEFAULTS.limiter; if(lim !== limiterOn) setLimiter(lim);
   if(typeof o.zoomX==='number') zoomX = o.zoomX; if(typeof o.zoomY==='number') zoomY = o.zoomY; $('zoomX').value = zoomX; $('zoomY').value = zoomY;
@@ -496,7 +520,7 @@ function samplePosAt(ch, beat){ const c = clipAt(ch, beat); if(!c) return -1; co
 /* ================= CONTROLS ================= */
 $('masterVol').addEventListener('input', e=>{ masterGain.gain.setTargetAtTime(e.target.value/100, ctx.currentTime, 0.02); $('masterVolVal').textContent = e.target.value+'%'; markDirty(); });
 $('masterVol').addEventListener('change', commit);
-$('bpmInput').addEventListener('change', e=>{ const v = clamp(Math.round(+e.target.value||133), 40, 240); e.target.value = v; if(v !== bpm){ bpm = v; if(isRunning) reschedule(); refreshTimeline(); drawAll(); markDirty(); commit(); } });
+$('bpmInput').addEventListener('change', e=>{ const v = clamp(Math.round(+e.target.value||133), 40, 240); e.target.value = v; if(v !== bpm){ bpm = v; channels.forEach(applyTune); if(isRunning) reschedule(); refreshTimeline(); drawAll(); markDirty(); commit(); } });
 ['scIntensity','scThreshold','scRelease','scCurve'].forEach(id=>$(id).addEventListener('change', commit));
 $('mixHead').addEventListener('click', toggleMixer);
 $('vizCanvas').addEventListener('click', toggleMixer);
@@ -554,7 +578,7 @@ function restore(st){
   restoring = true;
   try{
     const o = JSON.parse(st); const wasRunning = isRunning, beat = currentBeat();
-    stopSources(); channels.forEach(ch=>{ try{ ch.gainNode.disconnect(); }catch(e){} }); channels = []; sidechainTrigger = null; closeOptions();
+    stopSources(); channels.forEach(ch=>{ try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} }); channels = []; sidechainTrigger = null; closeOptions();
     for(const c of o.ch){ const sample = samples.find(s=>s.id===c.sampleId); if(sample && sample.buffer) addChannelFromSample(sample, Object.assign({}, c, { persistedId:c.id, quiet:true })); }
     applySettings({ bpm:o.bpm, master:o.master, limiterOn:o.limiterOn, sc:o.sc, zoomX, zoomY });
     refreshTimeline(); drawAll(); markDirty();
@@ -677,21 +701,78 @@ function renderWaveformImage(buffer){ const w=180, h=60, dpr=2; const c=document
 /* ================= CHANNELS & CLIPS ================= */
 function sampleBeats(sample){ return sample.buffer.duration / beatSec(); }
 function defaultClipLen(sample){ return Math.max(1, Math.round(sampleBeats(sample))); }
+
+/* ===== TUNE — 6 recipe sliders per loop. Same builder runs live AND in export, so export = what you hear. =====
+   values 0..1. BASS + AIR are real EQ shelves, centre (0.5) = flat. The rest start at 0 = off. */
+const TUNE_SLOTS = [
+  { id:'bass',  name:'BASS',  eq:true,  def:0.5 },
+  { id:'air',   name:'AIR',   eq:true,  def:0.5 },
+  { id:'growl', name:'GROWL', def:0 },
+  { id:'heat',  name:'HEAT',  def:0 },
+  { id:'space', name:'SPACE', def:0 },
+  { id:'ghost', name:'GHOST', def:0 },
+];
+function tuneDefaults(){ return TUNE_SLOTS.map(s=>s.def); }
+function isFlatTune(v){ return !v || v.every((x,i)=>Math.abs(x - TUNE_SLOTS[i].def) < 0.005); }
+const _irCache = new WeakMap(), _curveCache = {};
+function satCurve(kind){ if(_curveCache[kind]) return _curveCache[kind]; const n = 2048, c = new Float32Array(n); for(let i=0;i<n;i++){ const x = i/(n-1)*2-1; c[i] = kind==='growl' ? Math.sign(x)*Math.pow(Math.abs(Math.tanh(x*1.6)), 0.6) : Math.tanh(x) + 0.08*x*x; } return (_curveCache[kind] = c); }
+function spaceIR(ac){ let ir = _irCache.get(ac); if(ir) return ir; const sr = ac.sampleRate, len = Math.floor(sr*2.6); ir = ac.createBuffer(2, len, sr); let seed = 1234567; const rnd = ()=>{ seed = (seed*1103515245 + 12345) & 0x7fffffff; return seed/0x7fffffff*2-1; };
+  for(let c=0;c<2;c++){ const d = ir.getChannelData(c); let lp = 0; for(let i=0;i<len;i++){ const t = i/sr; const env = Math.pow(1 - i/len, 3.2) * (t < 0.012 ? t/0.012 : 1); const k = 0.18 + 0.5*Math.exp(-t*1.6); lp += (rnd() - lp) * k; d[i] = lp*env; } }
+  _irCache.set(ac, ir); return ir; }
+function buildTune(ac){
+  const n = {}; const G = v=>{ const g = ac.createGain(); g.gain.value = v; return g; };
+  n.in = G(1); n.out = G(1);
+  n.bass = ac.createBiquadFilter(); n.bass.type='lowshelf'; n.bass.frequency.value=140;
+  n.air = ac.createBiquadFilter(); n.air.type='highshelf'; n.air.frequency.value=7500;
+  n.in.connect(n.bass); n.bass.connect(n.air);
+  // HEAT: warm tape-ish saturation in parallel + low-mid body
+  n.heatSum = G(1); n.heatDry = G(1); n.heatDrive = G(1); n.heatSh = ac.createWaveShaper(); n.heatSh.curve = satCurve('heat'); n.heatSh.oversample='2x'; n.heatWet = G(0);
+  n.heatBody = ac.createBiquadFilter(); n.heatBody.type='peaking'; n.heatBody.frequency.value=350; n.heatBody.Q.value=0.8; n.heatBody.gain.value=0;
+  n.air.connect(n.heatDry); n.air.connect(n.heatDrive); n.heatDrive.connect(n.heatSh); n.heatSh.connect(n.heatWet); n.heatDry.connect(n.heatSum); n.heatWet.connect(n.heatSum); n.heatSum.connect(n.heatBody);
+  // GROWL: resonant mid band → hard drive, blended in (the "talking" mids)
+  n.grSum = G(1); n.grBand = ac.createBiquadFilter(); n.grBand.type='bandpass'; n.grBand.Q.value=3.5; n.grBand.frequency.value=500;
+  n.grDrive = G(1); n.grSh = ac.createWaveShaper(); n.grSh.curve = satCurve('growl'); n.grSh.oversample='4x';
+  n.grTone = ac.createBiquadFilter(); n.grTone.type='lowpass'; n.grTone.frequency.value=3500; n.grWet = G(0);
+  n.heatBody.connect(n.grSum); n.heatBody.connect(n.grBand); n.grBand.connect(n.grDrive); n.grDrive.connect(n.grSh); n.grSh.connect(n.grTone); n.grTone.connect(n.grWet); n.grWet.connect(n.grSum);
+  // dry out + SPACE (dark wide reverb) + GHOST (smeared dotted echoes, dry fades back)
+  n.dry = G(1); n.grSum.connect(n.dry); n.dry.connect(n.out);
+  n.spHp = ac.createBiquadFilter(); n.spHp.type='highpass'; n.spHp.frequency.value=180; n.spConv = ac.createConvolver(); n.spConv.buffer = spaceIR(ac); n.spWet = G(0);
+  n.grSum.connect(n.spHp); n.spHp.connect(n.spConv); n.spConv.connect(n.spWet); n.spWet.connect(n.out);
+  n.ghDelay = ac.createDelay(4); n.ghFb = G(0); n.ghLp = ac.createBiquadFilter(); n.ghLp.type='lowpass'; n.ghLp.frequency.value=2200; n.ghHp = ac.createBiquadFilter(); n.ghHp.type='highpass'; n.ghHp.frequency.value=250; n.ghWet = G(0);
+  n.grSum.connect(n.ghDelay); n.ghDelay.connect(n.ghLp); n.ghLp.connect(n.ghHp); n.ghHp.connect(n.ghFb); n.ghFb.connect(n.ghDelay); n.ghHp.connect(n.ghWet); n.ghWet.connect(n.out);
+  return n;
+}
+function tuneParams(v){ // v = 6 values 0..1 → every number the chain needs (one place = live and export match)
+  const [b, a, gr, h, sp, gh] = v || tuneDefaults();
+  return {
+    bass:(b-0.5)*2*12, air:(a-0.5)*2*12,
+    heatDrive:1 + h*h*9, heatWet:h*0.55, heatDry:1 - h*0.35, heatBody:h*4,
+    grFreq:320 + gr*900, grDrive:1 + gr*gr*28, grWet:gr*0.85, grTone:2200 + gr*3000,
+    dry:(1 - gh*0.45) * (1 - sp*0.25), spWet:sp*sp*1.1,
+    ghTime:beatSec()*0.75, ghFb:gh*0.62, ghWet:gh*0.9,
+  };
+}
+function setTune(n, v, ac, now){ const p = tuneParams(v); const set = (param, val)=>{ if(now == null) param.value = val; else param.setTargetAtTime(val, now, 0.03); };
+  set(n.bass.gain, p.bass); set(n.air.gain, p.air); set(n.heatDrive.gain, p.heatDrive); set(n.heatWet.gain, p.heatWet); set(n.heatDry.gain, p.heatDry); set(n.heatBody.gain, p.heatBody);
+  set(n.grBand.frequency, p.grFreq); set(n.grDrive.gain, p.grDrive); set(n.grWet.gain, p.grWet); set(n.grTone.frequency, p.grTone);
+  set(n.dry.gain, p.dry); set(n.spWet.gain, p.spWet); set(n.ghDelay.delayTime, p.ghTime); set(n.ghFb.gain, p.ghFb); set(n.ghWet.gain, p.ghWet); }
+function applyTune(ch){ if(ch.tuneNodes) setTune(ch.tuneNodes, ch.tune, ctx, ctx.currentTime); }
 async function addChannelFromSample(sample, opts={}){
   if(!sample.buffer){ setStatus('loading ' + sample.displayName + '…'); await ensureLoaded(sample); if(!sample.buffer) return; }
   const gainNode = ctx.createGain(); gainNode.gain.value = 0;
   const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=20000; lp.Q.value=0.7;
   const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=20; hp.Q.value=0.7;
-  gainNode.connect(lp); lp.connect(hp); hp.connect(masterGain);
+  const tuneNodes = buildTune(ctx);
+  gainNode.connect(lp); lp.connect(hp); hp.connect(tuneNodes.in); tuneNodes.out.connect(masterGain);
   const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; gainNode.connect(analyser);
-  const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
+  const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, tune:(Array.isArray(opts.tune) && opts.tune.length===6) ? opts.tune.slice() : tuneDefaults(), tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
   if(ch.scTrigger){ channels.forEach(c=>c.scTrigger=false); sidechainTrigger = ch; }
-  channels.push(ch); applyFilter(ch); refreshTimeline();
+  channels.push(ch); applyFilter(ch); setTune(tuneNodes, ch.tune, ctx, null); refreshTimeline();
   if(!opts.quiet){ markDirty(); commit(); }
   if(isRunning && !restoring) reschedule();
   if(!restoring) scrollToRow(channels.length-1);
 }
-function removeChannel(ch){ ch.sources.forEach(s=>{ try{ s.stop(); }catch(e){} }); ch.sources = []; try{ ch.gainNode.disconnect(); }catch(e){} channels = channels.filter(c=>c.id!==ch.id); if(sidechainTrigger===ch) sidechainTrigger=null; if(sel.chId===ch.id) closeOptions(); refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); }
+function removeChannel(ch){ ch.sources.forEach(s=>{ try{ s.stop(); }catch(e){} }); ch.sources = []; try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} channels = channels.filter(c=>c.id!==ch.id); if(sidechainTrigger===ch) sidechainTrigger=null; if(sel.chId===ch.id) closeOptions(); refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); }
 function addClip(ch){ const last = ch.clips.length ? ch.clips.reduce((m,c)=> Math.max(m, c.start+c.len), 0) : 0; ch.clips.push({ start:last, len:defaultClipLen(ch.sample), off:0, mute:false }); refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); }
 function removeSelectedClip(){ const ch = channels.find(c=>c.id===sel.chId); if(!ch || sel.clipIdx<0) return; ch.clips.splice(sel.clipIdx, 1); sel.clipIdx = -1; refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); closeOptions(); }
 function applyFilter(ch){ const v=ch.filterVal, t=ctx.currentTime; if(v<0){ ch.lp.frequency.setTargetAtTime(20000-(Math.abs(v)/100)*19700, t, 0.02); ch.hp.frequency.setTargetAtTime(20, t, 0.02); } else { ch.hp.frequency.setTargetAtTime(20+(v/100)*3000, t, 0.02); ch.lp.frequency.setTargetAtTime(20000, t, 0.02); } }
@@ -702,7 +783,7 @@ function toggleClipMute(ch, k){ const c = ch.clips[k]; if(!c) return; c.mute = !
 /* ================= OPTIONS (inline band under the row) ================= */
 function findChannel(id){ return channels.find(c=>c.id===id); }
 function syncOptions(ch){ $('optName').textContent = ch.sample.displayName + (sel.clipIdx>=0 ? '  ·  clip ' + (sel.clipIdx+1) : ''); $('optVol').value = Math.round(ch.volume*100); $('optVolVal').textContent = Math.round(ch.volume*100)+'%'; $('optFilt').value = ch.filterVal; $('optFiltVal').textContent = ch.filterVal===0 ? 'flat' : (ch.filterVal<0 ? 'LP '+Math.abs(ch.filterVal) : 'HP '+ch.filterVal); $('optPitch').value = ch.pitchSemitones; $('optPitchVal').textContent = fmtSt(ch.pitchSemitones); const t = $('optSCTrigger'), d = $('optSCDuck'), m = $('optMute'); t.textContent = ch.scTrigger ? 'TRIG ●' : 'TRIGGER'; t.className = 'toggle-btn' + (ch.scTrigger ? ' red' : ''); d.textContent = ch.scDuck ? 'DUCK ●' : 'DUCK'; d.className = 'toggle-btn' + (ch.scDuck ? ' green' : ''); m.textContent = ch.mute ? 'MUTED' : 'MUTE'; m.className = 'toggle-btn' + (ch.mute ? ' amber' : ''); $('optRemoveClip').style.display = sel.clipIdx>=0 ? '' : 'none'; }
-function openOptions(ch, clipIdx){ sel = { chId:ch.id, clipIdx:clipIdx??-1 }; syncOptions(ch); $('optPanel').classList.add('open'); positionOptions(); drawTL(); }
+function openOptions(ch, clipIdx){ sel = { chId:ch.id, clipIdx:clipIdx??-1 }; syncOptions(ch); syncTune(ch); $('optPanel').classList.add('open'); positionOptions(); drawTL(); }
 function closeOptions(){ sel = { chId:null, clipIdx:-1 }; $('optPanel').classList.remove('open'); drawTL(); }
 function optHeight(){ const p = $('optPanel'); return p.classList.contains('open') ? p.scrollHeight : 0; }
 function selRowIdx(){ return sel.chId ? channels.findIndex(c=>c.id===sel.chId) : -1; }
@@ -908,7 +989,7 @@ async function renderArrangementOffline(sampleRate){
     if(ch.mute || !ch.clips.length) return;
     const g = offline.createGain(); const lp = offline.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7; const hp = offline.createBiquadFilter(); hp.type='highpass'; hp.Q.value=0.7;
     if(ch.filterVal<0){ lp.frequency.value=20000-(Math.abs(ch.filterVal)/100)*19700; hp.frequency.value=20; } else { hp.frequency.value=20+(ch.filterVal/100)*3000; lp.frequency.value=20000; }
-    g.connect(lp); lp.connect(hp); hp.connect(oMaster);
+    const oTune = buildTune(offline); setTune(oTune, ch.tune, offline, null); g.connect(lp); lp.connect(hp); hp.connect(oTune.in); oTune.out.connect(oMaster);
     const rate = playRate(ch), dur = ch.buffer.duration;
     ch.clips.forEach(c=>{ if(c.mute) return; const src = offline.createBufferSource(); src.buffer = ch.buffer; src.loop = true; src.detune.value = (ch.pitchSemitones||0)*100; src.connect(g); src.start(c.start*bs, (c.off*bs*rate) % dur); src.stop((c.start+c.len)*bs); });
     const ducks = ch.scDuck && sidechainTrigger && ch !== sidechainTrigger;
@@ -924,6 +1005,31 @@ function bufferToWav(abuffer){ const numCh=abuffer.numberOfChannels, length=abuf
 /* ================= BOOT ================= */
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 (async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
+
+/* ===== TUNE UI ===== */
+const TUNE_SEGS = 14; let tuneEls = [];
+function buildTuneRack(){ const box = $('tuneRack'); box.innerHTML = ''; tuneEls = TUNE_SLOTS.map((slot, i)=>{
+  const w = el('div','tsl'), tr = el('div','ttrack'), cap = el('div','tcap'), nm = el('div','tname' + (slot.eq?' eq':'')); nm.textContent = slot.name;
+  const segs = []; for(let j=0;j<TUNE_SEGS;j++){ const sg = el('div','tseg'); tr.appendChild(sg); segs.push(sg); } tr.appendChild(cap); w.appendChild(tr); w.appendChild(nm); box.appendChild(w);
+  let dragging = false, lastTap = 0;
+  const fromY = e=>{ const r = tr.getBoundingClientRect(); return clamp(1 - (e.clientY - r.top - 7)/(r.height - 14), 0, 1); };
+  const setV = v=>{ const ch = findChannel(sel.chId); if(!ch) return; if(slot.eq && Math.abs(v-0.5) < 0.03) v = 0.5; ch.tune[i] = v; applyTune(ch); drawTuneSlot(i, v); markDirty(); };
+  tr.addEventListener('pointerdown', e=>{ e.preventDefault(); const t = performance.now(); if(t - lastTap < 300){ setV(slot.def); commit(); lastTap = 0; return; } lastTap = t; dragging = true; tr.setPointerCapture(e.pointerId); setV(fromY(e)); });
+  tr.addEventListener('pointermove', e=>{ if(dragging) setV(fromY(e)); });
+  const up = ()=>{ if(dragging){ dragging = false; commit(); } }; tr.addEventListener('pointerup', up); tr.addEventListener('pointercancel', up);
+  return { segs, cap, slot };
+}); }
+function drawTuneSlot(i, v){ const t = tuneEls[i]; if(!t) return; const on = Math.round(v*TUNE_SEGS), mid = Math.round(0.5*TUNE_SEGS);
+  t.segs.forEach((sg, j)=>{ let lit; if(t.slot.eq){ lit = v >= 0.5 ? (j >= mid && j < on) : (j >= on && j < mid); } else lit = j < on; sg.className = 'tseg' + (lit ? ' on' : '') + (lit && j >= TUNE_SEGS-3 ? ' hot' : '') + (!lit && t.slot.eq && j===mid-1 ? ' ctr' : ''); });
+  t.cap.style.bottom = `calc(${(v*100).toFixed(1)}% - ${(v*14 - 3.5).toFixed(1)}px)`; }
+function syncTune(ch){ ch.tune.forEach((v,i)=>drawTuneSlot(i, v)); }
+function showOptTab(which){ $('tabTune').classList.toggle('on', which==='tune'); $('tabClip').classList.toggle('on', which==='clip'); $('paneTune').style.display = which==='tune' ? '' : 'none'; $('paneClip').style.display = which==='clip' ? '' : 'none'; requestAnimationFrame(()=>{ clampScroll(); drawTL(); }); }
+$('tabTune').addEventListener('click', ()=>showOptTab('tune')); $('tabClip').addEventListener('click', ()=>showOptTab('clip'));
+$('tuneFlat').addEventListener('click', ()=>{ const ch = findChannel(sel.chId); if(!ch) return; ch.tune = tuneDefaults(); applyTune(ch); syncTune(ch); markDirty(); commit(); setStatus('flat'); });
+$('tuneRand').addEventListener('click', ()=>{ const ch = findChannel(sel.chId); if(!ch) return;
+  ch.tune = TUNE_SLOTS.map(s=> s.eq ? 0.5 + (Math.random()-0.5)*0.7 : (Math.random() < 0.45 ? 0 : Math.random()*0.85));
+  applyTune(ch); syncTune(ch); markDirty(); commit(); setStatus('🎲 rolled'); });
+buildTuneRack();
 </script>
 </body>
 </html>

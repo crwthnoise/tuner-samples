@@ -1,0 +1,10 @@
+[
+ {"file":"Drums/kick_133.wav","name":"Kick","tags":["hype","punchy"]},
+ {"file":"Drums/hats_133.wav","name":"Hats","tags":["hype","crisp"]},
+ {"file":"Drums/clap_133.wav","name":"Clap","tags":["hype"]},
+ {"file":"Drums/perc_133.wav","name":"Perc","tags":["chill","groove"]},
+ {"file":"Bass/bass_fmin_133.wav","name":"Bass","tags":["dark","motivation"]},
+ {"file":"Melodic/pad_fmin_133.wav","name":"Pad","tags":["cinematic","sad","dreamy"]},
+ {"file":"Melodic/pluck_arp_fmin_133.wav","name":"Pluck Arp","tags":["epic","happy"]},
+ {"file":"FX/riser_133.wav","name":"Riser","tags":["cinematic","epic","anger"]}
+]

@@ -1,0 +1,99 @@
+[
+ {
+  "id": "lib-bass-bass-fmin-133-wav",
+  "file": "Bass/bass_fmin_133.wav",
+  "name": "Bass",
+  "folder": "Bass",
+  "bpm": 133,
+  "key": "Fmin",
+  "tags": [
+   "dark",
+   "motivation"
+  ]
+ },
+ {
+  "id": "lib-drums-clap-133-wav",
+  "file": "Drums/clap_133.wav",
+  "name": "Clap",
+  "folder": "Drums",
+  "bpm": 133,
+  "key": null,
+  "tags": [
+   "hype"
+  ]
+ },
+ {
+  "id": "lib-drums-hats-133-wav",
+  "file": "Drums/hats_133.wav",
+  "name": "Hats",
+  "folder": "Drums",
+  "bpm": 133,
+  "key": null,
+  "tags": [
+   "hype",
+   "crisp"
+  ]
+ },
+ {
+  "id": "lib-drums-kick-133-wav",
+  "file": "Drums/kick_133.wav",
+  "name": "Kick",
+  "folder": "Drums",
+  "bpm": 133,
+  "key": null,
+  "tags": [
+   "hype",
+   "punchy"
+  ]
+ },
+ {
+  "id": "lib-drums-perc-133-wav",
+  "file": "Drums/perc_133.wav",
+  "name": "Perc",
+  "folder": "Drums",
+  "bpm": 133,
+  "key": null,
+  "tags": [
+   "chill",
+   "groove"
+  ]
+ },
+ {
+  "id": "lib-fx-riser-133-wav",
+  "file": "FX/riser_133.wav",
+  "name": "Riser",
+  "folder": "FX",
+  "bpm": 133,
+  "key": null,
+  "tags": [
+   "cinematic",
+   "epic",
+   "anger"
+  ]
+ },
+ {
+  "id": "lib-melodic-pad-fmin-133-wav",
+  "file": "Melodic/pad_fmin_133.wav",
+  "name": "Pad",
+  "folder": "Melodic",
+  "bpm": 133,
+  "key": "Fmin",
+  "tags": [
+   "cinematic",
+   "sad",
+   "dreamy"
+  ]
+ },
+ {
+  "id": "lib-melodic-pluck-arp-fmin-133-wav",
+  "file": "Melodic/pluck_arp_fmin_133.wav",
+  "name": "Pluck Arp",
+  "folder": "Melodic",
+  "bpm": 133,
+  "key": "Fmin",
+  "tags": [
+   "epic",
+   "happy"
+  ]
+ }
+]

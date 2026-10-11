@@ -95,5 +95,41 @@
    "epic",
    "happy"
   ]
+ },
+ {
+  "id": "lib-tuner-demo-chill-808-150-dmin-dark-chill-wav",
+  "file": "TUNER DEMO/chill_808_150_Dmin_[dark,chill].wav",
+  "name": "chill 808",
+  "folder": "TUNER DEMO",
+  "bpm": 150,
+  "key": "Dmin",
+  "tags": [
+   "dark",
+   "chill"
+  ]
+ },
+ {
+  "id": "lib-tuner-demo-chill-drums-150-chill-hype-wav",
+  "file": "TUNER DEMO/chill_drums_150_[chill,hype].wav",
+  "name": "chill drums",
+  "folder": "TUNER DEMO",
+  "bpm": 150,
+  "key": null,
+  "tags": [
+   "chill",
+   "hype"
+  ]
+ },
+ {
+  "id": "lib-tuner-demo-chill-synth-150-dmin-dreamy-chill-wav",
+  "file": "TUNER DEMO/chill_synth_150_Dmin_[dreamy,chill].wav",
+  "name": "chill synth",
+  "folder": "TUNER DEMO",
+  "bpm": 150,
+  "key": "Dmin",
+  "tags": [
+   "dreamy",
+   "chill"
+  ]
  }
 ]

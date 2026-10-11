@@ -109,6 +109,14 @@
   .toggle-btn.green{ border-color:var(--green); background:var(--green-dim); color:var(--green); }
   .toggle-btn.amber{ border-color:var(--amber); color:var(--amber); }
   .opt-actions{ display:flex; gap:6px; margin-top:6px; }
+  .opt-actions .btn-ghost{ height:40px; font-size:12px; border-radius:20px; color:#ff6b6b; border-color:rgba(255,80,80,.45); }
+  .bubble{ position:fixed; left:50%; bottom:180px; white-space:nowrap; transform:translate(-50%,12px) scale(.96); z-index:30; display:flex; align-items:center; gap:10px; background:#1b1b1f; color:#fff; border:1px solid rgba(255,255,255,.14); border-radius:28px; padding:8px 8px 8px 18px; font-size:13px; font-weight:700; letter-spacing:.02em; box-shadow:0 10px 30px rgba(0,0,0,.5); opacity:0; pointer-events:none; transition:opacity .18s, transform .18s; max-width:calc(100% - 32px); }
+  .bubble.show{ opacity:1; pointer-events:auto; transform:translate(-50%,0) scale(1); }
+  .bubble button{ height:40px; min-width:84px; border:none; border-radius:20px; background:#fff; color:#000; font-size:13px; font-weight:800; cursor:pointer; }
+  .bubble.hint{ padding:12px 18px; font-weight:600; }
+  .bubble.hint b{ color:#ff6b6b; }
+  @keyframes tlshake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 50%{transform:translateX(5px)} 75%{transform:translateX(-3px)} }
+  .shake{ animation:tlshake .22s ease-out; }
   .opt-actions button{ flex:1; }
   .btn-ghost{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:8px; height:32px; padding:0 10px; font-size:10px; cursor:pointer; font-weight:600; }
   .btn-primary{ background:var(--red); color:var(--void); border:none; border-radius:8px; height:32px; padding:0 10px; font-size:10px; cursor:pointer; font-weight:700; }
@@ -253,7 +261,7 @@
       <div class="row"><label>FILTER</label><input type="range" id="optFilt" min="-100" max="100"><span class="val" id="optFiltVal"></span></div>
       <div class="row"><label>PITCH</label><input type="range" id="optPitch" min="-12" max="12"><span class="val" id="optPitchVal"></span></div>
       <div class="row"><label>SC</label><button class="toggle-btn" id="optSCTrigger">TRIGGER</button><button class="toggle-btn" id="optSCDuck">DUCK</button><button class="toggle-btn" id="optMute">MUTE</button></div>
-      <div class="opt-actions"><button class="btn-ghost" id="optRemoveClip">remove clip</button><button class="btn-ghost" id="optRemove">remove loop</button></div>
+      <div class="opt-actions"><button class="btn-ghost" id="optRemoveClip">🗑 clip</button><button class="btn-ghost" id="optRemove">🗑 whole loop</button></div>
       </div>
     </div>
   </div>
@@ -307,13 +315,14 @@
     </div>
   </div>
   <div class="dock-info" id="dockInfo"></div>
+<div class="bubble" id="bubble"><span id="bubbleTxt"></span><button id="bubbleUndo">↶ UNDO</button></div>
   <div class="store-warn" id="storeWarn">saving unavailable in this browser — use save as file</div>
 </div>
 
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v9.3';
+const APP_VERSION = 'v9.4';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    Where the shared library comes from. Two options, both can be on at once:
    1. local:  files in this site's /samples folder (+ optional samples/index.json)
@@ -785,7 +794,7 @@ async function addChannelFromSample(sample, opts={}){
   const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; gainNode.connect(analyser);
   const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, tune:migrateTune(opts.tune), tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
   if(ch.scTrigger){ channels.forEach(c=>c.scTrigger=false); sidechainTrigger = ch; }
-  channels.push(ch); applyFilter(ch); setTune(tuneNodes, ch.tune, ctx, null); refreshTimeline();
+  channels.push(ch); applyFilter(ch); setTune(tuneNodes, ch.tune, ctx, null); refreshTimeline(); if(!restoring) maybeTapHint();
   if(!opts.quiet){ markDirty(); commit(); }
   if(isRunning && !restoring) reschedule();
   if(!restoring) scrollToRow(channels.length-1);
@@ -802,6 +811,17 @@ function toggleClipMute(ch, k){ const c = ch.clips[k]; if(!c) return; c.mute = !
 function findChannel(id){ return channels.find(c=>c.id===id); }
 function syncOptions(ch){ $('optName').textContent = ch.sample.displayName + (sel.clipIdx>=0 ? '  ·  clip ' + (sel.clipIdx+1) : ''); $('optVol').value = Math.round(ch.volume*100); $('optVolVal').textContent = Math.round(ch.volume*100)+'%'; $('optFilt').value = ch.filterVal; $('optFiltVal').textContent = ch.filterVal===0 ? 'flat' : (ch.filterVal<0 ? 'LP '+Math.abs(ch.filterVal) : 'HP '+ch.filterVal); $('optPitch').value = ch.pitchSemitones; $('optPitchVal').textContent = fmtSt(ch.pitchSemitones); const t = $('optSCTrigger'), d = $('optSCDuck'), m = $('optMute'); t.textContent = ch.scTrigger ? 'TRIG ●' : 'TRIGGER'; t.className = 'toggle-btn' + (ch.scTrigger ? ' red' : ''); d.textContent = ch.scDuck ? 'DUCK ●' : 'DUCK'; d.className = 'toggle-btn' + (ch.scDuck ? ' green' : ''); m.textContent = ch.mute ? 'MUTED' : 'MUTE'; m.className = 'toggle-btn' + (ch.mute ? ' amber' : ''); $('optRemoveClip').style.display = sel.clipIdx>=0 ? '' : 'none'; }
 function openOptions(ch, clipIdx){ sel = { chId:ch.id, clipIdx:clipIdx??-1 }; syncOptions(ch); syncTune(ch); fitTune(); $('optPanel').classList.add('open'); positionOptions(); drawTL(); }
+let bubbleTimer = null;
+function showBubble(txt, withUndo, ms){ const b = $('bubble'); $('bubbleTxt').innerHTML = txt; $('bubbleUndo').style.display = withUndo ? '' : 'none'; b.classList.toggle('hint', !withUndo); b.classList.add('show'); clearTimeout(bubbleTimer); bubbleTimer = setTimeout(()=> b.classList.remove('show'), ms || 4000); }
+function hideBubble(){ clearTimeout(bubbleTimer); $('bubble').classList.remove('show'); }
+function tripleDelete(ch, k){
+  if(!ch || !ch.clips[k]) return;
+  tl.classList.remove('shake'); void tl.offsetWidth; tl.classList.add('shake');
+  try{ navigator.vibrate && navigator.vibrate(25); }catch(e){}
+  if(ch.clips.length <= 1){ removeChannel(ch); showBubble('loop deleted', true); }
+  else { if(sel.chId === ch.id) closeOptions(); ch.clips.splice(k, 1); refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); drawTL(); showBubble('clip deleted', true); }
+}
+function maybeTapHint(){ if(channels.length < 2) return; let seen = false; try{ seen = localStorage.getItem('tuner_tapHint') === '1'; }catch(e){} if(seen) return; try{ localStorage.setItem('tuner_tapHint','1'); }catch(e){} setTimeout(()=> showBubble('tap a clip: <b>1</b> mute · <b>2</b> options · <b>3</b> delete', false, 6000), 400); }
 function closeOptions(){ sel = { chId:null, clipIdx:-1 }; $('optPanel').classList.remove('open'); drawTL(); }
 function optHeight(){ const p = $('optPanel'); return p.classList.contains('open') ? p.scrollHeight : 0; }
 function selRowIdx(){ return sel.chId ? channels.findIndex(c=>c.id===sel.chId) : -1; }
@@ -815,8 +835,10 @@ $('optPitch').addEventListener('input', e=>{ const ch=findChannel(sel.chId); if(
 $('optSCTrigger').addEventListener('click', ()=>{ const ch=findChannel(sel.chId); if(!ch) return; if(ch.scTrigger){ ch.scTrigger=false; sidechainTrigger=null; } else { channels.forEach(c=>{ c.scTrigger=false; }); ch.scTrigger=true; ch.scDuck=false; sidechainTrigger=ch; } syncOptions(ch); refreshTimeline(); markDirty(); commit(); drawAll(); });
 $('optSCDuck').addEventListener('click', ()=>{ const ch=findChannel(sel.chId); if(!ch) return; ch.scDuck=!ch.scDuck; if(ch.scDuck && ch.scTrigger){ ch.scTrigger=false; if(sidechainTrigger===ch) sidechainTrigger=null; } syncOptions(ch); refreshTimeline(); markDirty(); commit(); drawTL(); });
 $('optMute').addEventListener('click', ()=>{ const ch=findChannel(sel.chId); if(!ch) return; ch.mute=!ch.mute; syncOptions(ch); markDirty(); commit(); drawTL(); });
-$('optRemoveClip').addEventListener('click', removeSelectedClip);
-$('optRemove').addEventListener('click', ()=>{ const ch=findChannel(sel.chId); if(!ch) return; removeChannel(ch); });
+$('optRemoveClip').addEventListener('click', ()=>{ removeSelectedClip(); showBubble('clip deleted', true); });
+$('optRemove').addEventListener('click', ()=>{ const ch=findChannel(sel.chId); if(!ch) return; removeChannel(ch); showBubble('loop deleted', true); });
+$('bubbleUndo').addEventListener('click', ()=>{ hideBubble(); undo(); });
+tl.addEventListener('animationend', ()=> tl.classList.remove('shake'));
 
 /* ================= PLAYBACK / SCHEDULING ================= */
 function currentBeat(){ return isRunning ? startBeat + (ctx.currentTime - songStartTime)/beatSec() : playBeat; }
@@ -974,9 +996,12 @@ function endPtr(e){
   if(g.moved) return;
   const ht = g.ht;
   if(ht.kind === 'clip' || ht.kind === 'trimL' || ht.kind === 'trimR'){
-    /* single tap = mute/unmute this clip · double tap = open options */
-    if(pendingTap && pendingTap.ch === ht.ch && pendingTap.k === ht.k){ clearTimeout(pendingTap.t); pendingTap = null; if(sel.chId === ht.ch.id && sel.clipIdx === ht.k) closeOptions(); else openOptions(ht.ch, ht.k); }
-    else { if(pendingTap) clearTimeout(pendingTap.t); pendingTap = { ch:ht.ch, k:ht.k, t:setTimeout(()=>{ pendingTap = null; toggleClipMute(ht.ch, ht.k); }, 280) }; }
+    /* 1 tap = mute/unmute · 2 taps = options · 3 taps = delete (undo bubble) */
+    const same = pendingTap && pendingTap.ch === ht.ch && pendingTap.k === ht.k;
+    const n = same ? pendingTap.n + 1 : 1;
+    if(pendingTap) clearTimeout(pendingTap.t);
+    if(n >= 3){ pendingTap = null; tripleDelete(ht.ch, ht.k); }
+    else { const ch = ht.ch, k = ht.k; pendingTap = { ch, k, n, t:setTimeout(()=>{ pendingTap = null; if(n === 1) toggleClipMute(ch, k); else { if(sel.chId === ch.id && sel.clipIdx === k) closeOptions(); else openOptions(ch, k); } }, 260) }; }
   }
   else if(ht.kind === 'add'){ addClip(ht.ch); }
   else if(ht.kind === 'row'){ if(sel.chId === ht.ch.id && sel.clipIdx < 0) closeOptions(); else openOptions(ht.ch, -1); }

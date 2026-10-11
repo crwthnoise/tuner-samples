@@ -322,7 +322,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v9.4';
+const APP_VERSION = 'v9.5';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    Where the shared library comes from. Two options, both can be on at once:
    1. local:  files in this site's /samples folder (+ optional samples/index.json)
@@ -432,7 +432,8 @@ async function applyProjectPayload(payload, id, opts={}){
   clearChannels();
   applySettings(payload);
   for(const s of (payload.samples||[])){ if(samples.find(x=>x.id===s.id)) continue; const buf = s.buf ? s.buf : (s.base64 ? b64ToAb(s.base64) : null); if(!buf) continue; const file = new File([new Blob([buf], {type:s.mime||'audio/wav'})], s.name||'loop.wav', {type:s.mime||'audio/wav'}); await addSample(file, { persistedId:s.id, arrayBuf:buf, bpm:s.bpm, key:s.key, tags:s.tags, folder:s.folder, displayName:s.displayName, builtin:!!s.builtin, skipSave:true, quiet:true }); }
-  const unitSec = Math.max(0.001, ...(payload.channels||[]).map(c=>{ const sm = samples.find(s=>s.id===c.sampleId); return sm ? sm.buffer.duration : 0; }));
+  await Promise.all((payload.channels||[]).map(c=> samples.find(s=>s.id===c.sampleId)).filter(Boolean).map(sm=> ensureLoaded(sm)));
+  const unitSec = Math.max(0.001, ...(payload.channels||[]).map(c=>{ const sm = samples.find(s=>s.id===c.sampleId); return sm && sm.buffer ? sm.buffer.duration : 0; }));
   const unitBeats = Math.max(1, Math.round(unitSec/beatSec()));
   for(const c of (payload.channels||[])){ const sample = samples.find(s=>s.id===c.sampleId); if(!sample) continue; const o = Object.assign({}, c, { persistedId:c.id, quiet:true }); if(!o.clips && o.blocks) o.clips = migrateBlocks(o, unitBeats); await addChannelFromSample(sample, o); }
   currentProjectId = id; currentProjectName = payload.name || 'untitled'; dirty = !id;
@@ -627,9 +628,11 @@ async function loadGithubLibrary(){
 }
 async function loadBuiltins(){
   if(!SAMPLE_SOURCE.local) return;
+  /* register only — each loop downloads the first time it's used (fast startup) */
   try{
     const r = await fetch('samples/index.json', { cache:'no-cache' }); if(!r.ok) return; const idx = await r.json();
-    for(const it of idx){ if(samples.find(x=>x.id===it.id)) continue; try{ const buf = await (await fetch('samples/' + it.file)).arrayBuffer(); const file = new File([new Blob([buf], {type:'audio/wav'})], it.file, {type:'audio/wav'}); await addSample(file, { persistedId:it.id, arrayBuf:buf, bpm:it.bpm, key:it.key, tags:it.tags||[], folder:it.folder||'Library', displayName:it.name, builtin:true, skipSave:true, quiet:true }); }catch(e){} }
+    for(const it of idx){ if(samples.find(x=>x.id===it.id)) continue; registerRemote({ id:it.id, file:it.file.split('/').pop(), url:'samples/' + it.file.split('/').map(encodeURIComponent).join('/'), name:it.name, folder:it.folder||'Library', bpm:it.bpm, key:it.key, tags:it.tags||[] }); }
+    renderLibrary();
   }catch(e){}
 }
 async function applySampleMetaOverrides(){ if(Store.mode==='none') return; for(const s of samples){ try{ const m = await Store.get('smeta:'+s.id); if(!m) continue; if(m.name) s.displayName = m.name; if(m.folder) s.folder = m.folder; if(m.bpm!=null) s.bpm = m.bpm; if(m.key!==undefined) s.key = m.key; if(Array.isArray(m.tags)) s.tags = m.tags; s.hidden = !!m.hidden; }catch(e){} } renderLibrary(); }

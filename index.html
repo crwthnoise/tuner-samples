@@ -164,37 +164,57 @@
   .ask-card button{ flex:1; height:42px; font-size:12px; }
 
   /* ---------- LIBRARY (PACKS) ---------- */
-  .lib-top{ display:flex; gap:6px; margin-bottom:6px; }
+  .lib-head{ position:sticky; top:-10px; z-index:3; background:#110f0d; margin:-10px -2px 0; padding:10px 2px 2px; }
+  .lib-top{ display:none; margin-bottom:8px; } .lib-top.open{ display:flex; gap:6px; }
   .search-input{ flex:1; min-width:0; background:var(--lane); color:var(--text); border:1px solid var(--rail); border-radius:8px; padding:0 10px; height:34px; font:inherit; font-size:11px; outline:none; }
   .search-input::placeholder{ color:var(--dim); }
-  .lib-tags{ display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px; }
-  .chip{ font-size:8px; font-weight:700; letter-spacing:.04em; padding:4px 8px; border-radius:10px; border:1px solid var(--border); background:var(--panel-2); color:var(--dim); cursor:pointer; user-select:none; -webkit-user-select:none; }
+  .hscroll{ display:flex; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior-x:contain; }
+  .hscroll::-webkit-scrollbar{ display:none; }
+  /* USB pack strip */
+  .usb-strip{ gap:10px; padding:4px 2px 10px; scroll-snap-type:x proximity; }
+  .usb{ --c:#f2ede2; flex:none; width:60px; display:flex; flex-direction:column; align-items:center; cursor:pointer; scroll-snap-align:start; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; transition:transform .15s; }
+  .usb .plug{ width:28px; height:15px; background:linear-gradient(90deg,#8d8a83,#eeece6 45%,#a9a69f); border:1px solid #000; border-bottom:none; border-radius:2px 2px 0 0; display:flex; justify-content:center; gap:6px; padding-top:4px; }
+  .usb .plug i{ width:5px; height:4px; background:#2a2724; border-radius:1px; }
+  .usb .body{ position:relative; width:60px; height:64px; border-radius:5px 5px 11px 11px; background:linear-gradient(#26221e,#0e0d0b); border:1px solid #000; box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 4px 8px #000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:6px 3px 8px; overflow:hidden; }
+  .usb .stripe{ position:absolute; top:6px; left:7px; right:7px; height:3px; border-radius:2px; background:var(--c); opacity:.85; }
+  .usb b{ font:700 8px/1.1 'Jura',sans-serif; letter-spacing:.06em; white-space:nowrap; max-width:56px; overflow:hidden; color:var(--text); text-align:center; margin-top:4px; }
+  .usb b.l{ font-size:7px; letter-spacing:.02em; } .usb b.xl{ font-size:6px; letter-spacing:0; white-space:normal; }
+  .usb small{ font:700 7px var(--mono); color:var(--dim); letter-spacing:.06em; }
+  .usb .led{ position:absolute; bottom:5px; width:4px; height:4px; border-radius:50%; background:#2f2a24; }
+  .usb.on{ transform:translateY(-4px); }
+  .usb.on .body{ border-color:var(--c); box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 1px var(--c), 0 6px 14px #000; }
+  .usb.on .led{ background:var(--green); box-shadow:0 0 6px var(--green); }
+  .usb.locked{ opacity:.5; } .usb.locked .stripe{ background:#5a524a; } .usb.locked small{ color:var(--red); }
+  .usb.add .body{ background:transparent; border:1px dashed var(--border); box-shadow:none; } .usb.add .plug{ opacity:.35; } .usb.add b{ color:var(--green); }
+  .lib-name{ display:none; gap:6px; margin:-2px 0 8px; } .lib-name.open{ display:flex; }
+  .lib-name button{ height:34px; padding:0 14px; }
+  .lib-tags{ gap:5px; margin-bottom:8px; }
+  .chip{ flex:none; font-size:8px; font-weight:700; letter-spacing:.04em; padding:5px 9px; border-radius:10px; border:1px solid var(--border); background:var(--panel-2); color:var(--dim); cursor:pointer; user-select:none; -webkit-user-select:none; white-space:nowrap; }
   .chip.on{ border-color:var(--red); color:var(--red); background:var(--red-dim); }
-  .chip.sm{ font-size:7px; padding:1px 5px; cursor:default; }
+  .chip.hid{ border-style:dashed; }
   .chip.m-anger{ color:#ff5a3c; } .chip.m-happy{ color:#ffd166; } .chip.m-sad{ color:#7aa2ff; } .chip.m-motivation{ color:#ff9600; } .chip.m-epic{ color:#ff8a70; } .chip.m-cinematic{ color:#c9a7ff; } .chip.m-dark{ color:#b08a6a; } .chip.m-chill{ color:#4fd1a5; } .chip.m-hype{ color:#ff5a8a; } .chip.m-dreamy{ color:#9ad0ff; }
-  .lib-folder{ display:flex; align-items:center; gap:6px; height:28px; font-size:9px; letter-spacing:.12em; color:var(--dim); text-transform:uppercase; cursor:pointer; margin-top:4px; }
-  .lib-folder b{ color:var(--text); font-weight:700; }
-  .lib-folder .n{ margin-left:auto; font-size:8px; letter-spacing:0; }
-  .lib-folder .car{ width:12px; text-align:center; }
-  #rack .zone{ filter:brightness(calc(1 + var(--lvl,0)*.55)); transition:filter .06s linear; }
-  .lib-row{ display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:8px; border:1px solid transparent; cursor:pointer; }
-  .lib-row:active{ background:var(--panel-2); }
-  .lib-row.playing{ border-color:var(--red); background:#20140f; }
-  .lib-row .thumb{ width:44px; height:26px; border-radius:4px; background:var(--panel-2) center/cover no-repeat; flex:none; border:1px solid var(--border); }
-  .lib-row .info{ flex:1; min-width:0; text-align:left; font-size:inherit; color:inherit; letter-spacing:0; }
-  .lib-row .nm{ font-size:10px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .lib-row .meta{ display:flex; align-items:center; gap:4px; margin-top:2px; font-size:8px; color:var(--dim); white-space:nowrap; overflow:hidden; }
-  .lib-row .add{ flex:none; width:36px; height:32px; border-radius:8px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-size:16px; cursor:pointer; padding:0; }
-  .lib-row .add:active{ background:var(--red); color:var(--void); }
-  .lib-detail{ background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:8px; margin:2px 0 6px; }
-  .lib-detail canvas{ width:100%; height:64px; display:block; border-radius:6px; background:var(--void); }
+  .chip.on.m-anger,.chip.on.m-happy,.chip.on.m-sad,.chip.on.m-motivation,.chip.on.m-epic,.chip.on.m-cinematic,.chip.on.m-dark,.chip.on.m-chill,.chip.on.m-hype,.chip.on.m-dreamy{ border-color:currentColor; background:#1c1612; }
+  /* rows = the waveform */
+  .lib-sec{ font:700 8px var(--mono); letter-spacing:.2em; color:var(--mute); margin:10px 2px 5px; }
+  .lrow{ position:relative; height:46px; border-radius:8px; overflow:hidden; background:#0d0b09; border:1px solid var(--panel-2); display:flex; align-items:center; margin-bottom:5px; cursor:pointer; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:pan-y; }
+  .lrow canvas{ position:absolute; left:0; top:0; width:calc(100% - 46px); height:100%; display:block; }
+  .lrow .txt{ position:relative; flex:1; min-width:0; padding:0 10px; pointer-events:none; }
+  .lrow .nm{ font:700 11px var(--ui); letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 3px #000,0 0 6px #000; }
+  .lrow .meta{ font:500 8px var(--mono); color:var(--dim); margin-top:1px; text-shadow:0 1px 3px #000; white-space:nowrap; }
+  .lrow .add{ position:relative; flex:none; width:46px; height:100%; border:none; border-left:1px solid var(--panel-2); background:linear-gradient(#272320,#121010); color:var(--text); font-size:22px; line-height:1; cursor:pointer; padding:0; }
+  .lrow .add:active{ background:var(--red); color:var(--void); }
+  .lrow.playing{ border-color:var(--red); }
+  .lrow.editing{ border-color:var(--text); }
+  .lib-detail{ background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:8px; margin:-2px 0 8px; }
   .lib-detail .drow{ display:flex; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap; }
-  .lib-detail .drow label{ font-size:8px; color:var(--dim); letter-spacing:.06em; width:36px; flex:none; }
-  .lib-detail input[type=text], .lib-detail input[type=number]{ background:var(--void); color:var(--text); border:1px solid var(--border); border-radius:6px; height:26px; padding:0 8px; font:inherit; font-size:10px; outline:none; min-width:0; }
+  .lib-detail .drow:first-child{ margin-top:0; }
+  .lib-detail .drow label{ font-size:8px; color:var(--dim); letter-spacing:.06em; width:40px; flex:none; }
+  .lib-detail input[type=text], .lib-detail input[type=number]{ background:var(--void); color:var(--text); border:1px solid var(--border); border-radius:6px; height:28px; padding:0 8px; font:inherit; font-size:11px; outline:none; min-width:0; }
   .lib-detail .tagbox{ display:flex; gap:4px; flex-wrap:wrap; flex:1; }
   .lib-detail .dbtns{ display:flex; gap:6px; margin-top:8px; }
   .lib-detail .dbtns button{ flex:1; height:34px; }
-  .lib-empty{ font-size:10px; color:var(--dim); text-align:center; padding:18px 0; }
+  .lib-empty{ font-size:10px; color:var(--dim); text-align:center; padding:22px 0; line-height:1.7; }
+  .lib-empty.locked b{ font:700 12px 'Jura',sans-serif; letter-spacing:.1em; color:var(--text); }
 
   /* ---------- SETTINGS / PROJECTS ---------- */
   .btn-ghost{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:8px; height:34px; padding:0 10px; font-size:10px; cursor:pointer; font-weight:700; }
@@ -287,9 +307,13 @@
 
 <!-- PACKS (library) -->
 <div class="sheet" id="packsSheet">
-  <div class="sh-head"><strong>PACKS</strong><button data-close="packsSheet">✕</button></div>
-  <div class="lib-top"><input type="text" id="librarySearch" class="search-input" placeholder="search name · key · tag"></div>
-  <div class="lib-tags" id="libTags"></div>
+  <div class="lib-head">
+  <div class="sh-head"><strong>PACKS</strong><button id="libSearchBtn" data-k="LIB SEARCH" title="search">⌕&#xFE0E;</button><button data-close="packsSheet">✕</button></div>
+  <div class="lib-top" id="libSearchWrap"><input type="text" id="librarySearch" class="search-input" placeholder="search name · key · bpm"></div>
+  <div class="usb-strip hscroll" id="usbStrip"></div>
+  <div class="lib-name" id="libName"><input type="text" id="libNameIn" class="search-input" maxlength="14" placeholder="name your folder"><button class="btn-primary" id="libNameOk">MAKE</button></div>
+  <div class="lib-tags hscroll" id="libTags"></div>
+  </div>
   <div class="lib-list" id="libList"></div>
 </div>
 
@@ -336,7 +360,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.8';
+const APP_VERSION = 'v10.9';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -485,7 +509,7 @@ async function loadAll(){
   await loadBuiltins(); loadGithubLibrary();
   if(m === 'none'){ $('storeWarn').classList.add('show'); setStatus('no storage here — use save as file'); refreshTimeline(); drawAll(); return; }
   try{ const keys = await Store.keys('sample:'); for(const k of keys){ const rec = await Store.get(k); if(!rec) continue; const buf = rec.buf ? rec.buf : (rec.base64 ? b64ToAb(rec.base64) : null); if(!buf) continue; const file = new File([new Blob([buf], {type:rec.mime||'audio/wav'})], rec.name||'loop.wav', {type:rec.mime||'audio/wav'}); await addSample(file, { persistedId:k.slice(7), arrayBuf:buf, bpm:rec.bpm, key:rec.key, skipSave:true, quiet:true }); } }catch(e){}
-  await applySampleMetaOverrides();
+  await applySampleMetaOverrides(); await loadCFolders();
   try{ let idx = await getProjectIndex(); if(idx.length){ idx.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)); await loadProjectById(idx[0].id, { quiet:true }); } else { applySettings({}); } }catch(e){}
   dirty = false; updateProjectLabel(); refreshTimeline(); drawAll();
   if(channels.length) setStatus(channels.length + ' loop' + (channels.length>1?'s':'') + ' restored');
@@ -604,7 +628,7 @@ $('limiterToggle').addEventListener('click', ()=>{ setLimiter(!limiterOn); markD
 /* SHEETS — they cover the rack + dock, never the timeline */
 function sheetTop(){ const r = $('rackZone').getBoundingClientRect(); document.documentElement.style.setProperty('--sheetTop', Math.max(90, Math.round(r.top)) + 'px'); }
 function openSheet(id){ document.querySelectorAll('.sheet.open').forEach(s=>{ if(s.id !== id) closeSheet(s.id); }); sheetTop(); $(id).classList.add('open'); if(id === 'setSheet') requestAnimationFrame(drawAll); }
-function closeSheet(id){ const s = $(id); if(!s || !s.classList.contains('open')) return; s.classList.remove('open'); if(id === 'packsSheet') stopPreview(); }
+function closeSheet(id){ const s = $(id); if(!s || !s.classList.contains('open')) return; s.classList.remove('open'); if(id === 'packsSheet'){ stopPreview(); libEdit = null; libNaming = null; } }
 document.querySelectorAll('[data-close]').forEach(b=> b.addEventListener('click', ()=> closeSheet(b.dataset.close)));
 $('packsBtn').addEventListener('click', ()=>{ if($('packsSheet').classList.contains('open')) closeSheet('packsSheet'); else { renderLibrary(); openSheet('packsSheet'); } });
 $('setBtn').addEventListener('click', ()=>{ if($('setSheet').classList.contains('open')) closeSheet('setSheet'); else openProjectsPanel(); });
@@ -672,7 +696,7 @@ async function ensureLoaded(sample){
   })();
   return sample._loading;
 }
-function registerRemote(it){ if(samples.find(x=>x.id===it.id)) return; const meta = parseLoopMeta(it.file); samples.push({ id:it.id, name:it.file, displayName:it.name || cleanName(it.file), url:it.url, buffer:null, bpm:it.bpm ?? meta.bpm, key:it.key ?? meta.key, tags:it.tags || parseTagsFromName(it.file), folder:it.folder || 'Library', builtin:true, hidden:false, waveImg:null, env:null, peaks:null }); }
+function registerRemote(it){ if(samples.find(x=>x.id===it.id)) return; const meta = parseLoopMeta(it.file); samples.push({ id:it.id, name:it.file, displayName:it.name || cleanName(it.file), url:it.url, buffer:null, bpm:it.bpm ?? meta.bpm, key:it.key ?? meta.key, tags:it.tags || parseTagsFromName(it.file), folder:it.folder || 'Library', builtin:true, hidden:false, waveImg:null, env:null, peaks:null, lpk:Array.isArray(it.peaks) ? it.peaks : null }); }
 async function loadGithubLibrary(){
   const g = SAMPLE_SOURCE.github; if(!g || !g.repo) return;
   const base = (g.path||'').replace(/^\/|\/$/g,''); const key = 'ghlist:' + g.repo + '/' + base;
@@ -681,7 +705,7 @@ async function loadGithubLibrary(){
   if(!list && Store.mode!=='none'){ try{ const c = await Store.get(key); if(c && c.list) list = c.list; }catch(e){} }
   if(!list) return;
   let overrides = {}; try{ const r = await fetch(`https://raw.githubusercontent.com/${g.repo}/${g.branch||'main'}/${base?base+'/':''}index.json`, { cache:'no-cache' }); if(r.ok){ const j = await r.json(); (Array.isArray(j)?j:[]).forEach(o=>{ if(o.file) overrides[o.file] = o; }); } }catch(e){}
-  for(const path of list){ const rel = base ? path.slice(base.length+1) : path; const parts = rel.split('/'); const file = parts.pop(); const folder = parts.length ? parts.join(' / ') : 'Library'; const o = overrides[rel] || overrides[file] || {}; registerRemote({ id:'gh-' + rel.replace(/[^a-z0-9]+/gi,'-').toLowerCase(), file, url:`https://raw.githubusercontent.com/${g.repo}/${g.branch||'main'}/${path.split('/').map(encodeURIComponent).join('/')}`, folder:o.folder || folder, name:o.name, bpm:o.bpm, key:o.key, tags:o.tags }); }
+  for(const path of list){ const rel = base ? path.slice(base.length+1) : path; const parts = rel.split('/'); const file = parts.pop(); const folder = parts.length ? parts.join(' / ') : 'Library'; const o = overrides[rel] || overrides[file] || {}; registerRemote({ id:'gh-' + rel.replace(/[^a-z0-9]+/gi,'-').toLowerCase(), file, url:`https://raw.githubusercontent.com/${g.repo}/${g.branch||'main'}/${path.split('/').map(encodeURIComponent).join('/')}`, folder:o.folder || folder, name:o.name, bpm:o.bpm, key:o.key, tags:o.tags, peaks:o.peaks }); }
   renderLibrary();
 }
 async function loadBuiltins(){
@@ -689,7 +713,7 @@ async function loadBuiltins(){
   /* register only — each loop downloads the first time it's used (fast startup) */
   try{
     const r = await fetch('samples/index.json', { cache:'no-cache' }); if(!r.ok) return; const idx = await r.json();
-    for(const it of idx){ if(samples.find(x=>x.id===it.id)) continue; registerRemote({ id:it.id, file:it.file.split('/').pop(), url:'samples/' + it.file.split('/').map(encodeURIComponent).join('/'), name:it.name, folder:it.folder||'Library', bpm:it.bpm, key:it.key, tags:it.tags||[] }); }
+    for(const it of idx){ if(samples.find(x=>x.id===it.id)) continue; registerRemote({ id:it.id, file:it.file.split('/').pop(), url:'samples/' + it.file.split('/').map(encodeURIComponent).join('/'), name:it.name, folder:it.folder||'Library', bpm:it.bpm, key:it.key, tags:it.tags||[], peaks:it.peaks }); }
     renderLibrary();
   }catch(e){}
 }
@@ -706,66 +730,144 @@ async function addSample(file, opts={}){
   if(!opts.skipSave){ try{ await saveSampleAudio(sample, arrayBuf, file.type); await saveSampleMeta(sample); }catch(e){} setStatus(sample.displayName + ' added to library'); }
   return sample;
 }
-/* ---- library: folders, tags, preview ---- */
-let libTagFilter = new Set(), libClosed = new Set(), libExpanded = null;
-let previewId = null, previewSrc = null, previewStart = 0, previewRaf = null;
+/* ---- LIBRARY v10.9: USB pack strip · mood row · waveform rows (tap = play / tap again = stop + close) · hold = edit · custom folders · hidden ---- */
+/* every THREAT audio pack = a USB. A pack unlocks by itself when its folder shows up in samples/ (WARBLOOM/, TUNER DEMO/ …) */
+const TUNER_PACKS = [
+  { name:'WARBLOOM', c:'#d32f2f', folders:['WARBLOOM'] },
+  { name:'DEMO', c:'#4fd1a5', folders:['TUNER DEMO'] },
+  { name:'STARTER', c:'#f2ede2', folders:['Drums','Bass','Melodic','FX','Library'] },
+  ...['BLOODPETAL','BOOST','IRONFLOOR','RAW','WAVE','CHAOS','CHROME','DESTRUKTION','HIGH ENERGY','HOUSE HITZ','HYBRID BASS','PSYCHEDELIK','RAID','SATURATED DRUMS','SINISTER SOUND','TOUGH TONEZ'].map(n=>({ name:n, c:'#ff9600', folders:[n] }))
+];
+let libTagFilter = new Set(), libEdit = null, libShowHidden = false, libNaming = null, libSearchOpen = false;
+let libSel = 'ALL'; try{ libSel = localStorage.getItem('tuner_libSel') || 'ALL'; }catch(e){}
+let cfolders = [];   /* custom folders: [{ id, name, ids:[sampleId…] }] — the user's own packs */
+let previewId = null, previewSrc = null, previewStart = 0, previewDur = 1, previewRaf = null;
 const previewGain = ctx.createGain(); previewGain.gain.value = 0.9; previewGain.connect(masterGain);
 function moodClass(t){ return MOODS.includes(t) ? ' m-' + t : ''; }
-function stopPreview(){ if(previewSrc){ try{ previewSrc.stop(); }catch(e){} previewSrc = null; } previewId = null; if(previewRaf){ cancelAnimationFrame(previewRaf); previewRaf = null; } if(!isRunning){ lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; masterPeak = 0; masterData.fill(0); vizCaps.fill(0); } document.querySelectorAll('.lib-row.playing').forEach(r=>r.classList.remove('playing')); }
+async function loadCFolders(){ let v = null; try{ if(Store.mode !== 'none') v = await Store.get('cfolders'); }catch(e){} if(!v){ try{ v = JSON.parse(localStorage.getItem('tuner_cfolders') || 'null'); }catch(e){} } cfolders = Array.isArray(v) ? v : []; renderLibrary(); }
+function saveCFolders(){ try{ if(Store.mode !== 'none') Store.set('cfolders', cfolders).catch(()=>{}); }catch(e){} try{ localStorage.setItem('tuner_cfolders', JSON.stringify(cfolders)); }catch(e){} }
+function packOf(smp){ if(!smp.builtin) return 'MY SAMPLES'; const f = (smp.folder||'').split(' / ')[0]; const p = TUNER_PACKS.find(p=>p.folders.some(x=>x.toUpperCase() === f.toUpperCase())); return p ? p.name : f.toUpperCase(); }
+function inSel(smp, sel){ if(sel === 'ALL') return true; if(sel === 'MY') return !smp.builtin; if(sel.startsWith('cf:')){ const f = cfolders.find(x=>'cf:'+x.id === sel); return !!f && f.ids.includes(smp.id); } if(sel.startsWith('pk:')) return smp.builtin && packOf(smp) === sel.slice(3); return false; }
+function setLibSel(s){ libSel = s; libEdit = null; libShowHidden = false; try{ localStorage.setItem('tuner_libSel', s); }catch(e){} renderLibrary(); }
+function stopPreview(){ if(previewSrc){ try{ previewSrc.stop(); }catch(e){} previewSrc = null; } const was = previewId; previewId = null; if(previewRaf){ cancelAnimationFrame(previewRaf); previewRaf = null; } if(!isRunning){ lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; masterPeak = 0; masterData.fill(0); vizCaps.fill(0); } document.querySelectorAll('.lrow.playing').forEach(r=>r.classList.remove('playing')); if(was){ const s = samples.find(x=>x.id===was); if(s) drawRow(s); } }
+/* preview at the SONG tempo once a song is going (same stretch engine as the timeline, cached) */
+function previewBuffer(s){ if(!channels.length || !s.buffer) return s.buffer; const f = loopBeats(s) * beatSec() / s.buffer.duration; if(Math.abs(f - 1) < 0.002) return s.buffer; if(!s._st) s._st = new Map(); const key = f.toFixed(4); let b = s._st.get(key); if(!b){ b = wsola(s.buffer, f); if(s._st.size > 12) s._st.delete(s._st.keys().next().value); s._st.set(key, b); } return b; }
 async function startPreview(sample){
   await unlockAudio(); if(ctx.state !== 'running'){ try{ await ctx.resume(); }catch(e){} }
   stopPreview();
-  if(!sample.buffer){ setStatus('loading ' + sample.displayName + '…'); await ensureLoaded(sample); if(!sample.buffer) return; }
-  const src = ctx.createBufferSource(); src.buffer = sample.buffer; src.loop = true; src.connect(previewGain); src.start(); previewSrc = src; previewId = sample.id; previewStart = ctx.currentTime;
-  const row = document.querySelector('.lib-row[data-id="' + sample.id + '"]'); if(row) row.classList.add('playing');
-  const loop = ()=>{ if(previewId !== sample.id) return; drawPreview(sample); if(!isRunning){ updateLufs(); masterPeak = peakOf(analyserMaster, masterData); } previewRaf = requestAnimationFrame(loop); }; loop();
+  previewId = sample.id; const row0 = document.querySelector('.lrow[data-id="' + sample.id + '"]'); if(row0) row0.classList.add('playing');
+  if(!sample.buffer){ setStatus('loading ' + sample.displayName + '…'); await ensureLoaded(sample); if(!sample.buffer || previewId !== sample.id) return; }
+  const buf = previewBuffer(sample); if(previewId !== sample.id) return;
+  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(previewGain); src.start(); previewSrc = src; previewStart = ctx.currentTime; previewDur = buf.duration;
+  const row = document.querySelector('.lrow[data-id="' + sample.id + '"]'); if(row) row.classList.add('playing');
+  const loop = ()=>{ if(previewId !== sample.id) return; drawRow(sample); if(!isRunning){ updateLufs(); masterPeak = peakOf(analyserMaster, masterData); } previewRaf = requestAnimationFrame(loop); }; loop();
 }
-function drawPreview(sample){
-  if(!sample.peaks) return;
-  const c = document.querySelector('.lib-detail canvas[data-id="' + sample.id + '"]'); if(!c) return; const x = c.getContext('2d'); const sz = fitCanvas(c, x); if(!sz) return; const {w,h} = sz;
-  x.clearRect(0,0,w,h); const pk = sample.peaks, N = pk.length/2, mid = h/2, amp = h*0.46;
-  x.fillStyle = 'rgba(211,47,47,.8)'; for(let p=0;p<w;p++){ const i0 = Math.floor(p/w*N), i1 = Math.max(i0+1, Math.floor((p+1)/w*N)); let mn = 1, mx = -1; for(let q=i0;q<i1&&q<N;q++){ if(pk[q*2]<mn) mn = pk[q*2]; if(pk[q*2+1]>mx) mx = pk[q*2+1]; } if(mx<mn){ mn=0; mx=0; } x.fillRect(p, mid - mx*amp, 1, Math.max(1, (mx-mn)*amp)); }
-  const beats = sample.bpm && sample.buffer ? sample.buffer.duration/(60/sample.bpm) : 0; if(beats > 0 && beats < 64){ x.strokeStyle = 'rgba(242,237,226,.12)'; for(let b=1;b<beats;b++){ const px = Math.round(b/beats*w)+.5; x.beginPath(); x.moveTo(px, b%4===0?0:h*0.7); x.lineTo(px, h); x.stroke(); } }
-  if(previewId === sample.id){ const t = ((ctx.currentTime - previewStart) % sample.buffer.duration)/sample.buffer.duration; const px = t*w; x.fillStyle = 'rgba(211,47,47,.15)'; x.fillRect(0,0,px,h); x.strokeStyle = '#f2ede2'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(px,0); x.lineTo(px,h); x.stroke(); }
+/* row waveform: from the loaded audio, or from the peaks baked into samples/index.json (no download needed) */
+function rowPeaks(s){
+  if(s._rp && s._rpFrom === (s.peaks ? 'a' : 'i')) return s._rp;
+  let out = null;
+  if(s.peaks){ const pk = s.peaks, N = pk.length/2, n = 96; out = new Float32Array(n); let top = 0; for(let i=0;i<n;i++){ const a = Math.floor(i/n*N), z = Math.max(a+1, Math.floor((i+1)/n*N)); let m = 0; for(let q=a;q<z&&q<N;q++){ m = Math.max(m, Math.abs(pk[q*2]), Math.abs(pk[q*2+1])); } out[i] = m; top = Math.max(top, m); } if(top) for(let i=0;i<n;i++) out[i] /= top; s._rpFrom = 'a'; }
+  else if(s.lpk){ out = Float32Array.from(s.lpk, v=>v/99); s._rpFrom = 'i'; }
+  s._rp = out; return out;
 }
-function libMatches(smp){ if(smp.hidden) return false; const q = ($('librarySearch').value||'').trim().toLowerCase(); if(q){ const hay = (smp.displayName + ' ' + (smp.key||'') + ' ' + (smp.bpm||'') + ' ' + smp.folder + ' ' + smp.tags.join(' ')).toLowerCase(); if(!hay.includes(q)) return false; } for(const t of libTagFilter){ if(!smp.tags.includes(t)) return false; } return true; }
+function drawRow(s, cv){
+  const c = cv || document.querySelector('.lrow[data-id="' + s.id + '"] canvas'); if(!c) return; const x = c.getContext('2d'); const sz = fitCanvas(c, x); if(!sz) return; const {w,h} = sz;
+  x.clearRect(0,0,w,h); const pk = rowPeaks(s), mid = h/2, amp = h*0.44;
+  const playing = previewId === s.id && previewSrc; const t = playing ? ((ctx.currentTime - previewStart) % previewDur)/previewDur : -1; const px = t*w;
+  if(pk){ const n = pk.length, bw = w/n; for(let i=0;i<n;i++){ const bx = i*bw; const v = Math.max(0.03, pk[i]); x.fillStyle = playing && bx < px ? 'rgba(211,47,47,.95)' : (playing ? 'rgba(211,47,47,.45)' : 'rgba(211,47,47,.32)'); x.fillRect(bx + bw*0.15, mid - v*amp, Math.max(1, bw*0.7), v*amp*2); } }
+  else { x.fillStyle = 'rgba(211,47,47,.25)'; x.fillRect(0, mid-0.5, w, 1); }
+  if(playing){ x.fillStyle = '#f2ede2'; x.fillRect(px, 0, 1.5, h); }
+}
+function libMatches(smp){ if(!!smp.hidden !== libShowHidden) return false; if(!inSel(smp, libSel)) return false; const q = ($('librarySearch').value||'').trim().toLowerCase(); if(q){ const hay = (smp.displayName + ' ' + (smp.key||'') + ' ' + (smp.bpm||'') + ' ' + smp.folder + ' ' + smp.tags.join(' ')).toLowerCase(); if(!hay.includes(q)) return false; } for(const t of libTagFilter){ if(!smp.tags.includes(t)) return false; } return true; }
+function usb(label, sub, opts={}){
+  const u = el('div','usb' + (opts.on?' on':'') + (opts.locked?' locked':'') + (opts.add?' add':'')); u.dataset.k = 'USB';
+  if(opts.c) u.style.setProperty('--c', opts.c);
+  u.innerHTML = '<div class="plug"><i></i><i></i></div><div class="body"><span class="stripe"></span><b></b><small></small><span class="led"></span></div>';
+  const lb = u.querySelector('b'); lb.textContent = label; if(label.length > 11) lb.classList.add('xl'); else if(label.length > 7) lb.classList.add('l'); u.querySelector('small').textContent = sub;
+  let t = null, held = false;
+  if(opts.hold){ u.addEventListener('pointerdown', ()=>{ held = false; t = setTimeout(()=>{ held = true; opts.hold(); }, 600); }); ['pointerup','pointerleave','pointercancel'].forEach(ev=>u.addEventListener(ev, ()=>clearTimeout(t))); }
+  u.addEventListener('click', ()=>{ if(held){ held = false; return; } opts.tap && opts.tap(); });
+  return u;
+}
+function renderUsbStrip(){
+  const st = $('usbStrip'); if(!st) return; const keep = st.scrollLeft; st.innerHTML = '';
+  const vis = samples.filter(s=>!s.hidden);
+  st.appendChild(usb('ALL', vis.length + '', { on: libSel==='ALL', c:'#f2ede2', tap:()=>setLibSel('ALL') }));
+  st.appendChild(usb('MY SAMPLES', vis.filter(s=>!s.builtin).length + '', { on: libSel==='MY', c:'#4fd1a5', tap:()=>setLibSel('MY') }));
+  cfolders.forEach(f=> st.appendChild(usb(f.name, f.ids.filter(id=>{ const x = samples.find(s=>s.id===id); return x && !x.hidden; }).length + '', { on: libSel==='cf:'+f.id, c:'#4fd1a5', tap:()=>setLibSel('cf:'+f.id), hold:()=>ask('delete the folder ' + f.name + '? (the sounds stay in the library)', ()=>{ cfolders = cfolders.filter(x=>x!==f); saveCFolders(); if(libSel === 'cf:'+f.id) libSel = 'ALL'; renderLibrary(); }) })));
+  st.appendChild(usb('+ NEW', 'folder', { add:true, tap:()=>{ libNaming = { forId:null }; renderLibrary(); setTimeout(()=>{ const i = $('libNameIn'); if(i) i.focus(); }, 30); } }));
+  const have = new Map(); samples.filter(s=>s.builtin && !s.hidden).forEach(s=>{ const p = packOf(s); have.set(p, (have.get(p)||0) + 1); });
+  const known = TUNER_PACKS.map(p=>p.name); const extra = [...have.keys()].filter(n=>!known.includes(n)).map(n=>({ name:n, c:'#d32f2f' }));
+  const unlocked = [...TUNER_PACKS.filter(p=>have.has(p.name)), ...extra], locked = TUNER_PACKS.filter(p=>!have.has(p.name));
+  unlocked.forEach(p=> st.appendChild(usb(p.name, have.get(p.name) + '', { on: libSel==='pk:'+p.name, c:p.c, tap:()=>setLibSel('pk:'+p.name) })));
+  locked.forEach(p=> st.appendChild(usb(p.name, 'LOCKED', { locked:true, on: libSel==='pk:'+p.name, tap:()=>setLibSel('pk:'+p.name) })));
+  st.scrollLeft = keep;
+}
 function renderLibrary(){
   const tagsBox = $('libTags'), list = $('libList'); if(!tagsBox || !list) return;
-  const allTags = [...new Set(samples.filter(x=>!x.hidden).flatMap(x=>x.tags))]; const ordered = [...MOODS.filter(m=>allTags.includes(m)), ...allTags.filter(t=>!MOODS.includes(t)).sort()];
-  tagsBox.innerHTML = ''; ordered.forEach(t=>{ const c = el('div','chip' + moodClass(t) + (libTagFilter.has(t)?' on':'')); c.textContent = t; c.addEventListener('click', ()=>{ if(libTagFilter.has(t)) libTagFilter.delete(t); else libTagFilter.add(t); renderLibrary(); }); tagsBox.appendChild(c); });
+  renderUsbStrip();
+  /* naming a new folder */
+  const nm = $('libName'); if(nm){ nm.classList.toggle('open', !!libNaming); }
+  /* mood row (horizontal) — only moods that exist in this USB, + "hidden (n)" when something is hidden */
+  const here = samples.filter(s=>!s.hidden && inSel(s, libSel)); const have = new Set(here.flatMap(s=>s.tags));
+  [...libTagFilter].forEach(t=>{ if(!have.has(t)) libTagFilter.delete(t); });
+  tagsBox.innerHTML = '';
+  MOODS.filter(m=>have.has(m)).forEach(t=>{ const c = el('div','chip' + moodClass(t) + (libTagFilter.has(t)?' on':'')); c.textContent = t; c.dataset.k = 'MOOD'; c.addEventListener('click', ()=>{ if(libTagFilter.has(t)) libTagFilter.delete(t); else libTagFilter.add(t); libEdit = null; renderLibrary(); }); tagsBox.appendChild(c); });
+  const nh = samples.filter(s=>s.hidden && inSel(s, libSel)).length;
+  if(nh || libShowHidden){ const c = el('div','chip hid' + (libShowHidden?' on':'')); c.textContent = 'hidden ' + nh; c.addEventListener('click', ()=>{ libShowHidden = !libShowHidden; libEdit = null; renderLibrary(); }); tagsBox.appendChild(c); }
+  tagsBox.style.display = tagsBox.children.length ? '' : 'none';
+  /* rows */
   list.innerHTML = '';
+  if(libSel.startsWith('pk:') && !samples.some(s=>s.builtin && packOf(s) === libSel.slice(3))){ list.innerHTML = '<div class="lib-empty locked"><b>🔒 ' + libSel.slice(3).replace(/</g,'') + '</b><br>LOCKED — coming to TUNER</div>'; return; }
   const vis = samples.filter(libMatches);
-  if(!vis.length){ list.innerHTML = '<div class="lib-empty">' + (samples.length ? 'nothing matches' : 'no samples yet — tap + add') + '</div>'; return; }
-  const folders = [...new Set(vis.map(x=>x.folder))].sort((a,b)=> (a==='My samples'?-1:b==='My samples'?1:a.localeCompare(b)));
-  folders.forEach(fd=>{
-    const items = vis.filter(x=>x.folder===fd); const closed = libClosed.has(fd);
-    const fh = el('div','lib-folder'); fh.innerHTML = '<span class="car">' + (closed?'▶':'▼') + '</span><b></b><span class="n">' + items.length + '</span>'; fh.querySelector('b').textContent = fd; fh.addEventListener('click', ()=>{ if(closed) libClosed.delete(fd); else libClosed.add(fd); renderLibrary(); }); list.appendChild(fh);
-    if(closed) return;
-    items.forEach(smp=>{
-      const row = el('div','lib-row' + (previewId===smp.id?' playing':'')); row.dataset.id = smp.id;
-      const th = el('div','thumb'); if(smp.waveImg) th.style.backgroundImage = `url(${smp.waveImg})`; else { th.textContent = smp._loading ? '…' : '↓'; th.style.cssText += 'display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--dim)'; }
-      const info = el('div','info'); const nm = el('div','nm'); nm.textContent = smp.displayName; const meta = el('div','meta'); meta.innerHTML = `<span>${smp.bpm||'?'} bpm</span>${smp.key?'<span>· '+smp.key+'</span>':''}${smp.buffer?'<span>· '+fmtLen(smp.buffer.duration)+'</span>':''}`; smp.tags.slice(0,3).forEach(t=>{ const c = el('span','chip sm' + moodClass(t)); c.textContent = t; meta.appendChild(c); }); info.append(nm, meta);
-      const add = el('button','add'); add.textContent = '+'; add.title = 'add to track'; add.addEventListener('click', e=>{ e.stopPropagation(); addChannelFromSample(smp); setStatus(smp.displayName + ' → track'); });
-      row.append(th, info, add);
-      row.addEventListener('click', ()=>{ if(libExpanded === smp.id){ if(previewId === smp.id) stopPreview(); else startPreview(smp); } else { libExpanded = smp.id; startPreview(smp); } renderLibrary(); });
-      list.appendChild(row);
-      if(libExpanded === smp.id) list.appendChild(buildDetail(smp));
-    });
+  if(!vis.length){ list.innerHTML = '<div class="lib-empty">' + (libShowHidden ? 'nothing hidden here' : libSel.startsWith('cf:') ? 'empty folder — hold a sound → FOLDER → tap this one' : libSel === 'MY' ? 'your own sounds land here — tap + in the dock' : samples.length ? 'nothing matches' : 'no samples yet') + '</div>'; return; }
+  let lastPack = null;
+  vis.forEach(smp=>{
+    if(libSel === 'ALL'){ const p = packOf(smp); if(p !== lastPack){ const hd = el('div','lib-sec'); hd.textContent = p; list.appendChild(hd); lastPack = p; } }
+    list.appendChild(libRow(smp));
+    if(libEdit === smp.id) list.appendChild(buildEdit(smp));
   });
-  if(previewId){ const smp = samples.find(x=>x.id===previewId); if(smp) drawPreview(smp); }
 }
-function buildDetail(smp){
+function libRow(smp){
+  const row = el('div','lrow' + (previewId===smp.id?' playing':'') + (libEdit===smp.id?' editing':'')); row.dataset.id = smp.id; row.dataset.k = 'LIB ROW';
+  const cv = document.createElement('canvas');
+  const tx = el('div','txt'); const nm = el('div','nm'); nm.textContent = smp.displayName; const meta = el('div','meta'); meta.textContent = [(smp.bpm||'?') + ' BPM', smp.key, smp.buffer ? fmtLen(smp.buffer.duration) : null].filter(Boolean).join(' · '); tx.append(nm, meta);
+  const add = el('button','add'); add.dataset.k = libShowHidden ? 'UNHIDE' : 'LIB +'; add.textContent = libShowHidden ? '↺' : '+'; add.title = libShowHidden ? 'back in the library' : 'add to track';
+  add.addEventListener('click', e=>{ e.stopPropagation(); if(libShowHidden){ smp.hidden = false; saveSampleMeta(smp); setStatus(smp.displayName + ' is back'); renderLibrary(); return; } addChannelFromSample(smp); setStatus(smp.displayName + ' → track'); });
+  add.addEventListener('pointerdown', e=>e.stopPropagation());
+  row.append(cv, tx, add);
+  let t = null, held = false, sx = 0, sy = 0;
+  row.addEventListener('pointerdown', e=>{ held = false; sx = e.clientX; sy = e.clientY; clearTimeout(t); t = setTimeout(()=>{ held = true; try{ navigator.vibrate && navigator.vibrate(12); }catch(_){} libEdit = libEdit === smp.id ? null : smp.id; libNaming = null; renderLibrary(); }, 450); });
+  row.addEventListener('pointermove', e=>{ if(Math.abs(e.clientX-sx) > 8 || Math.abs(e.clientY-sy) > 8) clearTimeout(t); });
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>row.addEventListener(ev, ()=>clearTimeout(t)));
+  row.addEventListener('contextmenu', e=>e.preventDefault());
+  row.addEventListener('click', ()=>{ if(held){ held = false; return; }
+    if(previewId === smp.id){ stopPreview(); libEdit = null; libNaming = null; renderLibrary(); }   /* tap again = stop + close everything */
+    else { libEdit = null; libNaming = null; renderLibrary(); startPreview(smp); } });
+  requestAnimationFrame(()=>drawRow(smp, cv));
+  return row;
+}
+/* HOLD = edit (slim): name · (your own sounds: bpm/key) · folders · moods · hide/remove */
+function buildEdit(smp){
   const d = el('div','lib-detail');
-  const c = document.createElement('canvas'); c.dataset.id = smp.id; d.appendChild(c); c.addEventListener('click', ()=>{ if(previewId===smp.id) stopPreview(); else startPreview(smp); renderLibrary(); });
   const r1 = el('div','drow'); r1.innerHTML = '<label>NAME</label>'; const nameI = document.createElement('input'); nameI.type='text'; nameI.value = smp.displayName; nameI.style.flex='1'; nameI.addEventListener('change', ()=>{ smp.displayName = nameI.value.trim() || smp.displayName; saveSampleMeta(smp); renderLibrary(); }); r1.appendChild(nameI); d.appendChild(r1);
-  const r2 = el('div','drow'); r2.innerHTML = '<label>BPM</label>'; const bpmI = document.createElement('input'); bpmI.type='number'; bpmI.value = smp.bpm||''; bpmI.style.width='60px'; bpmI.placeholder='?'; bpmI.addEventListener('change', ()=>{ smp.bpm = +bpmI.value || null; saveSampleMeta(smp); renderLibrary(); }); const kl = el('label'); kl.textContent = 'KEY'; const keyI = document.createElement('input'); keyI.type='text'; keyI.value = smp.key||''; keyI.style.width='64px'; keyI.placeholder='Fmin'; keyI.addEventListener('change', ()=>{ smp.key = keyI.value.trim() || null; saveSampleMeta(smp); renderLibrary(); }); const fl = el('label'); fl.textContent = 'FOLDER'; const fI = document.createElement('input'); fI.type='text'; fI.value = smp.folder; fI.style.flex='1'; fI.setAttribute('list','folderList'); fI.addEventListener('change', ()=>{ smp.folder = fI.value.trim() || 'My samples'; saveSampleMeta(smp); renderLibrary(); }); r2.append(bpmI, kl, keyI, fl, fI); d.appendChild(r2);
-  let dl = $('folderList'); if(!dl){ dl = document.createElement('datalist'); dl.id = 'folderList'; document.body.appendChild(dl); } dl.innerHTML = [...new Set(samples.map(x=>x.folder))].map(f=>`<option value="${f.replace(/"/g,'&quot;')}">`).join('');
-  const r3 = el('div','drow'); r3.innerHTML = '<label>MOOD</label>'; const tb = el('div','tagbox'); MOODS.forEach(m=>{ const ch = el('div','chip' + moodClass(m) + (smp.tags.includes(m)?' on':'')); ch.textContent = m; ch.addEventListener('click', ()=>{ if(smp.tags.includes(m)) smp.tags = smp.tags.filter(t=>t!==m); else smp.tags = [...smp.tags, m]; saveSampleMeta(smp); renderLibrary(); }); tb.appendChild(ch); }); r3.appendChild(tb); d.appendChild(r3);
-  const r4 = el('div','drow'); r4.innerHTML = '<label>TAGS</label>'; const tb2 = el('div','tagbox'); smp.tags.filter(t=>!MOODS.includes(t)).forEach(t=>{ const ch = el('div','chip on'); ch.textContent = t + ' ×'; ch.addEventListener('click', ()=>{ smp.tags = smp.tags.filter(x=>x!==t); saveSampleMeta(smp); renderLibrary(); }); tb2.appendChild(ch); }); const tagI = document.createElement('input'); tagI.type='text'; tagI.placeholder='+ tag'; tagI.style.width='72px'; tagI.addEventListener('keydown', e=>{ if(e.key==='Enter'){ const t = tagI.value.trim().toLowerCase(); if(t && !smp.tags.includes(t)){ smp.tags = [...smp.tags, t]; saveSampleMeta(smp); renderLibrary(); } tagI.value=''; } }); tb2.appendChild(tagI); r4.appendChild(tb2); d.appendChild(r4);
-  const bt = el('div','dbtns'); const addB = el('button','btn-primary'); addB.textContent = '+ add to track'; addB.addEventListener('click', ()=>{ addChannelFromSample(smp); setStatus(smp.displayName + ' → track'); }); const rmB = el('button','btn-ghost'); rmB.textContent = smp.builtin ? 'hide' : 'remove'; rmB.addEventListener('click', ()=>{ if(previewId===smp.id) stopPreview(); if(smp.builtin){ smp.hidden = true; saveSampleMeta(smp); } else { samples = samples.filter(x=>x.id!==smp.id); Store.del('sample:'+smp.id).catch(()=>{}); Store.del('smeta:'+smp.id).catch(()=>{}); } libExpanded = null; renderLibrary(); markDirty(); }); bt.append(addB, rmB); d.appendChild(bt);
-  requestAnimationFrame(()=>drawPreview(smp));
+  if(!smp.builtin){ const r2 = el('div','drow'); r2.innerHTML = '<label>BPM</label>'; const bpmI = document.createElement('input'); bpmI.type='number'; bpmI.value = smp.bpm||''; bpmI.style.width='64px'; bpmI.placeholder='?'; bpmI.addEventListener('change', ()=>{ smp.bpm = +bpmI.value || null; smp._gbpm = undefined; saveSampleMeta(smp); renderLibrary(); }); const kl = el('label'); kl.textContent = 'KEY'; const keyI = document.createElement('input'); keyI.type='text'; keyI.value = smp.key||''; keyI.style.width='64px'; keyI.placeholder='Fmin'; keyI.addEventListener('change', ()=>{ smp.key = keyI.value.trim() || null; saveSampleMeta(smp); renderLibrary(); }); r2.append(bpmI, kl, keyI); d.appendChild(r2); }
+  const r3 = el('div','drow'); r3.innerHTML = '<label>FOLDER</label>'; const fb = el('div','tagbox');
+  cfolders.forEach(f=>{ const on = f.ids.includes(smp.id); const ch = el('div','chip' + (on?' on':'')); ch.textContent = f.name; ch.addEventListener('click', ()=>{ if(on) f.ids = f.ids.filter(x=>x!==smp.id); else f.ids.push(smp.id); saveCFolders(); setStatus(on ? 'out of ' + f.name : smp.displayName + ' → ' + f.name); renderLibrary(); }); fb.appendChild(ch); });
+  const nw = el('div','chip'); nw.textContent = '+ new'; nw.addEventListener('click', ()=>{ libNaming = { forId:smp.id }; renderLibrary(); setTimeout(()=>{ const i = $('libNameIn'); if(i) i.focus(); }, 30); }); fb.appendChild(nw);
+  r3.appendChild(fb); d.appendChild(r3);
+  const r4 = el('div','drow'); r4.innerHTML = '<label>MOOD</label>'; const tb = el('div','tagbox'); MOODS.forEach(m=>{ const ch = el('div','chip' + moodClass(m) + (smp.tags.includes(m)?' on':'')); ch.textContent = m; ch.addEventListener('click', ()=>{ if(smp.tags.includes(m)) smp.tags = smp.tags.filter(t=>t!==m); else smp.tags = [...smp.tags, m]; saveSampleMeta(smp); renderLibrary(); }); tb.appendChild(ch); }); r4.appendChild(tb); d.appendChild(r4);
+  const bt = el('div','dbtns'); const rmB = el('button','btn-ghost'); rmB.textContent = smp.builtin ? 'hide' : 'remove';
+  rmB.addEventListener('click', ()=>{ if(previewId===smp.id) stopPreview(); if(smp.builtin){ smp.hidden = true; saveSampleMeta(smp); setStatus('hidden — find it under "hidden"'); } else { samples = samples.filter(x=>x.id!==smp.id); Store.del('sample:'+smp.id).catch(()=>{}); Store.del('smeta:'+smp.id).catch(()=>{}); cfolders.forEach(f=>{ f.ids = f.ids.filter(x=>x!==smp.id); }); saveCFolders(); } libEdit = null; renderLibrary(); markDirty(); });
+  const done = el('button','btn-primary'); done.textContent = 'done'; done.addEventListener('click', ()=>{ libEdit = null; renderLibrary(); });
+  bt.append(rmB, done); d.appendChild(bt);
   return d;
 }
+function makeFolder(){ const i = $('libNameIn'); const name = (i.value||'').trim().toUpperCase().slice(0,14); if(!name){ libNaming = null; renderLibrary(); return; } const f = { id: Date.now().toString(36), name, ids: [] }; if(libNaming && libNaming.forId) f.ids.push(libNaming.forId); cfolders.push(f); saveCFolders(); i.value = ''; libNaming = null; setStatus(name + ' made' + (f.ids.length ? ' — sound added' : '')); if(!f.ids.length) setLibSel('cf:' + f.id); else renderLibrary(); }
+$('libNameOk').addEventListener('click', makeFolder);
+$('libNameIn').addEventListener('keydown', e=>{ if(e.key === 'Enter') makeFolder(); if(e.key === 'Escape'){ libNaming = null; renderLibrary(); } });
+$('libSearchBtn').addEventListener('click', ()=>{ libSearchOpen = !libSearchOpen; $('libSearchWrap').classList.toggle('open', libSearchOpen); if(libSearchOpen) $('librarySearch').focus(); else { $('librarySearch').value = ''; renderLibrary(); } });
+
 function renderWaveformImage(buffer){ const w=180, h=60, dpr=2; const c=document.createElement('canvas'); c.width=w*dpr; c.height=h*dpr; const g=c.getContext('2d'); g.scale(dpr,dpr); const data=buffer.getChannelData(0); const bars=120, step=Math.max(1,Math.floor(data.length/bars)), mid=h/2; for(let i=0;i<bars;i++){ let min=0,max=0; for(let j=0;j<step;j++){ const v=data[i*step+j]||0; if(v>max)max=v; if(v<min)min=v; } const yTop=mid+min*mid*0.92, yBot=mid+max*mid*0.92; g.fillStyle='#d32f2f'; const bw=Math.max(1,(w/bars)*0.72), x=i*(w/bars); g.fillRect(x, Math.min(yTop,yBot), bw, Math.max(1,Math.abs(yBot-yTop))); } return c.toDataURL('image/png'); }
 
 /* ================= CHANNELS & CLIPS ================= */

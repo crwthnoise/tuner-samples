@@ -328,7 +328,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.4';
+const APP_VERSION = 'v10.5';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -915,7 +915,7 @@ function updateChannelGain(ch){ let target = (isRunning && !ch.mute) ? ch.volume
 function advanceSidechain(now, beat){ if(!sidechainTrigger){ duckNow = 0; trigLevel = 0; wasHot = false; return; } const pos = samplePosAt(sidechainTrigger, beat); trigPos = pos < 0 ? 0 : pos; trigLevel = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); const hot = triggerHot(); if(hot){ duckNow = scDepth; releaseStart = now; } else { const p = (now - releaseStart) / Math.max(0.001, scRelease); duckNow = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } wasHot = hot; }
 let playheadRaf = null, songTimer = null;
 function tick(){ const now = ctx.currentTime; const end = songEndBeats(); const endAt = songStartTime + (end - startBeat)*beatSec(); if(!nextPass && endAt - now < 0.25 && endAt > now) queueNextPass(endAt); if(nextPass && now >= nextPass.at){ songStartTime = nextPass.at; startBeat = 0; channels.forEach(ch=>{ ch.sources = ch.nextSources || []; ch.nextSources = null; }); nextPass = null; } const beat = currentBeat(); if(beat >= end){ scheduleFrom(0); return; } advanceSidechain(now, beat); channels.forEach(ch=>{ ch.lastPeakLevel = peakOf(ch.analyser, ch.dataArray); updateChannelGain(ch); }); }
-function frame(){ tick(); updateLufs(); masterPeak = peakOf(analyserMaster, masterData); drawAll(); if(isRunning) playheadRaf = requestAnimationFrame(frame); }
+function frame(){ tick(); updateLufs(); masterPeak = peakOf(analyserMaster, masterData); drawAll(); updatePumpDot(); if(isRunning) playheadRaf = requestAnimationFrame(frame); }
 function followPlayhead(){ const x = currentBeat()*zoomX - scrollX; const w = tl.clientWidth; if(x > w - 40){ scrollX = currentBeat()*zoomX - 40; clampScroll(); } else if(x < 0){ scrollX = Math.max(0, currentBeat()*zoomX - 40); } }
 async function ensureRunning(fromBeat){
   await unlockAudio(); if(ctx.state !== 'running'){ try{ await ctx.resume(); }catch(e){} }
@@ -927,7 +927,7 @@ async function ensureRunning(fromBeat){
   songTimer = setInterval(tick, 40);
   playheadRaf = requestAnimationFrame(frame);
 }
-function stopAll(){ isRunning = false; if(songTimer){ clearInterval(songTimer); songTimer = null; } if(playheadRaf){ cancelAnimationFrame(playheadRaf); playheadRaf = null; } setPlay(false); stopSources(); const t = ctx.currentTime; channels.forEach(ch=>{ ch.gainNode.gain.cancelScheduledValues(t); ch.gainNode.gain.setValueAtTime(0, t); ch.lastPeakLevel = 0; ch.dataArray.fill(0); }); masterPeak = 0; duckNow = 0; trigLevel = 0; masterData.fill(0); lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; vizCaps.fill(0); drawAll(); }
+function stopAll(){ isRunning = false; if(songTimer){ clearInterval(songTimer); songTimer = null; } if(playheadRaf){ cancelAnimationFrame(playheadRaf); playheadRaf = null; } setPlay(false); stopSources(); const t = ctx.currentTime; channels.forEach(ch=>{ ch.gainNode.gain.cancelScheduledValues(t); ch.gainNode.gain.setValueAtTime(0, t); ch.lastPeakLevel = 0; ch.dataArray.fill(0); }); masterPeak = 0; duckNow = 0; trigLevel = 0; masterData.fill(0); lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; vizCaps.fill(0); drawAll(); updatePumpDot(); }
 transportBtn.addEventListener('click', async ()=>{ try{ if(isRunning) stopAll(); else await ensureRunning(); }catch(err){ setStatus('error: ' + err.message); } });
 function moveTo(beat){ playBeat = clamp(beat, 0, Math.max(0, songEndBeats()-0.001)); if(isRunning) scheduleFrom(playBeat); drawTL(); }
 function seekTo(beat){ playBeat = clamp(beat, 0, Math.max(0, songEndBeats()-0.001)); if(isRunning) scheduleFrom(playBeat); else ensureRunning(playBeat); drawTL(); }
@@ -1109,11 +1109,24 @@ const CORE_LOOKS=[
  {n:'PITCH',v:.5,acc:'#f2ede2',face:CF,what:'digital touchscreen — semitone readout, drag the glass',screws:1,
   g:v=>{const st=Math.round((v-.5)*24);return `<div class="scr scan" style="inset:0 8%;background:#030604;border-color:#2a2724">${R(13,k=>{const n=6-k;const on=st>=0?(n>=0&&n*2<=st):(n<=0&&n*2>=st);return `<div style="position:absolute;left:8%;right:8%;top:${4+k*7.2}%;height:4%;border-radius:1px;background:${n===0?'#f2ede2':on?'#4fd1a5':'#0e1a14'};${on?'box-shadow:0 0 4px #4fd1a5':''}"></div>`})}<div style="position:absolute;left:0;right:0;bottom:4%;text-align:center;font:800 13cqw ui-monospace,monospace;color:#4fd1a5;text-shadow:0 0 6px #4fd1a5">${st>0?'+':''}${st}</div><div style="position:absolute;left:0;right:0;top:${50-(v-.5)*80}%;height:1px;background:#f2ede2;opacity:.5"></div></div>`}},
 ];
+/* PUMP face = duck-curve screen: one row per beat (a bar of 4), each row shows the dip + swell the PUMP does to the loop.
+   depth on screen = the real depth (gain = 1 − depth × (1−phase)^2.2). While playing, a dot rides the curve on the beat. */
+const PUMP_ROWS = 4, PUMP_Y0 = k=> 4 + k*20, PUMP_H = 15;
+function pumpY(k, ph, d){ return PUMP_Y0(k) + d*Math.pow(1 - ph, 2.2)*PUMP_H; }
+function pumpFace(v){ const d = v*0.95; let svg = '';
+  for(let k=0;k<PUMP_ROWS;k++){ const y0 = PUMP_Y0(k); let pts = `0,${y0} 0,${pumpY(k,0,d).toFixed(2)}`; for(let j=1;j<=24;j++){ const ph = j/24; pts += ` ${(ph*100).toFixed(1)},${pumpY(k,ph,d).toFixed(2)}`; }
+    svg += `<line x1="0" x2="100" y1="${y0}" y2="${y0}" stroke="#3a1414" stroke-width="1" vector-effect="non-scaling-stroke"/><line x1="0" x2="100" y1="${y0+PUMP_H}" y2="${y0+PUMP_H}" stroke="#1e0a0a" stroke-width="1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>`;
+    svg += `<polygon points="${pts} 100,${y0}" fill="rgba(255,77,77,${.12+v*.3})"/><polyline points="${pts}" fill="none" stroke="#ff4d4d" stroke-width="${1.5+v}" stroke-linejoin="round" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 ${2+v*5}px #ff4d4d)"/>`; }
+  return `<div class="scr scan" style="inset:0 8%;background:#0a0303;border-color:#2a1414"><svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">${svg}</svg><i class="pumpDot" style="position:absolute;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:#fff;box-shadow:0 0 6px 2px #ff4d4d;display:none;z-index:2"></i><div style="position:absolute;left:0;right:0;bottom:2%;text-align:center;font:800 12cqw ui-monospace,monospace;color:#ff4d4d;text-shadow:0 0 6px #ff4d4d;z-index:2">${Math.round(v*100)}</div></div>`; }
+function updatePumpDot(){ const i = MODS.findIndex(m=>m.n==='PUMP'); const w = rackEls[i]; if(!w) return; const dot = w.querySelector('.pumpDot'); if(!dot) return; const ch = selCh();
+  if(!isRunning || !ch){ dot.style.display = 'none'; return; }
+  const d = (ch.fx[MODS[i].fx]||0)*0.95, b = currentBeat(), k = Math.floor(b) % PUMP_ROWS, ph = b - Math.floor(b);
+  dot.style.display = ''; dot.style.left = (ph*100).toFixed(2) + '%'; dot.style.top = pumpY(k, ph, d).toFixed(2) + '%'; }
 const FX_LOOKS=[
  {n:'WIDE',v:.6,acc:'#7fd0ff',face:'linear-gradient(#141c22,#0a0e12)',what:'stereo width, pushes out to the sides',
   g:v=>`<div style="position:absolute;inset:0 6%;">${R(12,k=>{const lit=k<v*12;const w=6+k*3.4;const c=lit?'#7fd0ff':'#16202a';return `<div style="position:absolute;bottom:${k*8.2}%;left:${50-w}%;width:${w*2}%;height:6%;display:flex;justify-content:space-between"><i style="width:22%;background:${c};${lit?'box-shadow:0 0 6px #7fd0ff':''}"></i><i style="width:22%;background:${c};${lit?'box-shadow:0 0 6px #7fd0ff':''}"></i></div>`})}</div>`},
- {n:'PUMP',v:.55,acc:'#ff4d4d',face:'#140808',what:'sidechain breathing — runs on the SIDECHAIN engine',
-  g:v=>`<div style="position:absolute;inset:4% 14%;display:flex;flex-direction:column;justify-content:space-around;align-items:center">${R(5,k=>`<div style="width:${40+v*55*(k%2?0.6:1)}%;height:${14+v*6}%;border-radius:50%;background:radial-gradient(#ff8a8a,#ff4d4d 50%,#5a1010);box-shadow:0 0 ${v*20}px #ff4d4d"></div>`)}</div>`},
+ {n:'PUMP',v:.55,acc:'#ff4d4d',face:'#140808',what:'duck-curve screen — 4 beats, one dip each; more PUMP = deeper dips · the dot rides the curve in time',screws:1,
+  g:v=>pumpFace(v)},
  {n:'SUB',nw:'NEW',v:.7,acc:'#ff8a00',face:'radial-gradient(circle at 50% 75%,#2a1a08,#0d0904 70%)',what:'(was SUB DROP) sub churned fat + thick · compressed even, pushed to the max but clean',screws:1,
   g:v=>`<div style="position:absolute;top:0;left:14%;right:14%;height:46cqh;display:flex;flex-direction:column-reverse;gap:1.5cqh">${seg(8,v,(on,j)=>`<i style="flex:1;border-radius:2px;background:${on?'#ff8a00':'#24180a'};${on?'box-shadow:0 0 8px #ff8a00':''}"></i>`)}</div>
    <div style="position:absolute;left:50%;bottom:0;width:84cqw;height:84cqw;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle,#3a2a18 0 ${10+v*6}%,#0a0705 ${11+v*6}% ${13+v*6}%,#1c140c ${14+v*6}% 58%,#000 59% 62%,#4a3a28 63% 70%,#0a0705 71%);box-shadow:0 0 ${v*30}px #ff8a0066,inset 0 0 20px #000;transform:translateX(-50%) scale(${.92+v*.08})"></div>`},

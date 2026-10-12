@@ -171,21 +171,27 @@
   .hscroll{ display:flex; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior-x:contain; }
   .hscroll::-webkit-scrollbar{ display:none; }
   /* USB pack strip */
-  .usb-strip{ gap:10px; padding:4px 2px 10px; scroll-snap-type:x proximity; }
-  .usb{ --c:#f2ede2; flex:none; width:60px; display:flex; flex-direction:column; align-items:center; cursor:pointer; scroll-snap-align:start; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; transition:transform .15s; }
-  .usb .plug{ width:28px; height:15px; background:linear-gradient(90deg,#8d8a83,#eeece6 45%,#a9a69f); border:1px solid #000; border-bottom:none; border-radius:2px 2px 0 0; display:flex; justify-content:center; gap:6px; padding-top:4px; }
-  .usb .plug i{ width:5px; height:4px; background:#2a2724; border-radius:1px; }
-  .usb .body{ position:relative; width:60px; height:64px; border-radius:5px 5px 11px 11px; background:linear-gradient(#26221e,#0e0d0b); border:1px solid #000; box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 4px 8px #000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:6px 3px 8px; overflow:hidden; }
-  .usb .stripe{ position:absolute; top:6px; left:7px; right:7px; height:3px; border-radius:2px; background:var(--c); opacity:.85; }
-  .usb b{ font:700 8px/1.1 'Jura',sans-serif; letter-spacing:.06em; white-space:nowrap; max-width:56px; overflow:hidden; color:var(--text); text-align:center; margin-top:4px; }
-  .usb b.l{ font-size:7px; letter-spacing:.02em; } .usb b.xl{ font-size:6px; letter-spacing:0; white-space:normal; }
+  .usb-strip{ gap:12px; padding:6px 2px 8px; scroll-snap-type:x proximity; }
+  .usb{ --c:#f2ede2; flex:none; height:58px; display:flex; flex-direction:row; align-items:center; cursor:pointer; scroll-snap-align:start; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; transition:transform .15s; }
+  .usb .plug{ flex:none; width:13px; height:26px; background:linear-gradient(#8d8a83,#eeece6 45%,#a9a69f); border:1px solid #000; border-right:none; border-radius:2px 0 0 2px; display:flex; flex-direction:column; justify-content:center; gap:5px; padding-left:3px; }
+  .usb .plug i{ width:4px; height:5px; background:#2a2724; border-radius:1px; }
+  .usb .body{ position:relative; height:48px; width:84px; border-radius:6px 11px 11px 6px; background:linear-gradient(#26221e,#0e0d0b); border:1px solid #000; box-shadow:inset 0 1px 0 rgba(255,255,255,.09), 0 4px 8px #000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:0 6px 0 10px; overflow:hidden; }
+  .usb .stripe{ position:absolute; left:4px; top:8px; bottom:8px; width:3px; border-radius:2px; background:var(--c); opacity:.85; }
+  .usb b{ font:700 9px/1.1 'Jura',sans-serif; letter-spacing:.06em; white-space:nowrap; max-width:70px; overflow:hidden; color:var(--text); text-align:center; }
+  .usb b.l{ font-size:8px; letter-spacing:.02em; } .usb b.xl{ font-size:7px; letter-spacing:0; white-space:normal; }
   .usb small{ font:700 7px var(--mono); color:var(--dim); letter-spacing:.06em; }
-  .usb .led{ position:absolute; bottom:5px; width:4px; height:4px; border-radius:50%; background:#2f2a24; }
-  .usb.on{ transform:translateY(-4px); }
-  .usb.on .body{ border-color:var(--c); box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 1px var(--c), 0 6px 14px #000; }
+  .usb .led{ position:absolute; right:7px; top:50%; margin-top:-2px; width:4px; height:4px; border-radius:50%; background:#2f2a24; }
+  .usb.art .body{ width:auto; padding:0; background:#000; border:none; border-radius:9px; }
+  .usb.art .body img{ height:48px; width:auto; display:block; pointer-events:none; }
+  .usb.art .body b{ display:none; }
+  .usb.art .body small{ position:absolute; right:5px; bottom:3px; background:rgba(0,0,0,.75); border-radius:3px; padding:1px 4px; color:var(--text); }
+  .usb.art .led{ right:auto; left:6px; top:5px; margin:0; }
+  .usb.on{ transform:translateY(-3px); }
+  .usb.on .body{ box-shadow:0 0 0 1.5px var(--c), 0 6px 14px #000; }
   .usb.on .led{ background:var(--green); box-shadow:0 0 6px var(--green); }
-  .usb.locked{ opacity:.5; } .usb.locked .stripe{ background:#5a524a; } .usb.locked small{ color:var(--red); }
-  .usb.add .body{ background:transparent; border:1px dashed var(--border); box-shadow:none; } .usb.add .plug{ opacity:.35; } .usb.add b{ color:var(--green); }
+  .usb.locked .body img{ filter:grayscale(.85) brightness(.45); }
+  .usb.locked:not(.art){ opacity:.5; } .usb.locked small{ color:#ff6b6b !important; }
+  .usb.add .body{ width:62px; background:transparent; border:1px dashed var(--border); box-shadow:none; } .usb.add .plug{ opacity:.35; } .usb.add b{ color:var(--green); }
   .lib-name{ display:none; gap:6px; margin:-2px 0 8px; } .lib-name.open{ display:flex; }
   .lib-name button{ height:34px; padding:0 14px; }
   .lib-tags{ gap:5px; margin-bottom:8px; }
@@ -360,7 +366,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.9';
+const APP_VERSION = 'v10.10';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -732,12 +738,15 @@ async function addSample(file, opts={}){
 }
 /* ---- LIBRARY v10.9: USB pack strip · mood row · waveform rows (tap = play / tap again = stop + close) · hold = edit · custom folders · hidden ---- */
 /* every THREAT audio pack = a USB. A pack unlocks by itself when its folder shows up in samples/ (WARBLOOM/, TUNER DEMO/ …) */
+const PACK_ART = ['WARBLOOM','BOOST','IRONFLOOR','RAW','WAVE','CHAOS','CHROME','DESTRUKTION','HIGH ENERGY','HOUSE HITZ','HYBRID BASS','PSYCHEDELIK','RAID','SATURATED DRUMS','SINISTER SOUND','TOUGH TONEZ'];   /* icons/packs/<name>.webp = the real USB art from each pack's [INFO] folder */
+const packArt = n => PACK_ART.includes(n) ? 'icons/packs/' + n.toLowerCase().replace(/ /g,'-') + '.webp' : null;
 const TUNER_PACKS = [
   { name:'WARBLOOM', c:'#d32f2f', folders:['WARBLOOM'] },
   { name:'DEMO', c:'#4fd1a5', folders:['TUNER DEMO'] },
   { name:'STARTER', c:'#f2ede2', folders:['Drums','Bass','Melodic','FX','Library'] },
   ...['BLOODPETAL','BOOST','IRONFLOOR','RAW','WAVE','CHAOS','CHROME','DESTRUKTION','HIGH ENERGY','HOUSE HITZ','HYBRID BASS','PSYCHEDELIK','RAID','SATURATED DRUMS','SINISTER SOUND','TOUGH TONEZ'].map(n=>({ name:n, c:'#ff9600', folders:[n] }))
 ];
+const SHOW_MOODS = false;   /* mood chips parked until the real categories are set (same ones as the website filter) */
 let libTagFilter = new Set(), libEdit = null, libShowHidden = false, libNaming = null, libSearchOpen = false;
 let libSel = 'ALL'; try{ libSel = localStorage.getItem('tuner_libSel') || 'ALL'; }catch(e){}
 let cfolders = [];   /* custom folders: [{ id, name, ids:[sampleId…] }] — the user's own packs */
@@ -780,9 +789,10 @@ function drawRow(s, cv){
 }
 function libMatches(smp){ if(!!smp.hidden !== libShowHidden) return false; if(!inSel(smp, libSel)) return false; const q = ($('librarySearch').value||'').trim().toLowerCase(); if(q){ const hay = (smp.displayName + ' ' + (smp.key||'') + ' ' + (smp.bpm||'') + ' ' + smp.folder + ' ' + smp.tags.join(' ')).toLowerCase(); if(!hay.includes(q)) return false; } for(const t of libTagFilter){ if(!smp.tags.includes(t)) return false; } return true; }
 function usb(label, sub, opts={}){
-  const u = el('div','usb' + (opts.on?' on':'') + (opts.locked?' locked':'') + (opts.add?' add':'')); u.dataset.k = 'USB';
+  const u = el('div','usb' + (opts.on?' on':'') + (opts.locked?' locked':'') + (opts.add?' add':'') + (opts.art?' art':'')); u.dataset.k = 'USB';
   if(opts.c) u.style.setProperty('--c', opts.c);
-  u.innerHTML = '<div class="plug"><i></i><i></i></div><div class="body"><span class="stripe"></span><b></b><small></small><span class="led"></span></div>';
+  u.innerHTML = '<div class="plug"><i></i><i></i></div><div class="body">' + (opts.art ? '<img alt="" decoding="async">' : '<span class="stripe"></span>') + '<b></b><small></small><span class="led"></span></div>';
+  if(opts.art) u.querySelector('img').src = opts.art;
   const lb = u.querySelector('b'); lb.textContent = label; if(label.length > 11) lb.classList.add('xl'); else if(label.length > 7) lb.classList.add('l'); u.querySelector('small').textContent = sub;
   let t = null, held = false;
   if(opts.hold){ u.addEventListener('pointerdown', ()=>{ held = false; t = setTimeout(()=>{ held = true; opts.hold(); }, 600); }); ['pointerup','pointerleave','pointercancel'].forEach(ev=>u.addEventListener(ev, ()=>clearTimeout(t))); }
@@ -799,8 +809,8 @@ function renderUsbStrip(){
   const have = new Map(); samples.filter(s=>s.builtin && !s.hidden).forEach(s=>{ const p = packOf(s); have.set(p, (have.get(p)||0) + 1); });
   const known = TUNER_PACKS.map(p=>p.name); const extra = [...have.keys()].filter(n=>!known.includes(n)).map(n=>({ name:n, c:'#d32f2f' }));
   const unlocked = [...TUNER_PACKS.filter(p=>have.has(p.name)), ...extra], locked = TUNER_PACKS.filter(p=>!have.has(p.name));
-  unlocked.forEach(p=> st.appendChild(usb(p.name, have.get(p.name) + '', { on: libSel==='pk:'+p.name, c:p.c, tap:()=>setLibSel('pk:'+p.name) })));
-  locked.forEach(p=> st.appendChild(usb(p.name, 'LOCKED', { locked:true, on: libSel==='pk:'+p.name, tap:()=>setLibSel('pk:'+p.name) })));
+  unlocked.forEach(p=> st.appendChild(usb(p.name, have.get(p.name) + '', { on: libSel==='pk:'+p.name, c:p.c, art:packArt(p.name), tap:()=>setLibSel('pk:'+p.name) })));
+  locked.forEach(p=> st.appendChild(usb(p.name, 'LOCKED', { locked:true, art:packArt(p.name), on: libSel==='pk:'+p.name, tap:()=>setLibSel('pk:'+p.name) })));
   st.scrollLeft = keep;
 }
 function renderLibrary(){
@@ -812,7 +822,7 @@ function renderLibrary(){
   const here = samples.filter(s=>!s.hidden && inSel(s, libSel)); const have = new Set(here.flatMap(s=>s.tags));
   [...libTagFilter].forEach(t=>{ if(!have.has(t)) libTagFilter.delete(t); });
   tagsBox.innerHTML = '';
-  MOODS.filter(m=>have.has(m)).forEach(t=>{ const c = el('div','chip' + moodClass(t) + (libTagFilter.has(t)?' on':'')); c.textContent = t; c.dataset.k = 'MOOD'; c.addEventListener('click', ()=>{ if(libTagFilter.has(t)) libTagFilter.delete(t); else libTagFilter.add(t); libEdit = null; renderLibrary(); }); tagsBox.appendChild(c); });
+  if(SHOW_MOODS) MOODS.filter(m=>have.has(m)).forEach(t=>{ const c = el('div','chip' + moodClass(t) + (libTagFilter.has(t)?' on':'')); c.textContent = t; c.dataset.k = 'MOOD'; c.addEventListener('click', ()=>{ if(libTagFilter.has(t)) libTagFilter.delete(t); else libTagFilter.add(t); libEdit = null; renderLibrary(); }); tagsBox.appendChild(c); });
   const nh = samples.filter(s=>s.hidden && inSel(s, libSel)).length;
   if(nh || libShowHidden){ const c = el('div','chip hid' + (libShowHidden?' on':'')); c.textContent = 'hidden ' + nh; c.addEventListener('click', ()=>{ libShowHidden = !libShowHidden; libEdit = null; renderLibrary(); }); tagsBox.appendChild(c); }
   tagsBox.style.display = tagsBox.children.length ? '' : 'none';
@@ -1049,7 +1059,8 @@ function seekTo(beat){ playBeat = clamp(beat, 0, Math.max(0, songEndBeats()-0.00
 
 /* ================= TIMELINE (zone 2 — the main event) ================= */
 const LANES_FIT = 9;  /* 9 lanes fill the zone; more loops scroll */
-function fitTL(){ fitCanvas(tl, tctx); const h = tl.clientHeight || 300; zoomY = clamp(Math.floor((h - RULER_H - 4)/LANES_FIT), 22, 64); clampScroll(); }
+let userZoomY = false;   /* pinch up/down sets lane height; until then lanes fit the screen */
+function fitTL(){ fitCanvas(tl, tctx); const h = tl.clientHeight || 300; if(!userZoomY) zoomY = clamp(Math.floor((h - RULER_H - 4)/LANES_FIT), 22, 64); clampScroll(); }
 function contentHeight(){ return channels.length*zoomY + 6; }
 function contentWidth(){ return (songEndBeats() + BAR*4) * zoomX; }
 function clampScroll(){ const w = tl.clientWidth, h = tl.clientHeight - RULER_H; scrollX = clamp(scrollX, 0, Math.max(0, contentWidth() - w)); scrollY = clamp(scrollY, 0, Math.max(0, contentHeight() - h)); }
@@ -1127,7 +1138,7 @@ function armHold(g, ch, k){ g.hold = setTimeout(()=>{ if(gesture === g && !g.mov
 function snap(b){ return Math.round(b); }
 tl.addEventListener('pointerdown', e=>{
   tl.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x:e.offsetX, y:e.offsetY, sx:e.offsetX, sy:e.offsetY });
-  if(ptrs.size === 2){ if(gesture && gesture.hold) clearTimeout(gesture.hold); const [a,b] = [...ptrs.values()]; gesture = { kind:'pinch', dx0:Math.abs(a.x-b.x), zx0:zoomX, cx:(a.x+b.x)/2 }; return; }
+  if(ptrs.size === 2){ if(gesture && gesture.hold) clearTimeout(gesture.hold); const [a,b] = [...ptrs.values()]; gesture = { kind:'pinch', dx0:Math.abs(a.x-b.x), dy0:Math.abs(a.y-b.y), zx0:zoomX, zy0:zoomY, cx:(a.x+b.x)/2 }; return; }
   const ht = hitTest(e.offsetX, e.offsetY); const tapX = e.offsetX;
   if(ht.kind === 'ruler'){ gesture = { kind:'seek' }; seekTo(snap(beatAtX(e.offsetX))); return; }
   if(ht.kind === 'trimL' || ht.kind === 'trimR' || ht.kind === 'clip'){ const c = ht.ch.clips[ht.k]; gesture = { kind: ht.kind === 'clip' ? 'maybe' : ht.kind, ht, c0:{ start:c.start, len:c.len, off:c.off }, sx:scrollX, sy:scrollY, moved:false, tapX }; armHold(gesture, ht.ch, ht.k); return; }
@@ -1137,7 +1148,7 @@ tl.addEventListener('pointermove', e=>{
   const p = ptrs.get(e.pointerId); if(!p) return; p.x = e.offsetX; p.y = e.offsetY;
   if(!gesture) return;
   if(gesture.hold && Math.abs(p.x - p.sx) + Math.abs(p.y - p.sy) > 8){ clearTimeout(gesture.hold); gesture.hold = null; }
-  if(gesture.kind === 'pinch' && ptrs.size === 2){ const [a,b] = [...ptrs.values()]; const dx = Math.abs(a.x-b.x); const fx = gesture.dx0 > 30 ? dx/gesture.dx0 : 1; setZoom(gesture.zx0*fx, gesture.cx); return; }
+  if(gesture.kind === 'pinch' && ptrs.size === 2){ const [a,b] = [...ptrs.values()]; const dx = Math.abs(a.x-b.x); const dy = Math.abs(a.y-b.y); const fx = gesture.dx0 > 30 ? dx/gesture.dx0 : 1; const fy = gesture.dy0 > 30 ? dy/gesture.dy0 : 1; if(gesture.dx0 > 30) setZoom(gesture.zx0*fx, gesture.cx); if(gesture.dy0 > 30){ zoomY = clamp(Math.round(gesture.zy0*fy), 22, 140); userZoomY = true; clampScroll(); drawTL(); } return; }
   if(gesture.kind === 'seek'){ seekTo(snap(beatAtX(e.offsetX))); return; }
   const dx = p.x - p.sx, dy = p.y - p.sy;
   if(gesture.kind === 'maybe'){ if(Math.abs(dx) > 8) gesture.kind = 'move'; else if(Math.abs(dy) > 8){ gesture.kind = 'pan'; gesture.sx = scrollX; gesture.sy = scrollY; } else return; }
@@ -1186,7 +1197,7 @@ function drawTrigger(){ const s = fitCanvas(specCanvas, specCtx); if(!s) return;
 function drawCurve(){ const s = fitCanvas(curveCanvas, curveCtx); if(!s) return; const {w,h} = s, x = curveCtx; x.clearRect(0,0,w,h); const pad = 4, gw = w - pad*2, gh = h - pad*2; const rel = Math.max(0.001, scRelease); const holdW = gw * 0.22, relW = gw - holdW, steps = 64; x.strokeStyle = 'rgba(58,48,36,.9)'; x.lineWidth = 1; for(let i=1;i<4;i++){ const gy = pad + gh*i/4; x.beginPath(); x.moveTo(pad, gy); x.lineTo(w - pad, gy); x.stroke(); } const yOf = duck => pad + duck*gh; x.beginPath(); x.moveTo(pad, yOf(scDepth)); x.lineTo(pad + holdW, yOf(scDepth)); for(let i=1;i<=steps;i++){ const p = i/steps; x.lineTo(pad + holdW + p*relW, yOf(scDepth*releaseShape(p, scCurve))); } x.strokeStyle = '#d32f2f'; x.lineWidth = 2; x.lineJoin = 'round'; x.stroke(); x.lineTo(pad + gw, pad); x.lineTo(pad, pad); x.closePath(); x.fillStyle = 'rgba(211,47,47,.10)'; x.fill(); x.strokeStyle = 'rgba(242,237,226,.2)'; x.setLineDash([2,3]); x.beginPath(); x.moveTo(pad+holdW, pad); x.lineTo(pad+holdW, pad+gh); x.stroke(); x.setLineDash([]); if(duckNow > 0.005){ let dx; if(wasHot) dx = pad + holdW*0.5; else { const p = clamp((ctx.currentTime - releaseStart)/rel, 0, 1); dx = pad + holdW + p*relW; } const g = scDepth>0 ? duckNow/scDepth : 0; x.shadowColor = 'rgba(211,47,47,1)'; x.shadowBlur = 6 + 14*g; x.fillStyle = '#ff5a3c'; x.beginPath(); x.arc(dx, yOf(duckNow), 3 + 3*g, 0, Math.PI*2); x.fill(); x.shadowBlur = 0; } x.fillStyle = 'rgba(242,237,226,.6)'; x.font = '700 7px "JetBrains Mono", ui-monospace, Menlo, monospace'; x.textAlign = 'left'; x.textBaseline = 'alphabetic'; x.fillText('CRV ' + scCurve.toFixed(1), pad + 2, pad + 8); x.textAlign = 'right'; x.fillText('REL ' + Math.round(rel*1000) + 'ms', w - pad - 2, pad + 8); x.fillText('−' + Math.round(scDepth*100) + '%', w - pad - 2, pad + gh - 2); }
 
 /* ================= EXPORT ================= */
-exportBtn.addEventListener('click', async ()=>{ if(!channels.length){ setStatus('add loops first'); return; } setStatus('rendering…'); exportBtn.disabled = true; try{ const rendered = await renderArrangementOffline(ctx.sampleRate); const blob = new Blob([bufferToWav(rendered)], {type:'audio/wav'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = (currentProjectId ? currentProjectName.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_') : 'threat') + '-' + Date.now() + '.wav'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 10000); setStatus('exported'); }catch(err){ setStatus('export failed: ' + (err && err.message ? err.message : '')); } exportBtn.disabled = false; });
+exportBtn.addEventListener('click', async ()=>{ if(!channels.length){ setStatus('add loops first'); return; } setStatus('rendering…'); exportBtn.disabled = true; try{ const rendered = await renderArrangementOffline(ctx.sampleRate); const blob = new Blob([bufferToWav(rendered, 24)], {type:'audio/wav'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = (currentProjectId ? currentProjectName.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_') : 'threat') + '-' + Date.now() + '.wav'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 10000); setStatus('exported'); }catch(err){ setStatus('export failed: ' + (err && err.message ? err.message : '')); } exportBtn.disabled = false; });
 function buildOfflineMasterChain(offline){ const oMaster=offline.createGain(); oMaster.gain.value=masterGain.gain.value; const oLow=offline.createBiquadFilter(); oLow.type='lowshelf'; oLow.frequency.value=200; oLow.gain.value=eqLow.gain.value; const oMid=offline.createBiquadFilter(); oMid.type='peaking'; oMid.frequency.value=1000; oMid.Q.value=0.9; oMid.gain.value=eqMid.gain.value; const oHigh=offline.createBiquadFilter(); oHigh.type='highshelf'; oHigh.frequency.value=4000; oHigh.gain.value=eqHigh.gain.value; oMaster.connect(oLow); oLow.connect(oMid); oMid.connect(oHigh); if(limiterOn){ const oLim=offline.createDynamicsCompressor(); oLim.threshold.value=-2; oLim.knee.value=0; oLim.ratio.value=20; oLim.attack.value=0.002; oLim.release.value=0.15; oHigh.connect(oLim); oLim.connect(offline.destination); } else oHigh.connect(offline.destination); return oMaster; }
 function duckTrackFor(totalLen, stepSec){ const out = new Float32Array(Math.ceil(totalLen/stepSec) + 1); if(!sidechainTrigger || sidechainTrigger.mute) return out; let rStart = -99, duck = 0; const rel = Math.max(0.001, scRelease), bs = beatSec(); for(let i=0;i<out.length;i++){ const t = i*stepSec; const pos = samplePosAt(sidechainTrigger, t/bs); const lvl = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); if(lvl > scThreshold){ duck = scDepth; rStart = t; } else { const p = (t - rStart)/rel; duck = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } out[i] = duck; } return out; }
 async function renderArrangementOffline(sampleRate){
@@ -1208,7 +1219,7 @@ async function renderArrangementOffline(sampleRate){
   });
   return offline.startRendering();
 }
-function bufferToWav(abuffer){ const numCh=abuffer.numberOfChannels, length=abuffer.length*numCh*2+44, buf=new ArrayBuffer(length), view=new DataView(buf); let pos=0; function u16(d){ view.setUint16(pos,d,true); pos+=2; } function u32(d){ view.setUint32(pos,d,true); pos+=4; } u32(0x46464952); u32(length-8); u32(0x45564157); u32(0x20746d66); u32(16); u16(1); u16(numCh); u32(abuffer.sampleRate); u32(abuffer.sampleRate*2*numCh); u16(numCh*2); u16(16); u32(0x61746164); u32(length-pos-4); const chans=[]; for(let i=0;i<numCh;i++) chans.push(abuffer.getChannelData(i)); let idx=0; while(pos<length){ for(let i=0;i<numCh;i++){ let s=Math.max(-1,Math.min(1,chans[i][idx]||0)); s = s<0 ? s*0x8000 : s*0x7FFF; view.setInt16(pos,s,true); pos+=2; } idx++; } return buf; }
+function bufferToWav(abuffer, bits){ const B = bits === 24 ? 3 : 2; const numCh=abuffer.numberOfChannels, length=abuffer.length*numCh*B+44, buf=new ArrayBuffer(length), view=new DataView(buf); let pos=0; function u16(d){ view.setUint16(pos,d,true); pos+=2; } function u32(d){ view.setUint32(pos,d,true); pos+=4; } u32(0x46464952); u32(length-8); u32(0x45564157); u32(0x20746d66); u32(16); u16(1); u16(numCh); u32(abuffer.sampleRate); u32(abuffer.sampleRate*B*numCh); u16(numCh*B); u16(B*8); u32(0x61746164); u32(length-pos-4); const chans=[]; for(let i=0;i<numCh;i++) chans.push(abuffer.getChannelData(i)); let idx=0; while(pos<length){ for(let i=0;i<numCh;i++){ let s=Math.max(-1,Math.min(1,chans[i][idx]||0)); if(B===3){ let v = Math.round(s<0 ? s*0x800000 : s*0x7FFFFF); view.setUint8(pos, v & 255); view.setUint8(pos+1, (v>>8) & 255); view.setUint8(pos+2, (v>>16) & 255); pos+=3; } else { s = s<0 ? s*0x8000 : s*0x7FFF; view.setInt16(pos,s,true); pos+=2; } } idx++; } return buf; }   /* EXPORT = 24-bit WAV (v10.10) */
 
 /* ================= MODULE LOOKS (verbatim from MOCKS/src/master_layout_v10.html) ================= */
 const seg=(n,v,f)=>{let s='';const on=Math.round(v*n);for(let j=0;j<n;j++)s+=f(j<on,j);return s};

@@ -423,7 +423,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.12';
+const APP_VERSION = 'v10.13';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1173,16 +1173,19 @@ transportBtn.addEventListener('click', async ()=>{ try{ if(isRunning) stopAll();
 let recState = 'idle', recT0 = 0, recBeat0 = 0, recChunks = [], recTimer = null, recNoLoops = false, recNextClick = 0, recHeld = false, recHoldT = null, recN = 0;
 let countInOn = true; try{ countInOn = localStorage.getItem('tuner_countIn') !== '0'; }catch(e){}
 let recSyncMs = 0; try{ recSyncMs = +localStorage.getItem('tuner_recSync') || 0; }catch(e){}
-let micStream = null, micNode = null;
+let micStream = null, micNode = null, micSrcNode = null, micSink = null;
+/* v10.13: let go of the mic as soon as a take ends — iPhone (and AirPods) switch to "call" sound while the mic is open; releasing it brings full-quality playback back */
+function micOff(){ try{ if(micStream) micStream.getTracks().forEach(t=> t.stop()); }catch(e){} try{ if(micSrcNode) micSrcNode.disconnect(); if(micNode) micNode.disconnect(); if(micSink) micSink.disconnect(); }catch(e){} micStream = null; micNode = null; micSrcNode = null; micSink = null; try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){} }
 async function micOn(){
   if(micNode) return true;
+  try{ if(navigator.audioSession) navigator.audioSession.type = 'play-and-record'; }catch(e){}
   try{ micStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } }); }
   catch(e){ setStatus('mic blocked — allow the microphone for this site'); return false; }
-  const src = ctx.createMediaStreamSource(micStream); const sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination);
+  const src = ctx.createMediaStreamSource(micStream); const sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination); micSrcNode = src; micSink = sink;
   const onChunk = (t, l, r)=>{ if(recState !== 'idle') recChunks.push({ t, l, r }); };
   try{
     const code = `class RecTap extends AudioWorkletProcessor{ process(inputs){ const i = inputs[0]; if(i && i[0]) this.port.postMessage({ t: currentTime, l: i[0].slice(0), r: i[1] ? i[1].slice(0) : null }); return true; } } registerProcessor('rec-tap', RecTap);`;
-    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type:'application/javascript' })));
+    if(!window._recTapReady){ await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type:'application/javascript' }))); window._recTapReady = true; }
     micNode = new AudioWorkletNode(ctx, 'rec-tap', { numberOfInputs:1, numberOfOutputs:1, channelCount:2, channelCountMode:'explicit' });
     micNode.port.onmessage = e=> onChunk(e.data.t, e.data.l, e.data.r);
   }catch(e){
@@ -1212,15 +1215,15 @@ async function startRec(useCount){
 async function stopRec(){
   if(recState === 'idle') return;
   const was = recState, tEnd = ctx.currentTime; recState = 'idle'; if(recTimer){ clearInterval(recTimer); recTimer = null; } renderRec();
-  if(was === 'count'){ setStatus('recording cancelled'); recChunks = []; return; }
+  const chunks = recChunks; recChunks = []; micOff();
+  if(was === 'count'){ setStatus('recording cancelled'); return; }
   const sr = ctx.sampleRate, lat = recLatency(), bs = beatSec();
   const startBeat = Math.floor(recBeat0 + 1e-6), pre = (recBeat0 - startBeat)*bs;   /* snap the lane start to the beat; pad the gap */
-  const takeDur = tEnd - lat - recT0; if(takeDur < 0.25){ setStatus('too short — hold or tap REC again to record'); recChunks = []; return; }
+  const takeDur = tEnd - lat - recT0; if(takeDur < 0.25){ setStatus('too short — hold or tap REC again to record'); return; }
   const beats = Math.max(1, Math.ceil((pre + takeDur)/bs - 1e-3)), n = Math.round(beats*bs*sr);
   const L = new Float32Array(n), R = new Float32Array(n), off = Math.round(pre*sr);
   let stereo = false;
-  for(const ch of recChunks){ const i0 = Math.round((ch.t - lat - recT0)*sr) + off; for(let k=0;k<ch.l.length;k++){ const i = i0 + k; if(i < off || i >= off + Math.round(takeDur*sr) || i >= n) continue; L[i] = ch.l[k]; R[i] = ch.r ? ch.r[k] : ch.l[k]; } if(ch.r) stereo = true; }
-  recChunks = [];
+  for(const ch of chunks){ const i0 = Math.round((ch.t - lat - recT0)*sr) + off; for(let k=0;k<ch.l.length;k++){ const i = i0 + k; if(i < off || i >= off + Math.round(takeDur*sr) || i >= n) continue; L[i] = ch.l[k]; R[i] = ch.r ? ch.r[k] : ch.l[k]; } if(ch.r) stereo = true; }
   const fade = Math.min(256, n); for(let k=0;k<fade;k++){ const g = k/fade; L[off+k] *= g; R[off+k] *= g; const e = off + Math.round(takeDur*sr) - 1 - k; if(e > off && e < n){ L[e] *= g; R[e] *= g; } }
   const buf = ctx.createBuffer(2, n, sr); buf.copyToChannel(L, 0); buf.copyToChannel(R, 1);
   recN = (samples.filter(x=> /^REC \d+/.test(x.displayName)).length) + 1;

@@ -205,7 +205,7 @@
   .usb small{ font:700 7px var(--mono); color:var(--dim); letter-spacing:.06em; }
   .usb .led{ position:absolute; right:7px; top:50%; margin-top:-2px; width:4px; height:4px; border-radius:50%; background:#2f2a24; }
   .usb.art .body{ width:auto; padding:0; background:#000; border:none; border-radius:9px; }
-  .usb.art .body img{ height:48px; width:96px; object-fit:cover; display:block; pointer-events:none; border-radius:9px; }   /* every pack art = same size (v10.17) */
+  .usb.art .body img{ height:48px; width:auto; display:block; pointer-events:none; }   /* art drawn whole (v10.18) — sizes get fixed at the source: HQ/APP/TUNER/USB_ART */
   .usb.art .body b{ display:none; }
   .usb.art .body small{ position:absolute; right:5px; bottom:3px; background:rgba(0,0,0,.75); border-radius:3px; padding:1px 4px; color:var(--text); }
   .usb.art .led{ right:auto; left:6px; top:5px; margin:0; }
@@ -447,7 +447,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.17';
+const APP_VERSION = 'v10.18';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -723,7 +723,8 @@ function wsola(buf, f){
 const HQ = { w:null, id:0, cb:new Map(), pend:new Map(), dead:false };
 function hqWorker(){ if(HQ.w || HQ.dead) return HQ.w; try{ HQ.w = new Worker('vendor/stretch-worker.js'); HQ.w.onmessage = e=>{ const f = HQ.cb.get(e.data.id); HQ.cb.delete(e.data.id); if(f) f(e.data); }; HQ.w.onerror = ()=>{ HQ.dead = true; HQ.cb.forEach(f=>f({error:'worker'})); HQ.cb.clear(); }; }catch(e){ HQ.dead = true; } return HQ.w; }
 function hqKey(s, key){ return s.id + '|' + key; }
-function hqRequest(s, f, key){ if(!s._hq) s._hq = new Map(); if(s._hq.has(key)) return Promise.resolve(s._hq.get(key)); const pk = hqKey(s, key); if(HQ.pend.has(pk)) return HQ.pend.get(pk); const w = hqWorker(); if(!w) return Promise.resolve(null);
+function hqRequest(s, f, key){ try{ return hqRequest_(s, f, key); }catch(e){ HQ.dead = true; return Promise.resolve(null); } }
+function hqRequest_(s, f, key){ if(!s._hq) s._hq = new Map(); if(s._hq.has(key)) return Promise.resolve(s._hq.get(key)); const pk = hqKey(s, key); if(HQ.pend.has(pk)) return HQ.pend.get(pk); const w = hqWorker(); if(!w) return Promise.resolve(null);
   const buf = s.buffer, sr = buf.sampleRate, outLen = Math.max(1, Math.round(buf.length*f)), chans = []; for(let c=0;c<buf.numberOfChannels;c++) chans.push(buf.getChannelData(c).slice());
   const pr = new Promise(res=>{ const id = ++HQ.id; HQ.cb.set(id, d=>{ HQ.pend.delete(pk); if(d.error || !d.chans){ res(null); return; } const out = ctx.createBuffer(d.chans.length, outLen, sr); d.chans.forEach((a,c)=>out.copyToChannel(a, c)); if(s._hq.size > 12) s._hq.delete(s._hq.keys().next().value); s._hq.set(key, out); res(out); hqArrived(s, key); }); w.postMessage({ id, chans, sr, outLen, shift:Math.round(0.0034*sr) }, chans.map(a=>a.buffer)); });
   HQ.pend.set(pk, pr); return pr; }

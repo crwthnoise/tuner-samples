@@ -82,6 +82,11 @@
   #pillDuck.on{ color:var(--green); } #pillDuck.on .led{ background:var(--green); box-shadow:0 0 5px var(--green); }
   .info{ flex:1; min-width:0; font:500 7.5px var(--mono); color:var(--mute); letter-spacing:.06em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; transition:color .2s; }
   .info.hl{ color:var(--text); }
+  .info.loop{ color:#ff4d4d; text-shadow:0 0 6px #ff3030, 0 0 14px rgba(255,48,48,.45); font-weight:700; letter-spacing:.12em; }
+  #thickTip{ position:fixed; z-index:29; max-width:min(240px,70vw); display:flex; align-items:flex-start; gap:8px; padding:7px 8px 7px 10px; background:#0a0908; border:1px solid var(--a,#888); border-radius:6px; box-shadow:0 6px 16px #000, 0 0 10px color-mix(in srgb, var(--a,#888) 35%, transparent); font:500 11px/1.35 var(--mono); color:#d8d2c6; opacity:0; transform:translateY(4px); pointer-events:none; transition:opacity .15s, transform .15s; }
+  #thickTip.on{ opacity:1; transform:none; pointer-events:auto; }
+  #thickTip b{ color:var(--a); font-weight:700; }
+  #thickTip button{ flex:none; border:0; background:none; color:#8a847a; font:700 13px var(--mono); padding:0 2px; line-height:1; cursor:pointer; }
   .info.mq{ text-overflow:clip; color:var(--text); text-align:left; }
   .info.mq span{ display:inline-block; padding-left:100%; animation:infoMq var(--mqd,9s) linear infinite; }
   @keyframes infoMq{ from{ transform:translateX(0); } to{ transform:translateX(-100%); } }
@@ -200,7 +205,7 @@
   .usb small{ font:700 7px var(--mono); color:var(--dim); letter-spacing:.06em; }
   .usb .led{ position:absolute; right:7px; top:50%; margin-top:-2px; width:4px; height:4px; border-radius:50%; background:#2f2a24; }
   .usb.art .body{ width:auto; padding:0; background:#000; border:none; border-radius:9px; }
-  .usb.art .body img{ height:48px; width:auto; display:block; pointer-events:none; }
+  .usb.art .body img{ height:48px; width:96px; object-fit:cover; display:block; pointer-events:none; border-radius:9px; }   /* every pack art = same size (v10.17) */
   .usb.art .body b{ display:none; }
   .usb.art .body small{ position:absolute; right:5px; bottom:3px; background:rgba(0,0,0,.75); border-radius:3px; padding:1px 4px; color:var(--text); }
   .usb.art .led{ right:auto; left:6px; top:5px; margin:0; }
@@ -437,11 +442,12 @@
 </div>
 
 <div class="ask" id="ask"><div class="ask-card"><p id="askTxt"></p><div><button class="btn-ghost" id="askNo">NO</button><button class="btn-primary" id="askYes">YES</button></div></div></div>
+<div id="thickTip"><span id="thickTipT"></span><button id="thickTipX" aria-label="close">✕</button></div>
 <div class="bubble" id="bubble"><span id="bubbleTxt"></span><button id="bubbleUndo">↶ UNDO</button><button id="bubbleRedo">↷ REDO</button></div>
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.16';
+const APP_VERSION = 'v10.17';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -479,8 +485,8 @@ const specCanvas = $('scSpectrumCanvas'), curveCanvas = $('scCurveCanvas');
 const specCtx = specCanvas.getContext('2d'), curveCtx = curveCanvas.getContext('2d');
 
 function beatSec(){ return 60/bpm; }
-function renderInfo(){ const el = $('dockInfo'); if(el.classList.contains('hl')) return; el.classList.remove('mq'); if(typeof thickIdx !== 'undefined' && thickIdx >= 0){ const t = thickDesc(); el.textContent = t; if(el.scrollWidth > el.clientWidth + 2){ el.classList.add('mq'); el.innerHTML = '<span></span>'; el.firstChild.textContent = t; el.style.setProperty('--mqd', Math.max(6, t.length*0.16).toFixed(1) + 's'); } return; } const proj = currentProjectId ? currentProjectName : 'untitled (unsaved)'; el.textContent = proj + (infoText ? ' · ' + infoText : '') + (dirty ? ' · unsaved' : ''); }
-function setStatus(msg){ const el = $('dockInfo'); el.classList.remove('mq'); el.textContent = msg; el.classList.add('hl'); clearTimeout(statusTimer); statusTimer = setTimeout(()=>{ el.classList.remove('hl'); renderInfo(); }, 2200); }
+function renderInfo(){ const el = $('dockInfo'); if(el.classList.contains('hl')) return; el.classList.remove('mq'); const sc = (typeof selCh === 'function') ? selCh() : null; el.classList.toggle('loop', !!sc); if(sc){ el.textContent = '▸ ' + sc.sample.displayName.toUpperCase(); return; } const proj = currentProjectId ? currentProjectName : 'untitled (unsaved)'; el.textContent = proj + (infoText ? ' · ' + infoText : '') + (dirty ? ' · unsaved' : ''); }
+function setStatus(msg){ const el = $('dockInfo'); el.classList.remove('mq', 'loop'); el.textContent = msg; el.classList.add('hl'); clearTimeout(statusTimer); statusTimer = setTimeout(()=>{ el.classList.remove('hl'); renderInfo(); }, 2200); }
 function markDirty(){ dirty = true; renderInfo(); scheduleAutosave(); setSaveLed(); }
 function setSaveLed(){ const l = document.querySelector('#saveBtn .sled'); if(l) l.classList.toggle('dirty', !!dirty); }
 function el(tag, cls){ const e = document.createElement(tag); if(cls) e.className = cls; return e; }
@@ -1137,7 +1143,7 @@ function toggleClipMute(ch, k){ const c = ch.clips[k]; if(!c) return; c.mute = !
 function findChannel(id){ return channels.find(c=>c.id===id); }
 function selCh(){ return sel.chId ? findChannel(sel.chId) : null; }
 function selRowIdx(){ return sel.chId ? channels.findIndex(c=>c.id===sel.chId) : -1; }
-function selectChannel(id, clipIdx){ const changed = sel.chId !== id; sel = { chId:id, clipIdx: clipIdx ?? -1 }; if(changed) renderRack(); renderPill(); drawTL(); }
+function selectChannel(id, clipIdx){ const changed = sel.chId !== id; sel = { chId:id, clipIdx: clipIdx ?? -1 }; if(changed){ renderRack(); if(thickIdx >= 0) showTip(); } renderPill(); drawTL(); renderInfo(); }
 function ensureSel(){ if(sel.chId && findChannel(sel.chId)) return; const ch = channels[0]; sel = { chId: ch ? ch.id : null, clipIdx:-1 }; renderRack(); renderPill(); }
 function renderPill(){ const ch = selCh(); $('pill').classList.toggle('off', !ch); $('pillTrig').classList.toggle('on', !!(ch && ch.scTrigger)); $('pillDuck').classList.toggle('on', !!(ch && ch.scDuck)); }
 function setTrigger(ch){ channels.forEach(c=>{ c.scTrigger = false; }); ch.scTrigger = true; ch.scDuck = false; sidechainTrigger = ch; refreshTimeline(); markDirty(); commit(); drawAll(); setStatus(ch.sample.displayName + ' is the TRIGGER'); }
@@ -1559,10 +1565,14 @@ function layoutRack(){ const box = $('rack'); const W = box.clientWidth; if(!W) 
 /* TAP (no drag) = card · TAP the little switch = ON/OFF · DRAG = tune · DOUBLE-TAP = default */
 let thickIdx = -1, cardTimer = 0;
 function thickDesc(){ const m = MODS[thickIdx], ch = selCh(); if(!m) return ''; const info = MOD_INFO[m.n]; return m.n + ' — ' + info.d + (info.s ? ' · ' + info.s + (swGet(m, ch) ? ' ON' : ' OFF') : ''); }
-function openThick(i){ const prev = thickIdx; thickIdx = i; if(prev >= 0) drawModule(prev); drawModule(i); layoutRack(); renderInfo(); }
-function closeThick(){ clearTimeout(cardTimer); if(thickIdx < 0) return; const i = thickIdx; thickIdx = -1; drawModule(i); layoutRack(); renderInfo(); }
+function showTip(){ const t = $('thickTip'); if(thickIdx < 0){ t.classList.remove('on'); return; } const m = MODS[thickIdx], ch = selCh(), info = MOD_INFO[m.n]; t.style.setProperty('--a', m.acc);
+  $('thickTipT').innerHTML = `<b>${m.n}</b> ${info.d}` + (info.s ? `<br><b>${info.s}</b> ${info.sd}` : '');
+  setTimeout(()=>{ if(thickIdx < 0) return; const r = rackEls[thickIdx].getBoundingClientRect(), tw = t.offsetWidth, th = t.offsetHeight; t.style.left = clamp(r.left + r.width/2 - tw/2, 8, innerWidth - tw - 8) + 'px'; t.style.top = Math.max(8, r.top - th - 8) + 'px'; t.classList.add('on'); }, 210); }
+$('thickTipX').addEventListener('click', e=>{ e.stopPropagation(); $('thickTip').classList.remove('on'); });
+function openThick(i){ const prev = thickIdx; thickIdx = i; if(prev >= 0) drawModule(prev); drawModule(i); layoutRack(); renderInfo(); showTip(); }
+function closeThick(){ clearTimeout(cardTimer); $('thickTip').classList.remove('on'); if(thickIdx < 0) return; const i = thickIdx; thickIdx = -1; drawModule(i); layoutRack(); renderInfo(); }
 document.addEventListener('pointerdown', e=>{
-  if(thickIdx >= 0 && !(rackEls[thickIdx] && rackEls[thickIdx].contains(e.target)) && !e.target.closest('.rk-m')) closeThick();
+  if(thickIdx >= 0 && !(rackEls[thickIdx] && rackEls[thickIdx].contains(e.target)) && !e.target.closest('.rk-m') && !e.target.closest('#thickTip')) closeThick();
   if(vzBig && !e.target.closest('#vizZone')) setVizBig(false);
 }, true);
 function bindModule(w, i){ const m = MODS[i]; let drag = null, lastTap = 0;

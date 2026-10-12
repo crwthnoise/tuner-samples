@@ -441,7 +441,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.15';
+const APP_VERSION = 'v10.16';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -712,8 +712,20 @@ function wsola(buf, f){
   for(let c=0;c<nch;c++){ const o = outs[c], dst = out.getChannelData(c); for(let i=0;i<outLen;i++) dst[i] = o[i] / Math.max(norm[i], 0.05); }
   return out;
 }
+/* HQ STRETCH (v10.16): Signalsmith Stretch (MIT, pro-grade) in a worker. WSOLA answers instantly so nothing waits,
+   then the HQ version swaps in a moment later (and export always waits for HQ). */
+const HQ = { w:null, id:0, cb:new Map(), pend:new Map(), dead:false };
+function hqWorker(){ if(HQ.w || HQ.dead) return HQ.w; try{ HQ.w = new Worker('vendor/stretch-worker.js'); HQ.w.onmessage = e=>{ const f = HQ.cb.get(e.data.id); HQ.cb.delete(e.data.id); if(f) f(e.data); }; HQ.w.onerror = ()=>{ HQ.dead = true; HQ.cb.forEach(f=>f({error:'worker'})); HQ.cb.clear(); }; }catch(e){ HQ.dead = true; } return HQ.w; }
+function hqKey(s, key){ return s.id + '|' + key; }
+function hqRequest(s, f, key){ if(!s._hq) s._hq = new Map(); if(s._hq.has(key)) return Promise.resolve(s._hq.get(key)); const pk = hqKey(s, key); if(HQ.pend.has(pk)) return HQ.pend.get(pk); const w = hqWorker(); if(!w) return Promise.resolve(null);
+  const buf = s.buffer, sr = buf.sampleRate, outLen = Math.max(1, Math.round(buf.length*f)), chans = []; for(let c=0;c<buf.numberOfChannels;c++) chans.push(buf.getChannelData(c).slice());
+  const pr = new Promise(res=>{ const id = ++HQ.id; HQ.cb.set(id, d=>{ HQ.pend.delete(pk); if(d.error || !d.chans){ res(null); return; } const out = ctx.createBuffer(d.chans.length, outLen, sr); d.chans.forEach((a,c)=>out.copyToChannel(a, c)); if(s._hq.size > 12) s._hq.delete(s._hq.keys().next().value); s._hq.set(key, out); res(out); hqArrived(s, key); }); w.postMessage({ id, chans, sr, outLen, shift:Math.round(0.0034*sr) }, chans.map(a=>a.buffer)); });
+  HQ.pend.set(pk, pr); return pr; }
+let hqResT = null;
+function hqArrived(s, key){ let hit = false; channels.forEach(ch=>{ if(ch.sample === s && ch._stKey === key){ ch.buffer = s._hq.get(key); hit = true; } }); if(hit && isRunning){ clearTimeout(hqResT); hqResT = setTimeout(()=>reschedule(), 30); } }
+async function hqSettle(){ for(let i=0;i<3;i++){ rebuildAll(); const all = [...HQ.pend.values()]; if(!all.length) return; await Promise.all(all); } rebuildAll(); }
 function stretchFactor(ch){ return playRate(ch) * loopBeats(ch.sample) * beatSec() / ch.sample.buffer.duration; }
-function rebuildBuffer(ch){ const s = ch.sample; if(!s.buffer) return; const f = stretchFactor(ch); if(!s._st) s._st = new Map(); const key = f.toFixed(4); let b = Math.abs(f - 1) < 0.002 ? s.buffer : s._st.get(key); if(!b){ b = wsola(s.buffer, f); if(s._st.size > 12) s._st.delete(s._st.keys().next().value); s._st.set(key, b); } ch.buffer = b; }
+function rebuildBuffer(ch){ const s = ch.sample; if(!s.buffer) return; const f = stretchFactor(ch); if(!s._st) s._st = new Map(); const key = f.toFixed(4); ch._stKey = key; if(Math.abs(f - 1) >= 0.002){ const hq = s._hq && s._hq.get(key); if(hq){ ch.buffer = hq; return; } hqRequest(s, f, key); } let b = Math.abs(f - 1) < 0.002 ? s.buffer : s._st.get(key); if(!b){ b = wsola(s.buffer, f); if(s._st.size > 12) s._st.delete(s._st.keys().next().value); s._st.set(key, b); } ch.buffer = b; }
 function rebuildAll(){ channels.forEach(rebuildBuffer); }
 let rebuildT = null;
 function queueRebuild(ch){ clearTimeout(rebuildT); rebuildT = setTimeout(()=>{ if(ch) rebuildBuffer(ch); else rebuildAll(); if(isRunning) reschedule(); drawTL(); }, 140); }
@@ -889,7 +901,7 @@ function inSel(smp, sel){ if(sel === 'ALL') return true; if(sel === 'MY') return
 function setLibSel(s){ libSel = s; libEdit = null; libShowHidden = false; try{ localStorage.setItem('tuner_libSel', s); }catch(e){} renderLibrary(); }
 function stopPreview(){ if(previewSrc){ try{ previewSrc.stop(); }catch(e){} previewSrc = null; } const was = previewId; previewId = null; if(previewRaf){ cancelAnimationFrame(previewRaf); previewRaf = null; } if(!isRunning){ lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; masterPeak = 0; masterData.fill(0); vizCaps.fill(0); } document.querySelectorAll('.lrow.playing').forEach(r=>r.classList.remove('playing')); if(was){ const s = samples.find(x=>x.id===was); if(s) drawRow(s); } }
 /* preview at the SONG tempo once a song is going (same stretch engine as the timeline, cached) */
-function previewBuffer(s){ if(!channels.length || !s.buffer) return s.buffer; const f = loopBeats(s) * beatSec() / s.buffer.duration; if(Math.abs(f - 1) < 0.002) return s.buffer; if(!s._st) s._st = new Map(); const key = f.toFixed(4); let b = s._st.get(key); if(!b){ b = wsola(s.buffer, f); if(s._st.size > 12) s._st.delete(s._st.keys().next().value); s._st.set(key, b); } return b; }
+function previewBuffer(s){ if(!channels.length || !s.buffer) return s.buffer; const f = loopBeats(s) * beatSec() / s.buffer.duration; if(Math.abs(f - 1) < 0.002) return s.buffer; if(!s._st) s._st = new Map(); const key = f.toFixed(4); const hq = s._hq && s._hq.get(key); if(hq) return hq; hqRequest(s, f, key); let b = s._st.get(key); if(!b){ b = wsola(s.buffer, f); if(s._st.size > 12) s._st.delete(s._st.keys().next().value); s._st.set(key, b); } return b; }
 async function startPreview(sample){
   await unlockAudio(); if(ctx.state !== 'running'){ try{ await ctx.resume(); }catch(e){} }
   stopPreview();
@@ -1426,6 +1438,7 @@ exportBtn.addEventListener('click', async ()=>{ if(!channels.length){ setStatus(
 function buildOfflineMasterChain(offline){ const oMaster=offline.createGain(); oMaster.gain.value=masterGain.gain.value; const oLow=offline.createBiquadFilter(); oLow.type='lowshelf'; oLow.frequency.value=200; oLow.gain.value=eqLow.gain.value; const oMid=offline.createBiquadFilter(); oMid.type='peaking'; oMid.frequency.value=1000; oMid.Q.value=0.9; oMid.gain.value=eqMid.gain.value; const oHigh=offline.createBiquadFilter(); oHigh.type='highshelf'; oHigh.frequency.value=4000; oHigh.gain.value=eqHigh.gain.value; oMaster.connect(oLow); oLow.connect(oMid); oMid.connect(oHigh); if(limiterOn){ const oLim=offline.createDynamicsCompressor(); oLim.threshold.value=-2; oLim.knee.value=0; oLim.ratio.value=20; oLim.attack.value=0.002; oLim.release.value=0.15; oHigh.connect(oLim); oLim.connect(offline.destination); } else oHigh.connect(offline.destination); return oMaster; }
 function duckTrackFor(totalLen, stepSec){ const out = new Float32Array(Math.ceil(totalLen/stepSec) + 1); if(!sidechainTrigger || sidechainTrigger.mute) return out; let rStart = -99, duck = 0; const rel = Math.max(0.001, scRelease), bs = beatSec(); for(let i=0;i<out.length;i++){ const t = i*stepSec; const pos = samplePosAt(sidechainTrigger, t/bs); const lvl = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); if(lvl > scThreshold){ duck = scDepth; rStart = t; } else { const p = (t - rStart)/rel; duck = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } out[i] = duck; } return out; }
 async function renderArrangementOffline(sampleRate){
+  await hqSettle();   /* export = always the HQ stretch */
   const bs = beatSec(), totalLen = songEndBeats()*bs;
   const offline = new OfflineAudioContext(2, Math.ceil(totalLen*sampleRate), sampleRate); const oMaster = buildOfflineMasterChain(offline);
   const STEP = 0.002; const track = duckTrackFor(totalLen, STEP);

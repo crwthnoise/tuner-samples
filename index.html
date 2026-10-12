@@ -268,6 +268,47 @@
   .bubble button{ height:40px; min-width:84px; border:none; border-radius:20px; background:#fff; color:#000; font-size:12px; font-weight:800; cursor:pointer; }
   .bubble.hint{ padding:12px 18px; font-weight:700; }
   .bubble.hint b{ color:#ff6b6b; }
+
+  /* ===== v10.12 VISUALIZER (SPAN style) · REC · CUSTOMIZE ===== */
+  :root{ --vz:#57e38a; --vzf:87,227,138; --vzavg:#e8f0ff; --vzbg:#151a20; --vzgrid:rgba(160,180,200,.10); --vzlbl:#6f7c8a; --vzpanel:#0d1014; --vzline:#2b3038; }
+  :root[data-vz="red"]{ --vz:#ff4a3d; --vzf:255,74,61; --vzavg:#f2ede2; --vzbg:#150f0d; --vzgrid:rgba(200,170,150,.10); --vzlbl:#7d6e66; }
+  :root[data-vz="ice"]{ --vz:#5fd4ff; --vzf:95,212,255; --vzavg:#ffffff; --vzbg:#10161c; --vzgrid:rgba(160,190,220,.10); --vzlbl:#6c7f90; }
+  :root[data-vz="amber"]{ --vz:#ffb02e; --vzf:255,176,46; --vzavg:#ffffff; --vzbg:#16120c; --vzgrid:rgba(210,190,150,.10); --vzlbl:#857660; }
+  .vizz{ position:relative; flex:none; height:34px; border-radius:10px; overflow:hidden; background:var(--vzbg); border:1px solid #000; box-shadow:inset 0 0 0 1px var(--vzline), 0 4px 10px #000; cursor:pointer; transition:height .22s ease; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
+  .vizz.big{ height:236px; }
+  #vizCv{ position:absolute; left:0; top:0; width:calc(100% - 58px); height:100%; display:block; }
+  .vizz.big #vizCv{ width:100%; height:calc(100% - 58px); }
+  .vz-lufs{ position:absolute; right:0; top:0; bottom:0; width:58px; display:flex; flex-direction:column; justify-content:center; align-items:center; border-left:1px solid var(--vzline); background:var(--vzpanel); }
+  .vz-lufs b{ font:700 13px var(--mono); color:var(--vz); letter-spacing:-.5px; line-height:1; }
+  .vz-lufs i{ font:500 6.5px var(--mono); color:var(--vzlbl); letter-spacing:1.2px; font-style:normal; margin-top:2px; }
+  .vizz.big .vz-lufs{ display:none; }
+  .vz-meters{ position:absolute; left:0; right:0; bottom:0; height:58px; display:none; grid-template-columns:repeat(4,1fr); gap:5px; padding:6px 6px 7px; background:var(--vzpanel); border-top:1px solid var(--vzline); box-sizing:border-box; }
+  .vizz.big .vz-meters{ display:grid; }
+  .vz-m{ background:#05070a; border:1px solid #232830; border-radius:5px; padding:3px 0 2px; text-align:center; display:flex; flex-direction:column; justify-content:center; }
+  .vz-m b{ display:block; font:700 15px var(--mono); color:var(--vz); letter-spacing:-.5px; line-height:1.05; }
+  .vz-m i{ display:block; font:700 7px var(--mono); color:#c9cfd6; letter-spacing:1.4px; font-style:normal; margin-top:1px; }
+  .vz-m u{ display:block; font:500 5.5px var(--mono); color:var(--vzlbl); letter-spacing:1px; text-decoration:none; margin-top:1px; }
+  .vz-m.hot b{ color:#ff4a3d; }
+  .vz-tag{ position:absolute; left:28px; top:5px; font:500 6.5px var(--mono); color:var(--vzlbl); letter-spacing:1.3px; display:none; pointer-events:none; }
+  .vz-tag em{ font-style:normal; color:var(--vzavg); opacity:.7; }
+  .vizz.big .vz-tag{ display:block; }
+  .dgrid{ grid-template-columns:repeat(4,50px); grid-auto-rows:48px; gap:10px 7px; }
+  .dgrid .btn{ width:50px; height:48px; }
+  #recBtn{ color:#ff8a80; } #recBtn .rdot{ width:14px; height:14px; border-radius:50%; background:#c62a22; box-shadow:0 0 6px #ff3b3088; margin-bottom:3px; transition:background .15s; }
+  #recBtn small{ color:#ff8a80; margin:0; }
+  #recBtn.count .rdot{ background:#ffb02e; box-shadow:0 0 10px #ffb02e; }
+  #recBtn.count small{ color:#ffb02e; }
+  #recBtn.on{ border-color:#ff3b30; box-shadow:0 0 14px #ff3b3066, inset 0 0 10px #ff3b3033; }
+  #recBtn.on .rdot{ background:#ff3b30; animation:recblink .8s steps(2,start) infinite; box-shadow:0 0 12px #ff3b30; }
+  @keyframes recblink{ to{ opacity:.25; } }
+  #custBtn svg{ width:22px; height:22px; }
+  .vz-swatches{ display:flex; gap:10px; padding:4px 2px 2px; }
+  .vz-sw{ flex:1; height:40px; border-radius:8px; border:1px solid #000; cursor:pointer; position:relative; box-shadow:inset 0 0 0 1px #2b3038; }
+  .vz-sw.on{ box-shadow:0 0 0 2px var(--text), inset 0 0 0 1px #000; }
+  .vz-sw span{ position:absolute; left:0; right:0; bottom:3px; text-align:center; font:700 7px var(--mono); letter-spacing:1px; color:#c9cfd6; }
+  @media (max-width:370px){
+    .dgrid{ grid-template-columns:repeat(4,46px); grid-auto-rows:46px; gap:9px 6px; } .dgrid .btn{ width:46px; height:46px; }
+  }
 </style>
 </head>
 <body>
@@ -285,6 +326,8 @@
 
 <!-- 2 · TIMELINE -->
 <div class="z tlz" id="tlZone"><canvas id="tl"></canvas><div class="tlctl"><button id="tlStart" data-k="TO START" title="back to start">⏮&#xFE0E;</button><button id="tlZoomOut" data-k="ZOOM-" title="zoom out">−</button><button id="tlZoomIn" data-k="ZOOM+" title="zoom in">+</button></div></div>
+<!-- 2b · VISUALIZER (v10.12) — tap = bigger / smaller -->
+<div class="vizz" id="vizZone" data-k="VIZ"><canvas id="vizCv"></canvas><span class="vz-tag">SPECTRUM <em>· slow avg</em></span><div class="vz-lufs"><b id="vzStrip">—</b><i>LUFS</i></div><div class="vz-meters"><div class="vz-m" id="vzM"><b>—</b><i>NOW</i><u>MOMENTARY</u></div><div class="vz-m" id="vzS"><b>—</b><i>3 SEC</i><u>SHORT-TERM</u></div><div class="vz-m" id="vzI"><b>—</b><i>SONG</i><u>INTEGRATED</u></div><div class="vz-m" id="vzP"><b>—</b><i>PEAK</i><u>TRUE PEAK</u></div></div></div>
 
 <!-- 3 · SELECTED LOOP -->
 <div class="z rackz" id="rackZone" data-screws="b">
@@ -300,11 +343,13 @@
 <div class="z dock" id="dock" data-screws="4">
   <div class="dgrid">
     <button class="btn big" id="addLoopBtn" data-k="+ LOOP" title="add your own loop">+</button>
-    <button class="btn" id="packsBtn" data-k="PACKS">PACKS</button>
     <button class="btn big" id="undoBtn" data-k="UNDO" title="undo · hold = redo" disabled>↶</button>
-    <button class="btn" id="exportBtn" data-k="EXPORT" disabled>EXPORT</button>
+    <button class="btn big" id="custBtn" data-k="CUSTOMIZE" title="customize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 0 18c1.3 0 2-.8 2-1.8 0-1.4-1.2-1.6-1.2-2.7 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.1" fill="currentColor"/><circle cx="10.5" cy="7" r="1.1" fill="currentColor"/><circle cx="15" cy="7.2" r="1.1" fill="currentColor"/></svg></button>
+    <button class="btn" id="recBtn" data-k="REC" title="tap = count-in · hold = record now · tap again = stop"><i class="rdot"></i><small id="recLbl">REC</small></button>
     <button class="btn big" id="setBtn" data-k="SETTINGS" title="settings · projects">⚙&#xFE0E;</button>
+    <button class="btn" id="exportBtn" data-k="EXPORT" disabled>EXPORT</button>
     <button class="btn" id="saveBtn" data-k="SAVE" title="save now (it also autosaves)"><i class="sled"></i>SAVE</button>
+    <button class="btn" id="packsBtn" data-k="PACKS">PACKS</button>
   </div>
   <button class="play" id="transportBtn" data-k="PLAY" aria-label="play"></button>
 </div>
@@ -334,8 +379,9 @@
   <div class="proj-list" id="projectList"></div>
   <div class="proj-store" id="projStore">storage: <b>checking…</b></div>
   <div class="store-warn" id="storeWarn">saving unavailable in this browser — use save as file</div>
-  <div class="sec">SEASON</div>
-  <div class="lib-tags" id="seasonChips"></div>
+  <div class="sec">RECORD</div>
+  <div class="sc-ctl"><label>COUNT</label><span style="flex:1;font:500 8px var(--mono);color:var(--mute)">1-bar count-in when you tap REC while stopped</span><button class="tog on" id="countInToggle">ON</button></div>
+  <div class="sc-ctl"><label>SYNC</label><input type="range" id="recSync" min="-100" max="200" value="0"><span id="recSyncVal">auto</span></div>
   <div class="sec">MASTER</div>
   <div class="sc-ctl"><label>VOL</label><input type="range" id="masterVol" min="0" max="100" value="85"><span id="masterVolVal">85%</span><button class="tog on" id="limiterToggle">LIM</button></div>
   <div class="sec">SIDECHAIN</div>
@@ -346,6 +392,17 @@
   <div class="sc-ctl"><label>CURVE</label><input type="range" id="scCurve" min="20" max="300" value="100"><span id="scCurveDisplay">1.0</span></div>
   <div class="sc-state-line" id="scState">no trigger</div>
   <div class="foot"><span id="verBadge"></span><span id="clickTop"></span></div>
+</div>
+
+
+<!-- CUSTOMIZE (v10.12): spectrum colour · season -->
+<div class="sheet small" id="custSheet">
+  <div class="sh-head"><strong>CUSTOMIZE</strong><button data-close="custSheet">✕</button></div>
+  <div class="sec" style="margin-top:4px">SPECTRUM</div>
+  <div class="vz-swatches" id="vzSwatches"></div>
+  <div class="sec">SEASON</div>
+  <div class="lib-tags" id="seasonChips"></div>
+  <div style="height:14px"></div>
 </div>
 
 <!-- double-tap a clip = options -->
@@ -366,7 +423,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.11';
+const APP_VERSION = 'v10.12';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -540,6 +597,60 @@ analyserMaster.connect(kShelf); kShelf.connect(kHp); kHp.connect(lufsAn);
 const lufsHist = []; let lufsM = -70, lufsS = -70, lufsPeakHold = -70, lufsPeakT = 0;
 function updateLufs(){ lufsAn.getFloatTimeDomainData(lufsBuf); let ms = 0; for(let i=0;i<lufsBuf.length;i++) ms += lufsBuf[i]*lufsBuf[i]; ms /= lufsBuf.length; const t = performance.now(); lufsHist.push([t, ms]); while(lufsHist.length && t - lufsHist[0][0] > 3000) lufsHist.shift(); let mM = 0, nM = 0, mS = 0, nS = 0; for(const [tt, v] of lufsHist){ mS += v; nS++; if(t - tt <= 400){ mM += v; nM++; } } const toL = m => m > 1e-12 ? -0.691 + 10*Math.log10(m*2) : -70; lufsM = nM ? toL(mM/nM) : -70; lufsS = nS ? toL(mS/nS) : -70; if(lufsM > lufsPeakHold || t - lufsPeakT > 2500){ lufsPeakHold = lufsM; lufsPeakT = t; } }
 const vizCaps = new Float32Array(64);
+/* ===== v10.12 VISUALIZER — SPAN-style spectrum (1/6-oct smoothed, +4.5 dB/oct tilt) + loudness meters ===== */
+const vizAn = ctx.createAnalyser(); vizAn.fftSize = 8192; vizAn.smoothingTimeConstant = 0.55; analyserMaster.connect(vizAn);
+const vizF = new Float32Array(vizAn.frequencyBinCount), vizT = new Float32Array(vizAn.fftSize);
+const VZ_N = 200, VZ_FLOOR = -120, vzLive = new Float32Array(VZ_N).fill(VZ_FLOOR), vzAvg = new Float32Array(VZ_N).fill(VZ_FLOOR);
+const vzBins = (()=>{ const hz = ctx.sampleRate / vizAn.fftSize, out = []; for(let i=0;i<VZ_N;i++){ const f = 20*Math.pow(1000, i/(VZ_N-1)); const lo = Math.max(1, Math.floor(f*Math.pow(2,-1/12)/hz)), hi = Math.max(lo, Math.min(vizAn.frequencyBinCount-1, Math.ceil(f*Math.pow(2,1/12)/hz))); out.push([lo, hi, 4.5*Math.log2(f/1000)]); } return out; })();
+let vzBig = false; try{ vzBig = localStorage.getItem('tuner_vizBig') === '1'; }catch(e){}
+let vzColor = 'green'; try{ vzColor = localStorage.getItem('tuner_vizColor') || 'green'; }catch(e){}
+const VZ_COLORS = { green:['#57e38a','#151a20'], red:['#ff4a3d','#150f0d'], ice:['#5fd4ff','#10161c'], amber:['#ffb02e','#16120c'] };
+let vzTP = -120, vzIntBlocks = [], vzLastBlock = 0, vzLastText = 0, vzActive = false, vzDecayRaf = null;
+function vzResetSong(){ vzTP = -120; vzIntBlocks = []; vzLastBlock = 0; }
+function vzIntegrated(){ const a = vzIntBlocks.filter(e=> e > 1.17e-7); if(!a.length) return -70; const m1 = a.reduce((x,y)=>x+y,0)/a.length; const gate = m1 * 0.1; const b = a.filter(e=> e >= gate); if(!b.length) return -70; return -0.691 + 10*Math.log10(b.reduce((x,y)=>x+y,0)/b.length); }
+function vzTruePeak(){ vizAn.getFloatTimeDomainData(vizT); let m = 0; const d = vizT, n = d.length; for(let i=1;i<n-2;i++){ const p0=d[i-1], p1=d[i], p2=d[i+1], p3=d[i+2]; let v = p1<0?-p1:p1; if(v>m) m=v; for(const t of [0.25,0.5,0.75]){ const t2=t*t, t3=t2*t; const y = 0.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t2+(-p0+3*p1-3*p2+p3)*t3); const a = y<0?-y:y; if(a>m) m=a; } } return m > 1e-6 ? 20*Math.log10(m) : -120; }
+function vzFmt(v){ return v <= -69.5 ? '—' : v.toFixed(1); }
+function updateViz(live){
+  const now = performance.now();
+  if(live){
+    vizAn.getFloatFrequencyData(vizF);
+    for(let i=0;i<VZ_N;i++){ const [lo,hi,tilt] = vzBins[i]; let pw = 0; for(let k=lo;k<=hi;k++) pw += Math.pow(10, vizF[k]/10); let d = 10*Math.log10(pw/(hi-lo+1) + 1e-14) + tilt + 24;   /* +24 = calibration: a loud mix rides the top third, like SPAN */ if(!isFinite(d)) d = VZ_FLOOR;
+      vzLive[i] = d > vzLive[i] ? d : vzLive[i]*0.78 + d*0.22; vzAvg[i] = vzAvg[i] <= VZ_FLOOR+1 ? d : vzAvg[i]*0.985 + d*0.015; }
+    const tp = vzTruePeak(); if(tp > vzTP) vzTP = tp;
+    if(isRunning && now - vzLastBlock >= 100){ vzLastBlock = now; if(lufsM > -70) vzIntBlocks.push(Math.pow(10, (lufsM + 0.691)/10)); if(vzIntBlocks.length > 36000) vzIntBlocks.shift(); }
+  } else { for(let i=0;i<VZ_N;i++){ vzLive[i] = Math.max(VZ_FLOOR, vzLive[i] - 2.5); vzAvg[i] = Math.max(VZ_FLOOR, vzAvg[i] - 1.2); } }
+  drawViz();
+  if(now - vzLastText > 90){ vzLastText = now;
+    $('vzStrip').textContent = vzFmt(lufsS);
+    const set = (id, v, hot)=>{ const e = $(id); e.firstChild.textContent = v; e.classList.toggle('hot', !!hot); };
+    set('vzM', vzFmt(lufsM)); set('vzS', vzFmt(lufsS)); set('vzI', vzFmt(vzIntegrated())); set('vzP', vzTP <= -119 ? '—' : vzTP.toFixed(1), vzTP > -1);
+  }
+}
+function drawViz(){
+  const cv = $('vizCv'); const c = cv.getContext('2d'); const fit = fitCanvas(cv, c); if(!fit) return;
+  const W = cv.clientWidth, H = cv.clientHeight, big = vzBig, cs = getComputedStyle(document.documentElement);
+  const col = cs.getPropertyValue('--vz').trim(), rgb = cs.getPropertyValue('--vzf').trim(), avgc = cs.getPropertyValue('--vzavg').trim(), grid = cs.getPropertyValue('--vzgrid').trim(), lbl = cs.getPropertyValue('--vzlbl').trim(), bg = cs.getPropertyValue('--vzbg').trim();
+  c.fillStyle = bg; c.fillRect(0,0,W,H);
+  const padL = big ? 24 : 0, padB = big ? 14 : 0, w = W - padL, hh = H - padB;
+  const dbTop = big ? 0 : -6, dbBot = big ? -84 : -72;
+  const fx = f=> padL + Math.log(f/20)/Math.log(1000)*w, dy = d=> (dbTop - d)/(dbTop - dbBot)*hh;
+  c.strokeStyle = grid; c.lineWidth = 1;
+  [50,100,200,500,1000,2000,5000,10000].forEach(f=>{ c.beginPath(); c.moveTo(Math.round(fx(f))+.5,0); c.lineTo(Math.round(fx(f))+.5,hh); c.stroke(); });
+  if(big){ for(let d=-12; d>dbBot; d-=12){ c.beginPath(); c.moveTo(padL, Math.round(dy(d))+.5); c.lineTo(W, Math.round(dy(d))+.5); c.stroke(); }
+    c.fillStyle = lbl; c.font = '500 7.5px ' + cs.getPropertyValue('--mono'); c.textAlign = 'center';
+    [[50,'50'],[100,'100'],[200,'200'],[500,'500'],[1000,'1k'],[2000,'2k'],[5000,'5k'],[10000,'10k']].forEach(([f,t])=> c.fillText(t, fx(f), H-4));
+    c.textAlign = 'right'; for(let d=-12; d>dbBot; d-=12) c.fillText(d, padL-3, dy(d)+3); }
+  const X = i=> padL + i/(VZ_N-1)*w, Y = v=> Math.max(0, Math.min(hh, dy(v)));
+  const g = c.createLinearGradient(0,0,0,hh); g.addColorStop(0, 'rgba('+rgb+','+(big?.32:.45)+')'); g.addColorStop(1, 'rgba('+rgb+',.04)');
+  c.beginPath(); c.moveTo(X(0), hh); for(let i=0;i<VZ_N;i++) c.lineTo(X(i), Y(vzLive[i])); c.lineTo(X(VZ_N-1), hh); c.closePath(); c.fillStyle = g; c.fill();
+  c.beginPath(); for(let i=0;i<VZ_N;i++){ const x = X(i), y = Y(vzLive[i]); i ? c.lineTo(x,y) : c.moveTo(x,y); } c.strokeStyle = col; c.lineWidth = big ? 1.4 : 1.2; c.shadowColor = col; c.shadowBlur = big ? 6 : 4; c.stroke(); c.shadowBlur = 0;
+  c.beginPath(); for(let i=0;i<VZ_N;i++){ const x = X(i), y = Y(vzAvg[i]); i ? c.lineTo(x,y) : c.moveTo(x,y); } c.strokeStyle = avgc; c.globalAlpha = .55; c.lineWidth = 1; c.stroke(); c.globalAlpha = 1;
+}
+function vizDecay(){ if(vzDecayRaf) cancelAnimationFrame(vzDecayRaf); let n = 0; const step = ()=>{ if(isRunning || previewId){ vzDecayRaf = null; return; } updateViz(false); if(++n < 70) vzDecayRaf = requestAnimationFrame(step); else vzDecayRaf = null; }; vzDecayRaf = requestAnimationFrame(step); }
+function setVizBig(on){ vzBig = on; $('vizZone').classList.toggle('big', on); try{ localStorage.setItem('tuner_vizBig', on?'1':'0'); }catch(e){} setTimeout(()=>{ sheetTop(); drawViz(); }, 240); }
+function setVizColor(k){ vzColor = VZ_COLORS[k] ? k : 'green'; if(vzColor === 'green') document.documentElement.removeAttribute('data-vz'); else document.documentElement.setAttribute('data-vz', vzColor); try{ localStorage.setItem('tuner_vizColor', vzColor); }catch(e){} renderSwatches(); drawViz(); }
+function renderSwatches(){ const box = $('vzSwatches'); box.innerHTML = ''; Object.entries(VZ_COLORS).forEach(([k,[c1,bg]])=>{ const b = el('div', 'vz-sw' + (k===vzColor?' on':'')); b.style.background = `linear-gradient(180deg, ${bg} 0 30%, ${c1}55 100%)`; b.style.borderTop = `2px solid ${c1}`; b.innerHTML = `<span>${k.toUpperCase()}${k==='green'?' · STOCK':''}</span>`; b.dataset.k = 'VIZ ' + k.toUpperCase(); b.addEventListener('click', ()=> setVizColor(k)); box.appendChild(b); }); }
+
 function peakOf(an, arr){ an.getByteFrequencyData(arr); let m = 0; for(let i=0;i<arr.length;i++){ if(arr[i]>m) m = arr[i]; } return m/255; }
 
 /* ================= SIDECHAIN MODEL ================= */
@@ -769,7 +880,7 @@ async function startPreview(sample){
   const buf = previewBuffer(sample); if(previewId !== sample.id) return;
   const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(previewGain); src.start(); previewSrc = src; previewStart = ctx.currentTime; previewDur = buf.duration;
   const row = document.querySelector('.lrow[data-id="' + sample.id + '"]'); if(row) row.classList.add('playing');
-  const loop = ()=>{ if(previewId !== sample.id) return; drawRow(sample); if(!isRunning){ updateLufs(); masterPeak = peakOf(analyserMaster, masterData); } previewRaf = requestAnimationFrame(loop); }; loop();
+  const loop = ()=>{ if(previewId !== sample.id) return; drawRow(sample); if(!isRunning){ updateLufs(); masterPeak = peakOf(analyserMaster, masterData); updateViz(true); } previewRaf = requestAnimationFrame(loop); }; loop();
 }
 /* row waveform: from the loaded audio, or from the peaks baked into samples/index.json (no download needed) */
 function rowPeaks(s){
@@ -1040,20 +1151,99 @@ function updateChannelGain(ch){ let target = (isRunning && !isSilent(ch)) ? ch.v
 function advanceSidechain(now, beat){ if(!sidechainTrigger){ duckNow = 0; trigLevel = 0; wasHot = false; return; } const pos = samplePosAt(sidechainTrigger, beat); trigPos = pos < 0 ? 0 : pos; trigLevel = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); const hot = triggerHot(); if(hot){ duckNow = scDepth; releaseStart = now; } else { const p = (now - releaseStart) / Math.max(0.001, scRelease); duckNow = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } wasHot = hot; }
 let playheadRaf = null, songTimer = null;
 function tick(){ const now = ctx.currentTime; const end = songEndBeats(); const endAt = songStartTime + (end - startBeat)*beatSec(); if(!nextPass && endAt - now < 0.25 && endAt > now) queueNextPass(endAt); if(nextPass && now >= nextPass.at){ songStartTime = nextPass.at; startBeat = 0; channels.forEach(ch=>{ ch.sources = ch.nextSources || []; ch.nextSources = null; }); nextPass = null; } const beat = currentBeat(); if(beat >= end){ scheduleFrom(0); return; } advanceSidechain(now, beat); channels.forEach(ch=>{ ch.lastPeakLevel = peakOf(ch.analyser, ch.dataArray); updateChannelGain(ch); }); }
-function frame(){ tick(); updateLufs(); masterPeak = peakOf(analyserMaster, masterData); drawAll(); updatePumpDot(); updateRackLevel(); if(isRunning) playheadRaf = requestAnimationFrame(frame); }
+function frame(){ tick(); updateLufs(); masterPeak = peakOf(analyserMaster, masterData); updateViz(true); drawAll(); updatePumpDot(); updateRackLevel(); if(isRunning) playheadRaf = requestAnimationFrame(frame); }
 function followPlayhead(){ const x = currentBeat()*zoomX - scrollX; const w = tl.clientWidth; if(x > w - 40){ scrollX = currentBeat()*zoomX - 40; clampScroll(); } else if(x < 0){ scrollX = Math.max(0, currentBeat()*zoomX - 40); } }
 async function ensureRunning(fromBeat){
   await unlockAudio(); if(ctx.state !== 'running'){ try{ await ctx.resume(); }catch(e){} }
   if(ctx.state !== 'running'){ setStatus('audio blocked — tap PLAY again'); return; }
   if(!channels.length){ setStatus('add loops first'); return; }
   if(isRunning){ scheduleFrom(fromBeat ?? currentBeat()); return; }
-  isRunning = true; setPlay(true);
+  isRunning = true; setPlay(true); vzResetSong();
   scheduleFrom(fromBeat ?? playBeat);
   songTimer = setInterval(tick, 40);
   playheadRaf = requestAnimationFrame(frame);
 }
-function stopAll(){ isRunning = false; if(songTimer){ clearInterval(songTimer); songTimer = null; } if(playheadRaf){ cancelAnimationFrame(playheadRaf); playheadRaf = null; } setPlay(false); stopSources(); const t = ctx.currentTime; channels.forEach(ch=>{ ch.gainNode.gain.cancelScheduledValues(t); ch.gainNode.gain.setValueAtTime(0, t); ch.lastPeakLevel = 0; ch.dataArray.fill(0); }); masterPeak = 0; duckNow = 0; trigLevel = 0; masterData.fill(0); lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; vizCaps.fill(0); drawAll(); updatePumpDot(); updateRackLevel(); }
+function stopAll(){ isRunning = false; if(songTimer){ clearInterval(songTimer); songTimer = null; } if(playheadRaf){ cancelAnimationFrame(playheadRaf); playheadRaf = null; } setPlay(false); stopSources(); const t = ctx.currentTime; channels.forEach(ch=>{ ch.gainNode.gain.cancelScheduledValues(t); ch.gainNode.gain.setValueAtTime(0, t); ch.lastPeakLevel = 0; ch.dataArray.fill(0); }); masterPeak = 0; duckNow = 0; trigLevel = 0; masterData.fill(0); lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; vizCaps.fill(0); drawAll(); updatePumpDot(); updateRackLevel(); if(recState !== 'idle') stopRec(); vizDecay(); }
 transportBtn.addEventListener('click', async ()=>{ try{ if(isRunning) stopAll(); else await ensureRunning(); }catch(err){ setStatus('error: ' + err.message); } });
+/* ===== v10.12 REC — mic into a new lane.
+   stopped + TAP  = 1-bar count-in, then plays + records (count-in can be turned off in ⚙)
+   playing + TAP  = records right now
+   HOLD           = records right now · let go = keeps recording
+   TAP again      = stop → the take lands on its own lane at the beat it started, saved to MY SAMPLES ===== */
+let recState = 'idle', recT0 = 0, recBeat0 = 0, recChunks = [], recTimer = null, recNoLoops = false, recNextClick = 0, recHeld = false, recHoldT = null, recN = 0;
+let countInOn = true; try{ countInOn = localStorage.getItem('tuner_countIn') !== '0'; }catch(e){}
+let recSyncMs = 0; try{ recSyncMs = +localStorage.getItem('tuner_recSync') || 0; }catch(e){}
+let micStream = null, micNode = null;
+async function micOn(){
+  if(micNode) return true;
+  try{ micStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } }); }
+  catch(e){ setStatus('mic blocked — allow the microphone for this site'); return false; }
+  const src = ctx.createMediaStreamSource(micStream); const sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination);
+  const onChunk = (t, l, r)=>{ if(recState !== 'idle') recChunks.push({ t, l, r }); };
+  try{
+    const code = `class RecTap extends AudioWorkletProcessor{ process(inputs){ const i = inputs[0]; if(i && i[0]) this.port.postMessage({ t: currentTime, l: i[0].slice(0), r: i[1] ? i[1].slice(0) : null }); return true; } } registerProcessor('rec-tap', RecTap);`;
+    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type:'application/javascript' })));
+    micNode = new AudioWorkletNode(ctx, 'rec-tap', { numberOfInputs:1, numberOfOutputs:1, channelCount:2, channelCountMode:'explicit' });
+    micNode.port.onmessage = e=> onChunk(e.data.t, e.data.l, e.data.r);
+  }catch(e){
+    micNode = ctx.createScriptProcessor(2048, 2, 2);
+    micNode.onaudioprocess = e=>{ const b = e.inputBuffer; onChunk(e.playbackTime - 2*b.length/ctx.sampleRate, b.getChannelData(0).slice(0), b.numberOfChannels > 1 ? b.getChannelData(1).slice(0) : null); };
+  }
+  src.connect(micNode); micNode.connect(sink); return true;
+}
+function recLatency(){ return (ctx.outputLatency || 0) + (ctx.baseLatency || 0) + 0.008 + recSyncMs/1000; }
+function click(at, accent){ const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = accent ? 1760 : 1175; g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(accent ? .5 : .32, at + .002); g.gain.exponentialRampToValueAtTime(.0001, at + .06); o.connect(g); g.connect(ctx.destination); o.start(at); o.stop(at + .08); }
+function renderRec(){ const b = $('recBtn'); b.classList.toggle('on', recState === 'rec'); b.classList.toggle('count', recState === 'count'); let t = 'REC'; if(recState === 'count'){ const left = Math.ceil((recT0 - ctx.currentTime)/beatSec() - 1e-3); t = left > 0 ? String(left) : 'REC'; } $('recLbl').textContent = t; }
+function recLoop(){ const now = ctx.currentTime; if(recState === 'count' && now >= recT0){ recState = 'rec'; setStatus('● recording — tap REC to stop'); }
+  if(recNoLoops && recState !== 'idle'){ const bs = beatSec(); while(recNextClick < now + 0.15){ const k = Math.round((recNextClick - recT0)/bs); click(recNextClick, ((k % 4) + 4) % 4 === 0); recNextClick += bs; } }
+  renderRec(); }
+async function startRec(useCount){
+  if(recState !== 'idle') return;
+  await unlockAudio(); if(ctx.state !== 'running'){ try{ await ctx.resume(); }catch(e){} }
+  if(!(await micOn())) return;
+  const bs = beatSec(); recChunks = []; recNoLoops = channels.length === 0;
+  if(recNoLoops){ const t0 = ctx.currentTime + 0.1; recT0 = t0 + (useCount ? 4*bs : 0); recBeat0 = 0; recNextClick = t0; }
+  else if(!isRunning){ await ensureRunning(useCount ? playBeat - 4 : playBeat); if(!isRunning) return; recT0 = songStartTime + (useCount ? 4*bs : 0); recBeat0 = playBeat; if(useCount) for(let i=0;i<4;i++) click(songStartTime + i*bs, i===0); }
+  else { recT0 = ctx.currentTime; recBeat0 = currentBeat(); }
+  recState = (recT0 - ctx.currentTime > 0.12) ? 'count' : 'rec';
+  if(recState === 'rec') setStatus('● recording — tap REC to stop'); else setStatus('count-in…');
+  if(recTimer) clearInterval(recTimer); recTimer = setInterval(recLoop, 30); renderRec();
+}
+async function stopRec(){
+  if(recState === 'idle') return;
+  const was = recState, tEnd = ctx.currentTime; recState = 'idle'; if(recTimer){ clearInterval(recTimer); recTimer = null; } renderRec();
+  if(was === 'count'){ setStatus('recording cancelled'); recChunks = []; return; }
+  const sr = ctx.sampleRate, lat = recLatency(), bs = beatSec();
+  const startBeat = Math.floor(recBeat0 + 1e-6), pre = (recBeat0 - startBeat)*bs;   /* snap the lane start to the beat; pad the gap */
+  const takeDur = tEnd - lat - recT0; if(takeDur < 0.25){ setStatus('too short — hold or tap REC again to record'); recChunks = []; return; }
+  const beats = Math.max(1, Math.ceil((pre + takeDur)/bs - 1e-3)), n = Math.round(beats*bs*sr);
+  const L = new Float32Array(n), R = new Float32Array(n), off = Math.round(pre*sr);
+  let stereo = false;
+  for(const ch of recChunks){ const i0 = Math.round((ch.t - lat - recT0)*sr) + off; for(let k=0;k<ch.l.length;k++){ const i = i0 + k; if(i < off || i >= off + Math.round(takeDur*sr) || i >= n) continue; L[i] = ch.l[k]; R[i] = ch.r ? ch.r[k] : ch.l[k]; } if(ch.r) stereo = true; }
+  recChunks = [];
+  const fade = Math.min(256, n); for(let k=0;k<fade;k++){ const g = k/fade; L[off+k] *= g; R[off+k] *= g; const e = off + Math.round(takeDur*sr) - 1 - k; if(e > off && e < n){ L[e] *= g; R[e] *= g; } }
+  const buf = ctx.createBuffer(2, n, sr); buf.copyToChannel(L, 0); buf.copyToChannel(R, 1);
+  recN = (samples.filter(x=> /^REC \d+/.test(x.displayName)).length) + 1;
+  const name = `REC ${recN}`;
+  const wav = bufferToWav(buf, 24);
+  const sample = await addSample({ name: `${name} ${Math.round(bpm)}bpm.wav`, type:'audio/wav' }, { arrayBuf: wav, displayName: name, bpm: bpm, folder:'My samples', quiet:true });
+  if(!sample) return;
+  await addChannelFromSample(sample, { clips:[{ start:startBeat, len:beats, off:0 }] });
+  setStatus(`${name} · ${beats/BAR >= 1 ? (beats/BAR).toFixed(beats%BAR?1:0) + ' bars' : beats + ' beats'} · saved to MY SAMPLES`);
+}
+const recBtn = $('recBtn');
+recBtn.addEventListener('pointerdown', e=>{ recHeld = false; if(recState !== 'idle') return; recHoldT = setTimeout(()=>{ recHeld = true; startRec(false); }, 350); });
+recBtn.addEventListener('pointerup', ()=>{ if(recHoldT){ clearTimeout(recHoldT); recHoldT = null; } if(recHeld){ recHeld = false; return; } if(recState !== 'idle'){ stopRec(); return; } startRec(!isRunning && countInOn); });
+recBtn.addEventListener('pointerleave', ()=>{ if(recHoldT){ clearTimeout(recHoldT); recHoldT = null; } });
+recBtn.addEventListener('contextmenu', e=> e.preventDefault());
+$('countInToggle').addEventListener('click', ()=>{ countInOn = !countInOn; try{ localStorage.setItem('tuner_countIn', countInOn?'1':'0'); }catch(e){} renderRecSettings(); });
+$('recSync').addEventListener('input', e=>{ recSyncMs = +e.target.value; try{ localStorage.setItem('tuner_recSync', String(recSyncMs)); }catch(e){} renderRecSettings(); });
+function renderRecSettings(){ const t = $('countInToggle'); t.classList.toggle('on', countInOn); t.textContent = countInOn ? 'ON' : 'OFF'; $('recSync').value = recSyncMs; $('recSyncVal').textContent = recSyncMs ? (recSyncMs > 0 ? '+' : '') + recSyncMs + 'ms' : 'auto'; }
+/* visualizer: tap = bigger / smaller (you keep tuning + picking loops while it's big) */
+$('vizZone').addEventListener('click', ()=> setVizBig(!vzBig));
+$('custBtn').addEventListener('click', ()=>{ if($('custSheet').classList.contains('open')) closeSheet('custSheet'); else { renderSwatches(); openSheet('custSheet'); } });
+renderRecSettings(); setVizColor(vzColor); if(vzBig) $('vizZone').classList.add('big'); requestAnimationFrame(drawViz);
+
 function moveTo(beat){ playBeat = clamp(beat, 0, Math.max(0, songEndBeats()-0.001)); if(isRunning) scheduleFrom(playBeat); drawTL(); }
 function seekTo(beat){ playBeat = clamp(beat, 0, Math.max(0, songEndBeats()-0.001)); if(isRunning) scheduleFrom(playBeat); else ensureRunning(playBeat); drawTL(); }
 

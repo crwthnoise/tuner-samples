@@ -328,7 +328,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.2';
+const APP_VERSION = 'v10.3';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -898,7 +898,10 @@ tl.addEventListener('animationend', ()=> tl.classList.remove('shake'));
 
 /* ================= PLAYBACK / SCHEDULING ================= */
 function currentBeat(){ return isRunning ? startBeat + (ctx.currentTime - songStartTime)/beatSec() : playBeat; }
-function stopSources(){ channels.forEach(ch=>{ ch.sources.forEach(s=>{ try{ s.stop(); }catch(e){} }); ch.sources = []; }); }
+function stopSources(){ channels.forEach(ch=>{ ch.sources.forEach(s=>{ try{ s.stop(); }catch(e){} }); ch.sources = []; (ch.nextSources||[]).forEach(s=>{ try{ s.stop(); }catch(e){} }); ch.nextSources = null; }); nextPass = null; }
+/* seamless song loop: the next pass is queued ahead on the audio clock, so there's no gap at the end */
+let nextPass = null;
+function queueNextPass(at){ const bs = beatSec(); channels.forEach(ch=>{ ch.nextSources = []; const rate = playRate(ch), dur = ch.buffer.duration; ch.clips.forEach(c=>{ if(c.mute) return; const src = ctx.createBufferSource(); src.buffer = ch.buffer; src.loop = true; src.detune.value = chPitch(ch)*100; src.connect(ch.gainNode); src.start(at + c.start*bs, (c.off*bs*rate) % dur); src.stop(at + (c.start + c.len)*bs); ch.nextSources.push(src); }); }); nextPass = { at }; }
 function scheduleFrom(fromBeat){
   stopSources();
   const bs = beatSec(), t0 = ctx.currentTime + 0.05; songStartTime = t0; startBeat = fromBeat;
@@ -911,7 +914,7 @@ function triggerHot(){ return !!(sidechainTrigger && !sidechainTrigger.mute && t
 function updateChannelGain(ch){ let target = (isRunning && !ch.mute) ? ch.volume : 0; let tau = 0.01; if(isRunning && ch.scDuck && ch !== sidechainTrigger && duckNow > 0){ target *= (1 - duckNow); tau = ATTACK; } ch.gainNode.gain.setTargetAtTime(target, ctx.currentTime, tau); }
 function advanceSidechain(now, beat){ if(!sidechainTrigger){ duckNow = 0; trigLevel = 0; wasHot = false; return; } const pos = samplePosAt(sidechainTrigger, beat); trigPos = pos < 0 ? 0 : pos; trigLevel = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); const hot = triggerHot(); if(hot){ duckNow = scDepth; releaseStart = now; } else { const p = (now - releaseStart) / Math.max(0.001, scRelease); duckNow = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } wasHot = hot; }
 let playheadRaf = null, songTimer = null;
-function tick(){ const now = ctx.currentTime; const beat = currentBeat(); const end = songEndBeats(); if(beat >= end){ scheduleFrom(0); return; } advanceSidechain(now, beat); channels.forEach(ch=>{ ch.lastPeakLevel = peakOf(ch.analyser, ch.dataArray); updateChannelGain(ch); }); }
+function tick(){ const now = ctx.currentTime; const end = songEndBeats(); const endAt = songStartTime + (end - startBeat)*beatSec(); if(!nextPass && endAt - now < 0.25 && endAt > now) queueNextPass(endAt); if(nextPass && now >= nextPass.at){ songStartTime = nextPass.at; startBeat = 0; channels.forEach(ch=>{ ch.sources = ch.nextSources || []; ch.nextSources = null; }); nextPass = null; } const beat = currentBeat(); if(beat >= end){ scheduleFrom(0); return; } advanceSidechain(now, beat); channels.forEach(ch=>{ ch.lastPeakLevel = peakOf(ch.analyser, ch.dataArray); updateChannelGain(ch); }); }
 function frame(){ tick(); updateLufs(); masterPeak = peakOf(analyserMaster, masterData); drawAll(); if(isRunning) playheadRaf = requestAnimationFrame(frame); }
 function followPlayhead(){ const x = currentBeat()*zoomX - scrollX; const w = tl.clientWidth; if(x > w - 40){ scrollX = currentBeat()*zoomX - 40; clampScroll(); } else if(x < 0){ scrollX = Math.max(0, currentBeat()*zoomX - 40); } }
 async function ensureRunning(fromBeat){

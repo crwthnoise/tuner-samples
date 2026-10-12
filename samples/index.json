@@ -131,5 +131,97 @@
    "dreamy",
    "chill"
   ]
+ },
+ {
+  "id": "lib-warbloom-symbols-bass-140-gmin-dubstep-dark-wav",
+  "file": "WARBLOOM/symbols_bass_140_GMIN_[dubstep,dark].wav",
+  "name": "symbols bass",
+  "folder": "WARBLOOM",
+  "bpm": 140,
+  "key": "Gmin",
+  "tags": [
+   "dubstep",
+   "dark"
+  ]
+ },
+ {
+  "id": "lib-warbloom-symbols-drop-140-gmin-dubstep-anger-wav",
+  "file": "WARBLOOM/symbols_drop_140_GMIN_[dubstep,anger].wav",
+  "name": "symbols drop",
+  "folder": "WARBLOOM",
+  "bpm": 140,
+  "key": "Gmin",
+  "tags": [
+   "dubstep",
+   "anger"
+  ]
+ },
+ {
+  "id": "lib-warbloom-symbols-drums-140-dubstep-hype-wav",
+  "file": "WARBLOOM/symbols_drums_140_[dubstep,hype].wav",
+  "name": "symbols drums",
+  "folder": "WARBLOOM",
+  "bpm": 140,
+  "key": null,
+  "tags": [
+   "dubstep",
+   "hype"
+  ]
+ },
+ {
+  "id": "lib-warbloom-symbols-kick-140-dubstep-wav",
+  "file": "WARBLOOM/symbols_kick_140_[dubstep].wav",
+  "name": "symbols kick",
+  "folder": "WARBLOOM",
+  "bpm": 140,
+  "key": null,
+  "tags": [
+   "dubstep"
+  ]
+ },
+ {
+  "id": "lib-warbloom-symbols-melodic-bass-140-gmin-dubstep-wav",
+  "file": "WARBLOOM/symbols_melodic_bass_140_GMIN_[dubstep].wav",
+  "name": "symbols melodic bass",
+  "folder": "WARBLOOM",
+  "bpm": 140,
+  "key": "Gmin",
+  "tags": [
+   "dubstep"
+  ]
+ },
+ {
+  "id": "lib-warbloom-symbols-melody-140-gmin-dubstep-epic-wav",
+  "file": "WARBLOOM/symbols_melody_140_GMIN_[dubstep,epic].wav",
+  "name": "symbols melody",
+  "folder": "WARBLOOM",
+  "bpm": 140,
+  "key": "Gmin",
+  "tags": [
+   "dubstep",
+   "epic"
+  ]
+ },
+ {
+  "id": "lib-warbloom-symbols-perc-140-dubstep-wav",
+  "file": "WARBLOOM/symbols_perc_140_[dubstep].wav",
+  "name": "symbols perc",
+  "folder": "WARBLOOM",
+  "bpm": 140,
+  "key": null,
+  "tags": [
+   "dubstep"
+  ]
+ },
+ {
+  "id": "lib-warbloom-symbols-top-140-dubstep-wav",
+  "file": "WARBLOOM/symbols_top_140_[dubstep].wav",
+  "name": "symbols top",
+  "folder": "WARBLOOM",
+  "bpm": 140,
+  "key": null,
+  "tags": [
+   "dubstep"
+  ]
  }
 ]

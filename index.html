@@ -328,7 +328,7 @@
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.3';
+const APP_VERSION = 'v10.4';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -998,6 +998,8 @@ function drawTL(){
   x.fillStyle = '#0e0c0a'; x.fillRect(0, 0, w, RULER_H);
   const showBeats = zoomX >= 9, onlyFours = zoomX*BAR < 7;
   for(let b = beat0; b <= beat1; b++){ const bar = b % BAR === 0, four = b % (BAR*4) === 0; if(!bar && !showBeats) continue; if(bar && onlyFours && !four) continue; const px = Math.round(b*zoomX - scrollX) + .5; if(bar){ x.fillStyle = four ? '#d32f2f' : 'rgba(242,237,226,.45)'; x.beginPath(); x.arc(px, 5, four ? 2 : 1.4, 0, Math.PI*2); x.fill(); } else { x.strokeStyle = 'rgba(242,237,226,.16)'; x.lineWidth = 1; x.beginPath(); x.moveTo(px, 9); x.lineTo(px, RULER_H - 2); x.stroke(); } }
+  /* start point — small red flag on the ruler (where PLAY starts / STOP returns) */
+  const spx = playBeat*zoomX - scrollX; if(spx >= -6 && spx <= w+6){ x.fillStyle = '#d32f2f'; x.beginPath(); x.moveTo(spx, RULER_H); x.lineTo(spx - 5, 2); x.lineTo(spx + 5, 2); x.closePath(); x.fill(); }
   /* playhead — cream */
   const phx = cur*zoomX - scrollX; if(phx >= -2 && phx <= w+2){ x.strokeStyle = 'rgba(242,237,226,.85)'; x.lineWidth = 2; x.beginPath(); x.moveTo(phx, 0); x.lineTo(phx, h); x.stroke(); }
 }
@@ -1010,10 +1012,10 @@ function snap(b){ return Math.round(b); }
 tl.addEventListener('pointerdown', e=>{
   tl.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x:e.offsetX, y:e.offsetY, sx:e.offsetX, sy:e.offsetY });
   if(ptrs.size === 2){ if(gesture && gesture.hold) clearTimeout(gesture.hold); const [a,b] = [...ptrs.values()]; gesture = { kind:'pinch', dx0:Math.abs(a.x-b.x), zx0:zoomX, cx:(a.x+b.x)/2 }; return; }
-  const ht = hitTest(e.offsetX, e.offsetY);
+  const ht = hitTest(e.offsetX, e.offsetY); const tapX = e.offsetX;
   if(ht.kind === 'ruler'){ gesture = { kind:'seek' }; seekTo(snap(beatAtX(e.offsetX))); return; }
-  if(ht.kind === 'trimL' || ht.kind === 'trimR' || ht.kind === 'clip'){ const c = ht.ch.clips[ht.k]; gesture = { kind: ht.kind === 'clip' ? 'maybe' : ht.kind, ht, c0:{ start:c.start, len:c.len, off:c.off }, sx:scrollX, sy:scrollY, moved:false }; armHold(gesture, ht.ch, ht.k); return; }
-  gesture = { kind:'pan', ht, sx:scrollX, sy:scrollY, moved:false }; if(ht.kind === 'row') armHold(gesture, ht.ch, -1);
+  if(ht.kind === 'trimL' || ht.kind === 'trimR' || ht.kind === 'clip'){ const c = ht.ch.clips[ht.k]; gesture = { kind: ht.kind === 'clip' ? 'maybe' : ht.kind, ht, c0:{ start:c.start, len:c.len, off:c.off }, sx:scrollX, sy:scrollY, moved:false, tapX }; armHold(gesture, ht.ch, ht.k); return; }
+  gesture = { kind:'pan', ht, sx:scrollX, sy:scrollY, moved:false, tapX }; if(ht.kind === 'row') armHold(gesture, ht.ch, -1);
 });
 tl.addEventListener('pointermove', e=>{
   const p = ptrs.get(e.pointerId); if(!p) return; p.x = e.offsetX; p.y = e.offsetY;
@@ -1030,6 +1032,10 @@ tl.addEventListener('pointermove', e=>{
   else if(gesture.kind === 'trimL'){ const ns = clamp(snap(c0.start + db), 0, c0.start + c0.len - 1); const d = ns - c0.start; c.start = ns; c.len = c0.len - d; c.off = c0.off + d; }
   refreshTimeline(); drawTL();
 });
+/* PLAY FROM TAP: a tap on the timeline drops the start point on that bar.
+   stopped → PLAY starts there (STOP comes back to it) · playing → a tap on open lane space jumps there; tapping a clip only selects */
+function tapStart(x, ht){ if(x == null || !channels.length || ht.kind === 'add') return; const onClip = ht.kind === 'clip' || ht.kind === 'trimL' || ht.kind === 'trimR'; if(isRunning && onClip) return;
+  const lastBar = Math.max(0, Math.floor((songEndBeats()-0.001)/BAR)*BAR); const b = clamp(Math.floor(beatAtX(x)/BAR)*BAR, 0, lastBar); if(isRunning) seekTo(b); else { playBeat = b; drawTL(); } }
 function endPtr(e){
   const p = ptrs.get(e.pointerId); ptrs.delete(e.pointerId); if(!p) return;
   if(!gesture) return;
@@ -1039,6 +1045,7 @@ function endPtr(e){
   if(g.kind === 'seek') return;
   if(g.moved) return;
   const ht = g.ht;
+  tapStart(g.tapX, ht);
   if(ht.kind === 'clip' || ht.kind === 'trimL' || ht.kind === 'trimR'){
     const ch = ht.ch, k = ht.k;
     const same = pendingTap && pendingTap.ch === ch && pendingTap.k === k;

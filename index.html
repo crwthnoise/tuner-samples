@@ -55,7 +55,12 @@
   .bpm-pop input::-webkit-outer-spin-button,.bpm-pop input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 
   /* 2 · TIMELINE (the main event) */
-  .tlz{ flex:1; min-height:0; }
+  .tlz{ flex:1; min-height:0; position:relative; }
+  .tlctl{ position:absolute; right:6px; bottom:6px; display:flex; gap:4px; z-index:3; }
+  .tlctl button{ width:30px; height:26px; border-radius:6px; border:1px solid #2a2622; background:rgba(14,12,10,.82); color:#f2ede2; font:700 13px var(--mono); padding:0; cursor:pointer; }
+  .tlctl button:active{ background:#d32f2f; color:#000; }
+  .sled{ width:6px; height:6px; border-radius:50%; background:#4fd1a5; box-shadow:0 0 5px #4fd1a5; margin-bottom:4px; }
+  .sled.dirty{ background:#ff9600; box-shadow:0 0 5px #ff9600; }
   #tl{ position:absolute; left:6px; top:4px; width:calc(100% - 12px); height:calc(100% - 8px); display:block; touch-action:none; }
   @keyframes tlshake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 50%{transform:translateX(5px)} 75%{transform:translateX(-3px)} }
   .shake{ animation:tlshake .22s ease-out; }
@@ -253,7 +258,7 @@
 </div>
 
 <!-- 2 · TIMELINE -->
-<div class="z tlz" id="tlZone"><canvas id="tl"></canvas></div>
+<div class="z tlz" id="tlZone"><canvas id="tl"></canvas><div class="tlctl"><button id="tlStart" data-k="TO START" title="back to start">⏮&#xFE0E;</button><button id="tlZoomOut" data-k="ZOOM-" title="zoom out">−</button><button id="tlZoomIn" data-k="ZOOM+" title="zoom in">+</button></div></div>
 
 <!-- 3 · SELECTED LOOP -->
 <div class="z rackz" id="rackZone" data-screws="b">
@@ -273,6 +278,7 @@
     <button class="btn big" id="undoBtn" data-k="UNDO" title="undo · hold = redo" disabled>↶</button>
     <button class="btn" id="exportBtn" data-k="EXPORT" disabled>EXPORT</button>
     <button class="btn big" id="setBtn" data-k="SETTINGS" title="settings · projects">⚙&#xFE0E;</button>
+    <button class="btn" id="saveBtn" data-k="SAVE" title="save now (it also autosaves)"><i class="sled"></i>SAVE</button>
   </div>
   <button class="play" id="transportBtn" data-k="PLAY" aria-label="play"></button>
 </div>
@@ -318,6 +324,7 @@
   <div class="opt-grid">
     <button class="btn-ghost" id="optAddClip">+ CLIP</button>
     <button class="btn-ghost" id="optMuteLoop">MUTE LOOP</button>
+    <button class="btn-ghost" id="optSolo" style="grid-column:1 / -1">SOLO</button>
     <button class="btn-ghost" id="optKeyLock" style="grid-column:1 / -1">KEY LOCK</button>
     <button class="btn-ghost danger" id="optRemoveClip">DELETE CLIP</button>
     <button class="btn-ghost danger" id="optRemove">DELETE LOOP</button>
@@ -325,11 +332,11 @@
 </div>
 
 <div class="ask" id="ask"><div class="ask-card"><p id="askTxt"></p><div><button class="btn-ghost" id="askNo">NO</button><button class="btn-primary" id="askYes">YES</button></div></div></div>
-<div class="bubble" id="bubble"><span id="bubbleTxt"></span><button id="bubbleUndo">↶ UNDO</button></div>
+<div class="bubble" id="bubble"><span id="bubbleTxt"></span><button id="bubbleUndo">↶ UNDO</button><button id="bubbleRedo">↷ REDO</button></div>
 <audio id="unlockAudio" playsinline style="display:none"></audio>
 <script>
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.6';
+const APP_VERSION = 'v10.7';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -369,7 +376,8 @@ const specCtx = specCanvas.getContext('2d'), curveCtx = curveCanvas.getContext('
 function beatSec(){ return 60/bpm; }
 function renderInfo(){ const el = $('dockInfo'); if(el.classList.contains('hl')) return; const proj = currentProjectId ? currentProjectName : 'untitled (unsaved)'; el.textContent = proj + (infoText ? ' · ' + infoText : '') + (dirty ? ' · unsaved' : ''); }
 function setStatus(msg){ const el = $('dockInfo'); el.textContent = msg; el.classList.add('hl'); clearTimeout(statusTimer); statusTimer = setTimeout(()=>{ el.classList.remove('hl'); renderInfo(); }, 2200); }
-function markDirty(){ dirty = true; renderInfo(); scheduleAutosave(); }
+function markDirty(){ dirty = true; renderInfo(); scheduleAutosave(); setSaveLed(); }
+function setSaveLed(){ const l = document.querySelector('#saveBtn .sled'); if(l) l.classList.toggle('dirty', !!dirty); }
 function el(tag, cls){ const e = document.createElement(tag); if(cls) e.className = cls; return e; }
 function fmtLen(s){ const m = Math.floor(s/60), sec = Math.round(s%60); return m>0 ? `${m}:${sec.toString().padStart(2,'0')}` : `${s.toFixed(1)}s`; }
 function fmtSt(n){ return (n>0?'+':'') + n + 'st'; }
@@ -428,7 +436,7 @@ async function saveCurrentProject({ asNew=false, name=null, silent=false } = {})
     await Store.set('proj:'+id, buildProjectPayload(finalName));
     let idx = (await getProjectIndex()).filter(p=>p.id!==id); idx.unshift({ id, name:finalName, updatedAt:Date.now() });
     await Store.set('projects', idx);
-    currentProjectId = id; currentProjectName = finalName; dirty = false; updateProjectLabel();
+    currentProjectId = id; currentProjectName = finalName; dirty = false; updateProjectLabel(); setSaveLed(); try{ localStorage.setItem('tuner_lastProj', id); }catch(e){}
     if(!silent) setStatus('saved "' + finalName + '"');
     refreshProjectList(); return true;
   }catch(e){ if(!silent) setStatus('save failed: ' + (e && e.message ? e.message : 'unknown error')); return false; }
@@ -443,7 +451,7 @@ async function applyProjectPayload(payload, id, opts={}){
   const unitSec = Math.max(0.001, ...(payload.channels||[]).map(c=>{ const sm = samples.find(s=>s.id===c.sampleId); return sm && sm.buffer ? sm.buffer.duration : 0; }));
   const unitBeats = Math.max(1, Math.round(unitSec/beatSec()));
   for(const c of (payload.channels||[])){ const sample = samples.find(s=>s.id===c.sampleId); if(!sample) continue; const o = Object.assign({}, c, { persistedId:c.id, quiet:true }); if(!o.clips && o.blocks) o.clips = migrateBlocks(o, unitBeats); if((payload.v||0) < 5 && o.clips && sample.buffer){ const oldLen = Math.max(1, Math.round(sample.buffer.duration/(60/(payload.bpm||133)))), nl = loopBeats(sample); o.clips = o.clips.map(cl=> cl.len === oldLen ? Object.assign({}, cl, { len:nl }) : cl); } await addChannelFromSample(sample, o); }
-  currentProjectId = id; currentProjectName = payload.name || 'untitled'; dirty = !id;
+  currentProjectId = id; currentProjectName = payload.name || 'untitled'; dirty = !id; setSaveLed(); if(id){ try{ localStorage.setItem('tuner_lastProj', id); }catch(e){} }
   updateProjectLabel(); refreshTimeline(); drawAll(); resetHistory();
   if(!opts.quiet) setStatus('opened "' + currentProjectName + '"');
   closeProjectsPanel();
@@ -467,7 +475,7 @@ async function exportProjectFile(){
 async function importProjectFile(file){ try{ const payload = JSON.parse(await file.text()); if(!payload || !payload.channels) throw new Error('not a THREAT project file'); await applyProjectPayload(payload, null, {}); setStatus('opened file: ' + (payload.name || file.name)); if(Store.mode !== 'none') await saveCurrentProject({ asNew:true, name:payload.name || file.name.replace(/\.threat\.json$|\.json$/i,''), silent:true }); }catch(e){ setStatus('open failed: ' + (e && e.message ? e.message : 'unknown')); } }
 $('projSaveAsBtn').addEventListener('click', ()=>{ const name = $('projSaveName').value.trim() || 'untitled'; saveCurrentProject({ asNew: !currentProjectId || name !== currentProjectName, name }); });
 $('projSaveName').addEventListener('keydown', e=>{ if(e.key === 'Enter') $('projSaveAsBtn').click(); });
-$('projNewBtn').addEventListener('click', ()=>{ if(isRunning) stopAll(); clearChannels(); currentProjectId = null; currentProjectName = 'untitled'; dirty = false; playBeat = 0; scrollX = 0; scrollY = 0; applySettings({ bpm:DEFAULTS.bpm, zoomX:DEFAULTS.zoomX, zoomY:DEFAULTS.zoomY, master:DEFAULTS.master, limiterOn:DEFAULTS.limiter, sc:{} }); updateProjectLabel(); refreshTimeline(); drawAll(); resetHistory(); $('projSaveName').value = ''; refreshProjectList(); closeProjectsPanel(); setStatus('new project — everything reset'); });
+$('projNewBtn').addEventListener('click', ()=>{ if(isRunning) stopAll(); try{ localStorage.removeItem('tuner_lastProj'); }catch(e){} clearChannels(); currentProjectId = null; currentProjectName = 'untitled'; dirty = false; playBeat = 0; scrollX = 0; scrollY = 0; applySettings({ bpm:DEFAULTS.bpm, zoomX:DEFAULTS.zoomX, zoomY:DEFAULTS.zoomY, master:DEFAULTS.master, limiterOn:DEFAULTS.limiter, sc:{} }); updateProjectLabel(); refreshTimeline(); drawAll(); resetHistory(); $('projSaveName').value = ''; refreshProjectList(); closeProjectsPanel(); setStatus('new project — everything reset'); });
 $('projExportBtn').addEventListener('click', exportProjectFile);
 $('projImportBtn').addEventListener('click', ()=> $('projFileInput').click());
 $('projFileInput').addEventListener('change', async e=>{ const f = e.target.files && e.target.files[0]; e.target.value=''; if(f) await importProjectFile(f); });
@@ -645,7 +653,7 @@ function restore(st){
     if(wasRunning) scheduleFrom(beat);
   } finally { restoring = false; }
 }
-function undo(){ if(!histPast.length) return; histFuture.push(histCur); histCur = histPast.pop(); restore(histCur); updateHistBtns(); setStatus('undo'); }
+function undo(){ if(!histPast.length) return; histFuture.push(histCur); histCur = histPast.pop(); restore(histCur); updateHistBtns(); setStatus('undo'); showBubble('undone', 'redo'); }
 function redo(){ if(!histFuture.length) return; histPast.push(histCur); histCur = histFuture.pop(); restore(histCur); updateHistBtns(); setStatus('redo'); }
 
 /* ================= SAMPLES ================= */
@@ -875,16 +883,17 @@ $('pillDuck').addEventListener('click', ()=>{ const ch = selCh(); if(!ch){ setSt
   if(ch.scDuck && !sidechainTrigger) setStatus('DUCKED — now pick a TRIGGER loop');
   refreshTimeline(); markDirty(); commit(); drawTL(); });
 
-function openOptions(ch, clipIdx){ selectChannel(ch.id, clipIdx); $('optName').textContent = ch.sample.displayName + (clipIdx >= 0 ? '  ·  clip ' + (clipIdx+1) : ''); $('optMuteLoop').textContent = ch.mute ? 'UNMUTE LOOP' : 'MUTE LOOP'; $('optKeyLock').textContent = ch.keyLock ? 'KEY LOCK ON — ignores song key' : (parseKey(ch.sample.key) ? 'KEY LOCK — follows song key' : 'KEY LOCK — no key on this loop'); $('optRemoveClip').style.display = clipIdx >= 0 ? '' : 'none'; openSheet('optSheet'); }
+function openOptions(ch, clipIdx){ selectChannel(ch.id, clipIdx); $('optName').textContent = ch.sample.displayName + (clipIdx >= 0 ? '  ·  clip ' + (clipIdx+1) : ''); $('optMuteLoop').textContent = ch.mute ? 'UNMUTE LOOP' : 'MUTE LOOP'; $('optSolo').textContent = ch.solo ? 'UNSOLO' : 'SOLO — hear only this loop'; $('optKeyLock').textContent = ch.keyLock ? 'KEY LOCK ON — ignores song key' : (parseKey(ch.sample.key) ? 'KEY LOCK — follows song key' : 'KEY LOCK — no key on this loop'); $('optRemoveClip').style.display = clipIdx >= 0 ? '' : 'none'; openSheet('optSheet'); }
 function closeOptions(){ closeSheet('optSheet'); }
 $('optAddClip').addEventListener('click', ()=>{ const ch = selCh(); if(ch) addClip(ch); closeOptions(); });
 $('optKeyLock').addEventListener('click', ()=>{ const ch = selCh(); if(!ch) return; ch.keyLock = !ch.keyLock; rebuildBuffer(ch); if(isRunning) reschedule(); markDirty(); commit(); drawTL(); closeOptions(); setStatus(ch.keyLock ? 'key locked — this loop ignores the song key' : 'follows the song key'); });
+$('optSolo').addEventListener('click', ()=>{ const ch = selCh(); if(!ch) return; ch.solo = !ch.solo; drawTL(); closeOptions(); setStatus(ch.solo ? 'solo: ' + ch.sample.displayName : (anySolo() ? 'unsoloed' : 'solo off — everything back')); });
 $('optMuteLoop').addEventListener('click', ()=>{ const ch = selCh(); if(!ch) return; ch.mute = !ch.mute; markDirty(); commit(); drawTL(); closeOptions(); });
 $('optRemoveClip').addEventListener('click', ()=>{ removeSelectedClip(); showBubble('clip deleted', true); });
 $('optRemove').addEventListener('click', ()=>{ const ch = selCh(); if(!ch) return; closeOptions(); removeChannel(ch); showBubble('loop deleted', true); });
 
 let bubbleTimer = null;
-function showBubble(txt, withUndo, ms){ const b = $('bubble'); $('bubbleTxt').innerHTML = txt; $('bubbleUndo').style.display = withUndo ? '' : 'none'; b.classList.toggle('hint', !withUndo); b.classList.add('show'); clearTimeout(bubbleTimer); bubbleTimer = setTimeout(()=> b.classList.remove('show'), ms || 4000); }
+function showBubble(txt, withUndo, ms){ const b = $('bubble'); $('bubbleTxt').innerHTML = txt; const isRedo = withUndo === 'redo'; $('bubbleUndo').style.display = withUndo && !isRedo ? '' : 'none'; $('bubbleRedo').style.display = isRedo ? '' : 'none'; b.classList.toggle('hint', !withUndo); b.classList.add('show'); clearTimeout(bubbleTimer); bubbleTimer = setTimeout(()=> b.classList.remove('show'), ms || 4000); }
 function hideBubble(){ clearTimeout(bubbleTimer); $('bubble').classList.remove('show'); }
 function tripleDelete(ch, k){
   if(!ch || !ch.clips[k]) return;
@@ -895,6 +904,7 @@ function tripleDelete(ch, k){
 }
 function maybeTapHint(){ if(channels.length < 2) return; let seen = false; try{ seen = localStorage.getItem('tuner_tapHint2') === '1'; }catch(e){} if(seen) return; try{ localStorage.setItem('tuner_tapHint2','1'); }catch(e){} setTimeout(()=> showBubble('tap = select · <b>2</b> mute · <b>3</b> delete · hold = options', false, 6000), 400); }
 $('bubbleUndo').addEventListener('click', ()=>{ hideBubble(); undo(); });
+$('bubbleRedo').addEventListener('click', ()=>{ hideBubble(); redo(); });
 tl.addEventListener('animationend', ()=> tl.classList.remove('shake'));
 
 /* ================= PLAYBACK / SCHEDULING ================= */
@@ -911,8 +921,10 @@ function scheduleFrom(fromBeat){
   duckNow = 0; releaseStart = -99; wasHot = false;
 }
 function reschedule(){ if(!isRunning) return; scheduleFrom(currentBeat()); }
+function anySolo(){ return channels.some(c=>c.solo); }
+function isSilent(ch){ return ch.mute || (anySolo() && !ch.solo); }
 function triggerHot(){ return !!(sidechainTrigger && !sidechainTrigger.mute && trigLevel > scThreshold); }
-function updateChannelGain(ch){ let target = (isRunning && !ch.mute) ? ch.volume : 0; let tau = 0.01; if(isRunning && ch.scDuck && ch !== sidechainTrigger && duckNow > 0){ target *= (1 - duckNow); tau = ATTACK; } ch.gainNode.gain.setTargetAtTime(target, ctx.currentTime, tau); }
+function updateChannelGain(ch){ let target = (isRunning && !isSilent(ch)) ? ch.volume : 0; let tau = 0.01; if(isRunning && ch.scDuck && ch !== sidechainTrigger && duckNow > 0){ target *= (1 - duckNow); tau = ATTACK; } ch.gainNode.gain.setTargetAtTime(target, ctx.currentTime, tau); }
 function advanceSidechain(now, beat){ if(!sidechainTrigger){ duckNow = 0; trigLevel = 0; wasHot = false; return; } const pos = samplePosAt(sidechainTrigger, beat); trigPos = pos < 0 ? 0 : pos; trigLevel = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); const hot = triggerHot(); if(hot){ duckNow = scDepth; releaseStart = now; } else { const p = (now - releaseStart) / Math.max(0.001, scRelease); duckNow = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } wasHot = hot; }
 let playheadRaf = null, songTimer = null;
 function tick(){ const now = ctx.currentTime; const end = songEndBeats(); const endAt = songStartTime + (end - startBeat)*beatSec(); if(!nextPass && endAt - now < 0.25 && endAt > now) queueNextPass(endAt); if(nextPass && now >= nextPass.at){ songStartTime = nextPass.at; startBeat = 0; channels.forEach(ch=>{ ch.sources = ch.nextSources || []; ch.nextSources = null; }); nextPass = null; } const beat = currentBeat(); if(beat >= end){ scheduleFrom(0); return; } advanceSidechain(now, beat); channels.forEach(ch=>{ ch.lastPeakLevel = peakOf(ch.analyser, ch.dataArray); updateChannelGain(ch); }); }
@@ -968,7 +980,7 @@ function drawTL(){
     const isSel = i === selI, isTrig = ch === sidechainTrigger;
     const padY = Math.max(3, Math.round(zoomY*0.13)), cy = top + 2 + padY, chh = zoomY - 4 - padY*2;
     ch.clips.forEach((c, k)=>{
-      const dim = ch.mute || c.mute; const cx0 = c.start*zoomX - scrollX, cw = c.len*zoomX; if(cx0 > w || cx0 + cw < 0) return;
+      const dim = isSilent(ch) || c.mute; const cx0 = c.start*zoomX - scrollX, cw = c.len*zoomX; if(cx0 > w || cx0 + cw < 0) return;
       x.save(); x.globalAlpha = dim ? 0.4 : (isSel ? 1 : 0.55);
       x.fillStyle = dim ? '#3a3024' : '#d32f2f'; x.beginPath(); roundRect(x, cx0+1, cy, cw-2, chh, 3); x.fill(); x.clip();
       /* waveform etched into the clip, looping the sample */
@@ -985,7 +997,8 @@ function drawTL(){
       const tag = (txt, bg, fg)=>{ const tw = x.measureText(txt).width + 8; if(tx - tw < cx0 + 60 || chh < 12) return; x.fillStyle = bg; x.beginPath(); roundRect(x, tx - tw, cy + chh/2 - 5.5, tw, 11, 3); x.fill(); x.fillStyle = fg; x.fillText(txt, tx - 4, cy + chh/2 + .5); tx -= tw + 3; };
       if(ch.scDuck) tag('DUCKED', '#0e0c0a', '#4fd1a5');
       if(isTrig) tag('TRIG', '#0e0c0a', '#ff8a70');
-      if(dim) tag('MUTE', '#0e0c0a', '#ff9600');
+      if(ch.solo) tag('SOLO', '#0e0c0a', '#ffd166');
+      if(dim) tag(c.mute || ch.mute ? 'MUTE' : 'OFF', '#0e0c0a', '#ff9600');
     });
     /* "+" ghost after the last clip */
     const last = ch.clips.length ? ch.clips.reduce((m,c)=>Math.max(m,c.start+c.len),0) : 0; const ax = last*zoomX - scrollX; const aw = Math.max(26, Math.min(zoomX*BAR, 40));
@@ -1079,7 +1092,7 @@ async function renderArrangementOffline(sampleRate){
   const offline = new OfflineAudioContext(2, Math.ceil(totalLen*sampleRate), sampleRate); const oMaster = buildOfflineMasterChain(offline);
   const STEP = 0.002; const track = duckTrackFor(totalLen, STEP);
   channels.forEach(ch=>{
-    if(ch.mute || !ch.clips.length) return;
+    if(isSilent(ch) || !ch.clips.length) return;
     const g = offline.createGain(); const lp = offline.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7; const hp = offline.createBiquadFilter(); hp.type='highpass'; hp.Q.value=0.7;
     if(ch.filterVal<0){ lp.frequency.value=20000-(Math.abs(ch.filterVal)/100)*19700; hp.frequency.value=20; } else { hp.frequency.value=20+(ch.filterVal/100)*3000; lp.frequency.value=20000; }
     const oTune = buildTune(offline); setTune(oTune, ch.fx, offline, null); g.connect(lp); lp.connect(hp); hp.connect(oTune.in); oTune.out.connect(oMaster);
@@ -1187,9 +1200,14 @@ buildRack();
 document.querySelectorAll('.z[data-screws]').forEach(z=>{ const all = z.dataset.screws === '4'; const spots = all ? [['top','left'],['top','right'],['bottom','left'],['bottom','right']] : [['bottom','left'],['bottom','right']]; spots.forEach(([v,h],i)=>{ const sc = el('i','zs'); sc.style[v] = '5px'; sc.style[h] = '5px'; sc.style.setProperty('--r', (20 + i*37) + 'deg'); z.appendChild(sc); }); });
 new ResizeObserver(()=>{ layoutRack(); }).observe($('rackZone'));
 
+/* SAVE (also autosaves 1s after every change) · BACK TO START · ZOOM */
+$('saveBtn').addEventListener('click', async ()=>{ if(!channels.length){ setStatus('nothing to save yet'); return; } const ok = await saveCurrentProject({}); if(ok !== false) showBubble('saved ✓ — it also autosaves', false, 1800); });
+$('tlStart').addEventListener('click', ()=>{ playBeat = 0; scrollX = 0; if(isRunning) scheduleFrom(0); clampScroll(); drawTL(); });
+$('tlZoomIn').addEventListener('click', ()=> setZoom(zoomX*1.4, tl.clientWidth/2));
+$('tlZoomOut').addEventListener('click', ()=> setZoom(zoomX/1.4, tl.clientWidth/2));
 /* ================= BOOT ================= */
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
-(async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
+(async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); let lp = null; try{ lp = localStorage.getItem('tuner_lastProj'); }catch(e){} if(lp && !channels.length){ await loadProjectById(lp, { quiet:true }); } }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
 </script>
 </body>
 </html>

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-/* MODULE LAB lab-5 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
+/* MODULE LAB lab-6 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
 :root{ --void:#0a0804; --red:#d32f2f; --green:#4fd1a5; --text:#f2ede2; --mute:#8a8176; --faint:#4a443d;
   --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --ui:'Jura','Arial Narrow',system-ui,sans-serif; color-scheme:dark; }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -55,7 +55,8 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 .scr{ position:absolute; inset:0 10%; background:#040605; border:2px solid #1a1a1a; border-radius:3px; box-shadow:inset 0 0 14px #000; overflow:hidden; }
 svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 </style>
-<script src="modules/sky.js?v=lab-5"></script>
+<script src="modules/sky.js?v=lab-6"></script>
+<script src="modules/rage.js?v=lab-6"></script>
 </head><body>
 <div class="z top">
   <h1><b>THREAT</b> TUNER<small>MODULE LAB</small></h1>
@@ -70,7 +71,7 @@ svg.f{ position:absolute; inset:0; width:100%; height:100%; }
   <button class="btn" id="sw">SWITCH</button>
   <button id="play" aria-label="play">▶</button>
 </div>
-<div class="note">lab-5 · module at real app size</div>
+<div class="note">lab-6 · module at real app size</div>
 <script>
 const $ = id=>document.getElementById(id);
 const clamp = (v,a,b)=>Math.min(b, Math.max(a, v));
@@ -94,22 +95,23 @@ const MODS = {
         transport(o){ node.port.postMessage(o); } }; },
   },
   SKY: Object.assign({}, window.TUNER_MODS.SKY, { build(ac){ const n = window.TUNER_MODS.SKY.build(ac); return { in:n.in, out:n.out, set(v, sw){ n.set(v, sw, ac.currentTime); } }; } }),
+  RAGE: Object.assign({}, window.TUNER_MODS.RAGE, { build(ac){ const n = window.TUNER_MODS.RAGE.build(ac); return { _n:n, in:n.in, out:n.out, set(v, sw){ n.set(v, sw, ac.currentTime); } }; } }),
 };
-const ORDER = ['QUIPU','SKY'];
+const ORDER = ['QUIPU','SKY','RAGE'];
 
-const st = { mod:'SKY', v:{ QUIPU:.5, SKY:.6 }, sw:{ SKY:false }, seed:7, slice:-1, wet:true, playing:false, loop:null };
-try{ const s = JSON.parse(localStorage.getItem('lab5') || '{}'); Object.assign(st, s, { playing:false, slice:-1 }); }catch(e){}
-function save(){ try{ localStorage.setItem('lab5', JSON.stringify({ mod:st.mod, v:st.v, sw:st.sw, seed:st.seed, wet:st.wet, loop:st.loop })); }catch(e){} }
+const st = { mod:'RAGE', v:{ QUIPU:.5, SKY:.6, RAGE:.5 }, sw:{ SKY:false, RAGE:false }, seed:7, slice:-1, wet:true, playing:false, loop:null };
+try{ const s = JSON.parse(localStorage.getItem('lab5') || '{}'); Object.assign(st, s, { playing:false, slice:-1 }); st.v = Object.assign({ QUIPU:.5, SKY:.6, RAGE:.5 }, st.v); st.sw = Object.assign({ SKY:false, RAGE:false }, st.sw); if(!s.lab6){ st.mod = 'RAGE'; } }catch(e){}
+function save(){ try{ localStorage.setItem('lab5', JSON.stringify({ lab6:1, mod:st.mod, v:st.v, sw:st.sw, seed:st.seed, wet:st.wet, loop:st.loop })); }catch(e){} }
 const M = ()=>MODS[st.mod];
 
 /* ---------- audio ---------- */
-let ctx = null, chain = {}, dry, wetBus, src = null, ready = null;
+let ctx = null, chain = {}, dry, wetBus, src = null, ready = null, an = null, anBuf = null;
 async function boot(){ if(ready) return ready; ready = (async()=>{
   ctx = new (window.AudioContext || window.webkitAudioContext)();
   const files = new Set(); ORDER.forEach(k=>(MODS[k].worklets||[]).forEach(f=>files.add(f)));
-  for(const f of files) await ctx.audioWorklet.addModule(f + '?v=lab-5');
+  for(const f of files) await ctx.audioWorklet.addModule(f + '?v=lab-6');
   dry = ctx.createGain(); wetBus = ctx.createGain(); const out = ctx.createGain(); out.gain.value = 0.85;
-  dry.connect(out); wetBus.connect(out); out.connect(ctx.destination);
+  dry.connect(out); wetBus.connect(out); out.connect(ctx.destination); an = ctx.createAnalyser(); an.fftSize = 512; wetBus.connect(an);
   ORDER.forEach(k=>{ chain[k] = MODS[k].build(ctx, st); });
   route(); })(); return ready; }
 function route(){ if(!ctx) return; ORDER.forEach(k=>{ try{ chain[k].out.disconnect(); }catch(e){} }); const c = chain[st.mod]; c.out.connect(wetBus);
@@ -167,6 +169,10 @@ $('ab').addEventListener('click', ()=>{ st.wet = !st.wet; $('ab').className = 'b
 $('play').addEventListener('click', ()=>{ if(st.playing) stop(); else start().catch(e=>{ $('readout').textContent = 'could not play: ' + e.message; }); });
 $('loopSel').addEventListener('change', e=>{ st.loop = e.target.value; save(); if(st.playing) start(); });
 addEventListener('resize', ()=>{ layout(); draw(); });
+/* audio react: modules with .react get the output level each frame (cheap: one opacity change) */
+(function tick(){ requestAnimationFrame(tick); const m = M(); if(!m.react || !an) return; if(!anBuf) anBuf = new Float32Array(an.fftSize);
+  let lvl = 0; if(st.playing && st.wet){ an.getFloatTimeDomainData(anBuf); let e = 0; for(let i=0;i<anBuf.length;i++) e += anBuf[i]*anBuf[i]; lvl = Math.sqrt(e/anBuf.length)*3; }
+  m.react($('slot'), lvl); })();
 layout(); chips(); draw(); readout(); loadLib();
 </script>
 </body></html>

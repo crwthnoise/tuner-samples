@@ -499,7 +499,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.29';
+const APP_VERSION = 'v10.30';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1121,7 +1121,7 @@ function libRow(smp){
   const cv = document.createElement('canvas');
   const tx = el('div','txt'); const nm = el('div','nm'); nm.textContent = smp.displayName; const meta = el('div','meta'); const NU = (smp.displayName||'').toUpperCase(); meta.textContent = [ (smp.bpm && !NU.includes(String(smp.bpm))) ? smp.bpm + ' BPM' : null, (smp.key && !NU.includes(smp.key.replace(/min|maj/i,'').toUpperCase())) ? smp.key : null, smp.buffer ? fmtLen(smp.buffer.duration) : null].filter(Boolean).join(' · ');   /* v10.25: no repeats — BPM/key only when the name doesn't already say it */ tx.append(nm, meta);
   const add = el('button','add'); add.dataset.k = libShowHidden ? 'UNHIDE' : 'LIB +'; add.textContent = libShowHidden ? '↺' : '+'; add.title = libShowHidden ? 'back in the library' : 'add to track';
-  add.addEventListener('click', e=>{ e.stopPropagation(); if(libShowHidden){ smp.hidden = false; saveSampleMeta(smp); setStatus(smp.displayName + ' is back'); renderLibrary(); return; } addChannelFromSample(smp); setStatus(smp.displayName + ' → track'); });
+  add.addEventListener('click', e=>{ e.stopPropagation(); stopPreview(); if(libShowHidden){ smp.hidden = false; saveSampleMeta(smp); setStatus(smp.displayName + ' is back'); renderLibrary(); return; } addChannelFromSample(smp); setStatus(smp.displayName + ' → track'); });
   add.addEventListener('pointerdown', e=>e.stopPropagation());
   row.append(cv, tx, add);
   let t = null, held = false, sx = 0, sy = 0;
@@ -1177,7 +1177,8 @@ function makeQuipu(ac, o){ try{ return new AudioWorkletNode(ac, 'quipu', { numbe
 function quipuOpts(ch, t0){ return { t0: t0 || 0, bs: beatSec(), loopBeats: ch ? loopBeats(ch.sample) : 4, seed: ch ? ch.qSeed : 1 }; }
 function upgradeQuipu(ch){ const n = ch.tuneNodes; if(!n || !n.quipu || !n.quipu._fake) return; const q = makeQuipu(ctx, quipuOpts(ch, quipuT0())); if(q._fake) return; n.quipu = q; n.blk.QUIPU = [q, q]; wireTune(n, n.order); applyTune(ch); }
 function quipuT0(){ return isRunning ? songStartTime - startBeat*beatSec() : 0; }
-function syncQuipu(ch, t0){ const n = ch.tuneNodes; if(n && n.quipu && n.quipu.port) n.quipu.port.postMessage({ t0, bs: beatSec(), loopBeats: loopBeats(ch.sample), seed: ch.qSeed }); }
+function syncQuipu(ch, t0, fresh){ const n = ch.tuneNodes; if(n && n.quipu && n.quipu.port) n.quipu.port.postMessage(Object.assign({ t0, bs: beatSec(), loopBeats: loopBeats(ch.sample), seed: ch.qSeed }, fresh ? { reset:true, run:true } : {})); }
+function quietQuipu(){ channels.forEach(ch=>{ const n = ch.tuneNodes; if(n && n.quipu && n.quipu.port) n.quipu.port.postMessage({ run:false }); }); }
 function migrateSw(o){ const out = {}; if(o && typeof o === 'object') SW_KEYS.forEach(k=>{ if(o[k]) out[k] = true; }); return out; }
 function migrateFx(v){ return Array.isArray(v) ? FX_SLOTS.map((_,i)=>clamp(+v[i]||0, 0, 1)) : fxDefaults(); }
 const _curveCache = {};
@@ -1382,7 +1383,7 @@ function scheduleFrom(fromBeat){
   const bs = beatSec(), t0 = ctx.currentTime + 0.05; songStartTime = t0; startBeat = fromBeat;
   channels.forEach(ch=>{ const rate = playRate(ch), dur = ch.buffer.duration; ch.clips.forEach(c=>{ const end = c.start + c.len; if(c.mute || end <= fromBeat) return; const src = ctx.createBufferSource(); src.buffer = ch.buffer; src.loop = true; src.detune.value = chPitch(ch)*100; src.connect(ch.gainNode); const startAt = t0 + Math.max(0, c.start - fromBeat)*bs; const into = Math.max(0, fromBeat - c.start); const offset = ((into + c.off)*bs*rate) % dur; src.start(startAt, offset); src.stop(t0 + (end - fromBeat)*bs); ch.sources.push(src); }); });
   const pumpAt = t0 + (Math.ceil(fromBeat - 1e-6) - fromBeat)*bs, pumpAt2 = t0 + (2*Math.ceil(fromBeat/2 - 1e-6) - fromBeat)*bs; channels.forEach(ch=>{ if(ch.tuneNodes) startPump(ch.tuneNodes, ctx, ch.tuneNodes.half ? pumpAt2 : pumpAt); });
-  channels.forEach(ch=>syncQuipu(ch, t0 - fromBeat*bs));   /* QUIPU knows where the bars are */
+  channels.forEach(ch=>syncQuipu(ch, t0 - fromBeat*bs, true));   /* v10.30: fresh memory on every (re)start / BPM change = always in sync */   /* QUIPU knows where the bars are */
   duckNow = 0; releaseStart = -99; wasHot = false;
 }
 function reschedule(){ if(!isRunning) return; scheduleFrom(currentBeat()); }
@@ -1408,7 +1409,7 @@ async function ensureRunning(fromBeat){
   songTimer = setInterval(tick, 40);
   playheadRaf = requestAnimationFrame(frame);
 }
-function stopAll(){ isRunning = false; if(songTimer){ clearInterval(songTimer); songTimer = null; } if(playheadRaf){ cancelAnimationFrame(playheadRaf); playheadRaf = null; } setPlay(false); stopSources(); const t = ctx.currentTime; channels.forEach(ch=>{ ch.gainNode.gain.cancelScheduledValues(t); ch.gainNode.gain.setValueAtTime(0, t); ch.lastPeakLevel = 0; ch.dataArray.fill(0); }); masterPeak = 0; duckNow = 0; trigLevel = 0; masterData.fill(0); lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; vizCaps.fill(0); drawAll(); updatePumpDot(); updateRackLevel(); if(recState !== 'idle') stopRec(); vizDecay(); }
+function stopAll(){ isRunning = false; quietQuipu(); if(songTimer){ clearInterval(songTimer); songTimer = null; } if(playheadRaf){ cancelAnimationFrame(playheadRaf); playheadRaf = null; } setPlay(false); stopSources(); const t = ctx.currentTime; channels.forEach(ch=>{ ch.gainNode.gain.cancelScheduledValues(t); ch.gainNode.gain.setValueAtTime(0, t); ch.lastPeakLevel = 0; ch.dataArray.fill(0); }); masterPeak = 0; duckNow = 0; trigLevel = 0; masterData.fill(0); lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; vizCaps.fill(0); drawAll(); updatePumpDot(); updateRackLevel(); if(recState !== 'idle') stopRec(); vizDecay(); }
 transportBtn.addEventListener('click', async ()=>{ try{ if(isRunning) stopAll(); else await ensureRunning(); }catch(err){ setStatus('error: ' + err.message); } });
 /* ===== v10.12 REC — mic into a new lane.
    stopped + TAP  = 1-bar count-in, then plays + records (count-in can be turned off in ⚙)

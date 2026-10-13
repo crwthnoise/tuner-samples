@@ -20,7 +20,7 @@
      Colours = v9.5 palette only. Skins repaint these zones later (Winamp-style). */
   :root{
     --void:#0a0804; --panel:#1a1612; --panel-2:#2a2218; --border:#3a3024; --text:#f2ede2; --dim:#9c9284; --mute:#8a8176;
-    --red:var(--red); --red-dim:#7a1e1e; --green:#4fd1a5; --green-dim:#2c4a3e; --amber:#ff9600;
+    --red:#d32f2f; --red-rgb:211,47,47; --red-hi:#ff4d4d; --red-hi-rgb:255,48,48; --red-lt:#ff8a8a; --red-dim:#7a1e1e; --green:#4fd1a5; --green-dim:#2c4a3e; --amber:#ff9600;
     --zone:#0e0c0a; --rail:#2a2724; --lane:#15120f;
     --ui:'Chakra Petch','Arial Narrow',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
     color-scheme:dark;
@@ -79,12 +79,20 @@
   .pill .led{ width:5px; height:5px; border-radius:50%; background:var(--rail); }
   .pill .sep{ color:var(--rail); font:700 8px var(--mono); }
   #pillTrig.on{ color:#ff8a70; } #pillTrig.on .led{ background:var(--red); box-shadow:0 0 5px var(--red); }
+  /* v10.23 LOOP PILL: the loop you're working on, always lit red */
+  .lpill{ display:none; max-width:36vw; min-width:0; flex:0 1 auto; border-color:var(--red); background:rgba(var(--red-rgb),.14); box-shadow:0 0 8px rgba(var(--red-rgb),.55), inset 0 0 6px rgba(var(--red-rgb),.25); }
+  .lpill.show{ display:flex; }
+  .lpill .led{ flex:none; background:var(--red-hi); box-shadow:0 0 5px var(--red-hi); }
+  .lpill span{ font:700 7px var(--mono); letter-spacing:1px; color:var(--red-lt); text-shadow:0 0 6px rgba(var(--red-hi-rgb),.8); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .chip.type{ font-weight:700; letter-spacing:1px; }
   #pillDuck.on{ color:var(--green); } #pillDuck.on .led{ background:var(--green); box-shadow:0 0 5px var(--green); }
   .info{ flex:1; min-width:0; font:500 7.5px var(--mono); color:var(--mute); letter-spacing:.06em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; transition:color .2s; }
   .info.hl{ color:var(--text); }
   :root[data-season="storm"]{ --red:#2a9fd8; --red-dim:#1b4a66; --red-rgb:42,159,216; --red-hi:#3ec5ff; --red-hi-rgb:62,197,255; --red-lt:#9be2ff; }
-  .info.err{ color:var(--red-hi) !important; font-weight:700; }
-  .info.loop{ color:var(--red-hi); text-shadow:0 0 6px var(--red-hi), 0 0 14px rgba(var(--red-hi-rgb),.45); font-weight:700; letter-spacing:.12em; }
+  .info.err{ color:#ff4d4d !important; font-weight:700; }
+  .info.loop{ color:#ff4d4d; text-shadow:0 0 6px #ff3030, 0 0 14px rgba(255,48,48,.45); font-weight:700; letter-spacing:.12em; }
+  :root[data-season="storm"] .info.err{ color:var(--red-hi) !important; }
+  :root[data-season="storm"] .info.loop{ color:var(--red-hi); text-shadow:0 0 6px var(--red-hi), 0 0 14px rgba(var(--red-hi-rgb),.45); }
   #thickTip{ position:fixed; z-index:29; max-width:min(240px,70vw); display:flex; align-items:flex-start; gap:8px; padding:7px 8px 7px 10px; background:#0a0908; border:1px solid var(--a,#888); border-radius:6px; box-shadow:0 6px 16px #000, 0 0 10px color-mix(in srgb, var(--a,#888) 35%, transparent); font:500 11px/1.35 var(--mono); color:#d8d2c6; opacity:0; transform:translateY(4px); pointer-events:none; transition:opacity .15s, transform .15s; }
   #thickTip.on{ opacity:1; transform:none; pointer-events:auto; }
   #thickTip b{ color:var(--a); font-weight:700; }
@@ -360,6 +368,7 @@
   <div class="rack idle" id="rack"></div>
   <div class="rfoot">
     <div class="pill off" id="pill"><button id="pillTrig" data-k="TRIGGER"><i class="led"></i>TRIGGER</button><span class="sep">|</span><button id="pillDuck" data-k="DUCKED"><i class="led"></i>DUCKED</button></div>
+    <div class="pill lpill" id="loopPill" data-k="LOOP PILL"><i class="led"></i><span id="loopPillName"></span></div>
     <div class="info" id="dockInfo"></div>
     <div class="dots" id="dots"><i class="on"></i><i></i><i></i></div>
   </div>
@@ -456,7 +465,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.22';
+const APP_VERSION = 'v10.23';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -530,7 +539,7 @@ function channelMeta(){ return channels.map(ch=>({ id:ch.id, sampleId:ch.sample.
 function settingsMeta(){ return { songKey:songKeyState, bpm, zoomX, zoomY, master:masterGain.gain.value, limiterOn, sc:{ depth:scDepth, thr:scThreshold, rel:scRelease, curve:scCurve } }; }
 function buildProjectPayload(name, forceB64){
   const usedIds = [...new Set(channels.map(c=>c.sample.id))], sampleList = [];
-  for(const sid of usedIds){ const s = samples.find(x=>x.id===sid); if(!s) continue; const buf = bufferToWav(s.buffer); const rec = { id:s.id, name:s.name, displayName:s.displayName, folder:s.folder, tags:s.tags, bpm:s.bpm, key:s.key, mime:'audio/wav', builtin:!!s.builtin }; if(Store.mode === 'idb' && !forceB64) rec.buf = buf; else rec.base64 = abToB64(buf); sampleList.push(rec); }
+  for(const sid of usedIds){ const s = samples.find(x=>x.id===sid); if(!s) continue; if(s.builtin && s.url && !forceB64){ sampleList.push({ id:s.id, lib:true, builtin:true }); continue; } if(!s.buffer) continue; const buf = bufferToWav(s.buffer); const rec = { id:s.id, name:s.name, displayName:s.displayName, folder:s.folder, tags:s.tags, bpm:s.bpm, key:s.key, mime:'audio/wav', builtin:!!s.builtin }; if(Store.mode === 'idb' && !forceB64) rec.buf = buf; else rec.base64 = abToB64(buf); sampleList.push(rec); }
   return Object.assign({ v:5, app:'THREAT', name, channels:channelMeta(), samples:sampleList }, settingsMeta());
 }
 function applySettings(o){
@@ -852,7 +861,7 @@ function redo(){ if(!histFuture.length) return; histPast.push(histCur); histCur 
 const MOODS = ['anger','happy','sad','motivation','epic','cinematic','dark','chill','hype','dreamy'];
 function parseTagsFromName(name){ const tags = []; const m = name.match(/\[([^\]]+)\]|\(([^)]+)\)/); if(m){ (m[1]||m[2]).split(/[,;|]/).forEach(t=>{ t = t.trim().toLowerCase(); if(t) tags.push(t); }); } (name.match(/#([a-z0-9\-]+)/gi)||[]).forEach(h=>tags.push(h.slice(1).toLowerCase())); return [...new Set(tags)]; }
 function cleanName(name){ const base = name.replace(/\.[^.]+$/,''); const out = base.replace(/\[[^\]]*\]|\([^)]*\)|#[a-z0-9\-]+/gi,'').split(/[_\-\s]+/).filter(t=>{ if(!t) return false; if(/^\d{2,3}$/.test(t)){ const n=+t; if(n>=40 && n<=240) return false; } if(/^(\d{2,3})?bpm$/i.test(t)) return false; if(/^[A-G]#?(min|maj|m)$/i.test(t)) return false; return true; }).join(' ').trim(); return out || base; }
-async function saveSampleMeta(sample){ if(Store.mode==='none') return; try{ await Store.set('smeta:'+sample.id, { name:sample.displayName, folder:sample.folder, bpm:sample.bpm, key:sample.key, tags:sample.tags, hidden:!!sample.hidden }); }catch(e){} }
+async function saveSampleMeta(sample){ if(Store.mode==='none') return; try{ await Store.set('smeta:'+sample.id, { name:sample.displayName, userName:!!sample.userName, folder:sample.folder, bpm:sample.bpm, key:sample.key, tags:sample.tags, hidden:!!sample.hidden }); }catch(e){} }
 function audioExt(n){ return /\.(wav|mp3|m4a|aac|aif|aiff|flac|ogg|caf)$/i.test(n); }
 /* v10.19: loading can never hang + any failure shows its real reason on screen (so a phone-only bug can be read off the LCD) */
 function withTimeout(p, ms, why){ return Promise.race([p, new Promise((_, rej)=>setTimeout(()=>rej(new Error(why)), ms))]); }
@@ -862,18 +871,45 @@ function tunerErr(msg){ msg = String(msg).slice(0, 140); tunerErrs.push(new Date
 window.tunerErr = tunerErr;
 window.addEventListener('error', e=>tunerErr((e.message || 'error') + (e.lineno ? ' @' + e.lineno : '')));
 window.addEventListener('unhandledrejection', e=>tunerErr('promise: ' + (e.reason && e.reason.message || e.reason)));
+/* v10.23 SMALL LOOPS: library loops are AAC .m4a (~10x smaller). AAC adds a bit of silence at the start/end,
+   so after decoding we find the exact loop start with the fingerprint from samples/meta.json and cut it back to the original length = seamless */
+function fpDecode(b64){ const t = atob(b64), u = new Uint8Array(t.length); for(let i=0;i<t.length;i++) u[i] = t.charCodeAt(i); return new Int16Array(u.buffer); }
+function trimLoop(s, ab){
+  if(!s.frames || !s.fp) return ab;
+  const ratio = ab.sampleRate / (s.sr || 44100), len = Math.round(s.frames * ratio); if(len < 16 || ab.length < len) return ab;
+  const fp = fpDecode(s.fp), sc = (s.fpScale || 1) / 32767, nc = ab.numberOfChannels, chs = []; for(let c=0;c<nc;c++) chs.push(ab.getChannelData(c));
+  const mono = i=>{ let v = 0; for(let c=0;c<nc;c++) v += chs[c][i]; return v / nc; };
+  const idx = new Int32Array(fp.length); for(let i=0;i<fp.length;i++) idx[i] = Math.round((s.fpAt + i) * ratio);
+  const maxD = Math.min(Math.round(6000 * ratio), ab.length - len, ab.length - 1 - idx[idx.length-1]);
+  let best = 0, bestE = Infinity;
+  for(let d=0; d<=maxD; d++){ let e = 0; for(let i=0;i<fp.length;i++){ const x = mono(idx[i] + d) - fp[i]*sc; e += x*x; if(e >= bestE) break; } if(e < bestE){ bestE = e; best = d; } }
+  const out = ctx.createBuffer(nc, len, ab.sampleRate); for(let c=0;c<nc;c++) out.getChannelData(c).set(chs[c].subarray(best, best + len));
+  s.trimAt = best; return out;
+}
+/* raw bytes: kept in the phone's cache, so after the first visit every sound is already there (even offline) */
+const RAW_CACHE = 'tuner-loops-v1';
+async function fetchRaw(sample){
+  if(sample.raw) return sample.raw;
+  const key = sample.url + (sample.frames ? (sample.url.includes('?') ? '&' : '?') + 'f=' + sample.frames : '');
+  let cache = null; try{ cache = await caches.open(RAW_CACHE); const hit = await cache.match(key); if(hit){ sample.raw = await hit.arrayBuffer(); return sample.raw; } }catch(e){ cache = null; }
+  const r = await withTimeout(fetch(sample.url), 30000, 'download timed out'); if(!r.ok) throw new Error('HTTP ' + r.status);
+  const buf = await r.arrayBuffer(); sample.raw = buf;
+  if(cache){ try{ await cache.put(key, new Response(buf.slice(0), { headers:{ 'Content-Type': r.headers.get('Content-Type') || 'audio/mp4' } })); }catch(e){} }
+  return buf;
+}
+let libRenderT = null; function renderLibrarySoon(){ if(libRenderT) return; libRenderT = setTimeout(()=>{ libRenderT = null; renderLibrary(); }, 300); }
 async function ensureLoaded(sample){
   if(sample.buffer) return sample;
   sample.failed = false;
   if(sample._loading) return sample._loading;
   sample._loading = (async ()=>{
-    try{ const r = await withTimeout(fetch(sample.url), 20000, 'download timed out'); if(!r.ok) throw new Error('HTTP ' + r.status); const buf = await r.arrayBuffer(); const audioBuf = await withTimeout(decodeAudio(buf), 15000, 'decode timed out'); sample.buffer = audioBuf; sample.waveImg = renderWaveformImage(audioBuf); sample.env = buildEnvelope(audioBuf); sample.peaks = buildPeaks(audioBuf); }
+    try{ const buf = await fetchRaw(sample); const audioBuf = trimLoop(sample, await withTimeout(decodeAudio(buf), 15000, 'decode timed out')); sample.buffer = audioBuf; sample.waveImg = renderWaveformImage(audioBuf); sample.env = buildEnvelope(audioBuf); sample.peaks = buildPeaks(audioBuf); }
     catch(e){ sample.failed = true; tunerErr("load " + sample.displayName + ": " + (e && e.message || e)); }
-    sample._loading = null; renderLibrary(); return sample;
+    sample._loading = null; renderLibrarySoon(); return sample;
   })();
   return sample._loading;
 }
-function registerRemote(it){ if(samples.find(x=>x.id===it.id)) return; const meta = parseLoopMeta(it.file); samples.push({ id:it.id, name:it.file, displayName:it.name || cleanName(it.file), url:it.url, buffer:null, bpm:it.bpm ?? meta.bpm, key:it.key ?? meta.key, tags:it.tags || parseTagsFromName(it.file), folder:it.folder || 'Library', builtin:true, hidden:false, waveImg:null, env:null, peaks:null, lpk:Array.isArray(it.peaks) ? it.peaks : null }); }
+function registerRemote(it){ if(samples.find(x=>x.id===it.id)) return; const meta = parseLoopMeta(it.file); samples.push({ id:it.id, name:it.file, displayName:it.name || cleanName(it.file), url:it.url, buffer:null, bpm:it.bpm ?? meta.bpm, key:it.key ?? meta.key, tags:it.tags || parseTagsFromName(it.file), folder:it.folder || 'Library', builtin:true, hidden:false, waveImg:null, env:null, peaks:null, lpk:Array.isArray(it.peaks) ? it.peaks : null, frames:it.frames||0, sr:it.sr||0, fpAt:it.fpAt||0, fpScale:it.fpScale||1, fp:it.fp||null }); }
 async function loadGithubLibrary(){
   const g = SAMPLE_SOURCE.github; if(!g || !g.repo) return;
   const base = (g.path||'').replace(/^\/|\/$/g,''); const key = 'ghlist:' + g.repo + '/' + base;
@@ -890,11 +926,11 @@ async function loadBuiltins(){
   /* register only — each loop downloads the first time it's used (fast startup) */
   try{
     const r = await fetch('samples/index.json', { cache:'no-cache' }); if(!r.ok) return; const idx = await r.json();
-    for(const it of idx){ if(samples.find(x=>x.id===it.id)) continue; registerRemote({ id:it.id, file:it.file.split('/').pop(), url:'samples/' + it.file.split('/').map(encodeURIComponent).join('/'), name:it.name, folder:it.folder||'Library', bpm:it.bpm, key:it.key, tags:it.tags||[], peaks:it.peaks }); }
-    renderLibrary();
+    for(const it of idx){ if(samples.find(x=>x.id===it.id)) continue; registerRemote({ id:it.id, file:it.file.split('/').pop(), url:'samples/' + it.file.split('/').map(encodeURIComponent).join('/'), name:it.name, folder:it.folder||'Library', bpm:it.bpm, key:it.key, tags:it.tags||[], peaks:it.peaks, frames:it.frames, sr:it.sr, fpAt:it.fpAt, fpScale:it.fpScale, fp:it.fp }); }
+    renderLibrary(); setTimeout(preloadAll, 400);
   }catch(e){}
 }
-async function applySampleMetaOverrides(){ if(Store.mode==='none') return; for(const s of samples){ try{ const m = await Store.get('smeta:'+s.id); if(!m) continue; if(m.name) s.displayName = m.name; if(m.folder) s.folder = m.folder; if(m.bpm!=null) s.bpm = m.bpm; if(m.key!==undefined) s.key = m.key; if(Array.isArray(m.tags)) s.tags = m.tags; s.hidden = !!m.hidden; }catch(e){} } renderLibrary(); }
+async function applySampleMetaOverrides(){ if(Store.mode==='none') return; for(const s of samples){ try{ const m = await Store.get('smeta:'+s.id); if(!m) continue; if(m.name && (!s.builtin || m.userName)) s.displayName = m.name; if(m.folder) s.folder = m.folder; if(m.bpm!=null) s.bpm = m.bpm; if(m.key!==undefined) s.key = m.key; if(Array.isArray(m.tags)) s.tags = m.tags; s.hidden = !!m.hidden; }catch(e){} } renderLibrary(); }
 function parseLoopMeta(filename){ let bpmv=null, key=null; const parts=filename.replace(/\.[^.]+$/,'').toUpperCase().split(/[_\s-]/); for(const p of parts){ if(!bpmv && /^\d{2,3}$/.test(p)){ const n=parseInt(p,10); if(n>=40 && n<=240) bpmv=n; } if(!key && (/^[A-G]#?MIN$/.test(p) || /^[A-G]#?MAJ$/.test(p))){ const sharp=p[1]==='#'; const note=p[0]+(sharp?'#':''); const mode=p.slice(sharp?2:1); key=note+(mode==='MIN'?'min':'maj'); } } return {bpm:bpmv, key}; }
 async function addSample(file, opts={}){
   if(!opts.quiet) setStatus('loading ' + file.name);
@@ -933,8 +969,25 @@ let prefetchQ = [], prefetchRun = 0;
 function prefetchSel(){ prefetchQ = samples.filter(x=>!x.buffer && !x.failed && !x.hidden && inSel(x, libSel)); pumpPrefetch(); }
 function pumpPrefetch(){ while(prefetchRun < 2 && prefetchQ.length){ const x = prefetchQ.shift(); if(x.buffer) continue; prefetchRun++; ensureLoaded(x).finally(()=>{ prefetchRun--; pumpPrefetch(); }); } }
 function setLibSel(s){ setTimeout(prefetchSel, 50); libSel = s; libEdit = null; libShowHidden = false; try{ localStorage.setItem('tuner_libSel', s); }catch(e){} renderLibrary(); }
-let previewTok = 0; const previewAll = new Set();
-function stopPreview(){ previewTok++; previewAll.forEach(x=>{ try{ x.stop(); }catch(e){} try{ x.disconnect(); }catch(e){} }); previewAll.clear(); previewSrc = null; const was = previewId; previewId = null; if(previewRaf){ cancelAnimationFrame(previewRaf); previewRaf = null; } if(!isRunning){ lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; masterPeak = 0; masterData.fill(0); vizCaps.fill(0); } document.querySelectorAll('.lrow.playing').forEach(r=>r.classList.remove('playing')); if(was){ const s = samples.find(x=>x.id===was); if(s) drawRow(s); } }
+/* v10.23 PRELOAD: on open, every library sound downloads (small .m4a, 4 at a time) with a progress line on the LCD; the open pack also decodes */
+let preloadDone = false;
+async function preloadAll(){
+  if(preloadDone) return; preloadDone = true;
+  const list = samples.filter(x=>x.builtin && x.url && !x.raw); if(!list.length) return;
+  const first = list.filter(x=>inSel(x, libSel)), rest = list.filter(x=>!inSel(x, libSel)), q = first.concat(rest);
+  let done = 0, failed = 0; const total = q.length, el = $('dockInfo');
+  const show = ()=>{ if(done < total){ el.classList.remove('mq','loop','err'); el.classList.add('hl'); el.textContent = 'loading sounds ' + done + '/' + total + ' ' + '▮'.repeat(Math.round(done/total*10)) + '▯'.repeat(10 - Math.round(done/total*10)); } };
+  show();
+  const worker = async ()=>{ while(q.length){ const x = q.shift(); try{ await fetchRaw(x); }catch(e){ failed++; } done++; show(); } };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  prefetchSel();
+  setStatus(failed ? ('sounds ready · ' + failed + ' failed (tap to retry)') : ('all ' + total + ' sounds ready ✓'));
+}
+let previewTok = 0; const previewAll = new Set(); let previewBus = null;
+/* v10.23: every preview plays through its OWN fresh volume node; stopping fades it out and unplugs the whole node,
+   so an old preview can never keep playing, whatever started it (iPhone kept old sources alive) */
+function killPreviewBus(){ const b = previewBus; previewBus = null; if(!b) return; try{ const t = ctx.currentTime; b.gain.cancelScheduledValues(t); b.gain.setValueAtTime(b.gain.value, t); b.gain.linearRampToValueAtTime(0, t + 0.015); }catch(e){} setTimeout(()=>{ try{ b.disconnect(); }catch(e){} }, 40); }
+function stopPreview(){ previewTok++; killPreviewBus(); previewAll.forEach(x=>{ try{ x.stop(); }catch(e){} try{ x.disconnect(); }catch(e){} }); previewAll.clear(); previewSrc = null; const was = previewId; previewId = null; if(previewRaf){ cancelAnimationFrame(previewRaf); previewRaf = null; } if(!isRunning){ lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; masterPeak = 0; masterData.fill(0); vizCaps.fill(0); } document.querySelectorAll('.lrow.playing').forEach(r=>r.classList.remove('playing')); if(was){ const s = samples.find(x=>x.id===was); if(s) drawRow(s); } }
 /* preview at the SONG tempo once a song is going (same stretch engine as the timeline, cached) */
 function previewBuffer(s){ if(!channels.length || !s.buffer) return s.buffer; const f = loopBeats(s) * beatSec() / s.buffer.duration; if(Math.abs(f - 1) < 0.002) return s.buffer; if(!s._st) s._st = new Map(); const key = f.toFixed(4); const hq = s._hq && s._hq.get(key); if(hq) return hq; hqRequest(s, f, key); let b = s._st.get(key); if(!b){ b = wsola(s.buffer, f); if(s._st.size > 12) s._st.delete(s._st.keys().next().value); s._st.set(key, b); } return b; }
 async function startPreview(sample){
@@ -943,8 +996,9 @@ async function startPreview(sample){
   if(tok !== previewTok) return; const row0 = document.querySelector('.lrow[data-id="' + sample.id + '"]'); if(row0) row0.classList.add('playing');
   if(!sample.buffer){ setStatus('loading ' + sample.displayName + '…'); await ensureLoaded(sample); if(!sample.buffer || tok !== previewTok) return; }
   const buf = previewBuffer(sample); if(tok !== previewTok) return;
-  previewAll.forEach(x=>{ try{ x.stop(); }catch(e){} }); previewAll.clear();
-  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(previewGain); src.start(); previewSrc = src; previewAll.add(src); previewStart = ctx.currentTime; previewDur = buf.duration;
+  previewAll.forEach(x=>{ try{ x.stop(); }catch(e){} try{ x.disconnect(); }catch(e){} }); previewAll.clear(); killPreviewBus();
+  const bus = ctx.createGain(); bus.gain.value = 1; bus.connect(previewGain); previewBus = bus;
+  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(bus); src.start(); previewSrc = src; previewAll.add(src); previewStart = ctx.currentTime; previewDur = buf.duration;
   const row = document.querySelector('.lrow[data-id="' + sample.id + '"]'); if(row) row.classList.add('playing');
   const loop = ()=>{ if(previewId !== sample.id) return; drawRow(sample); if(!isRunning){ updateLufs(); masterPeak = peakOf(analyserMaster, masterData); updateViz(true); } previewRaf = requestAnimationFrame(loop); }; loop();
 }
@@ -964,7 +1018,14 @@ function drawRow(s, cv){
   else { x.fillStyle = 'rgba('+REDRGB+',.25)'; x.fillRect(0, mid-0.5, w, 1); }
   if(playing){ x.fillStyle = '#f2ede2'; x.fillRect(px, 0, 1.5, h); }
 }
-function libMatches(smp){ if(!!smp.hidden !== libShowHidden) return false; if(!inSel(smp, libSel)) return false; const q = ($('librarySearch').value||'').trim().toLowerCase(); if(q){ const hay = (smp.displayName + ' ' + (smp.key||'') + ' ' + (smp.bpm||'') + ' ' + smp.folder + ' ' + smp.tags.join(' ')).toLowerCase(); if(!hay.includes(q)) return false; } for(const t of libTagFilter){ if(!smp.tags.includes(t)) return false; } return true; }
+/* v10.23 TYPE CHIPS: DRUMS · BASS · SYNTHS · VOCALS · FX — read from the file name / folder */
+const LIB_TYPES = ['DRUMS','BASS','SYNTHS','VOCALS','FX'];
+let libType = null;
+function typeOf(smp){ if(smp._type !== undefined) return smp._type; const t = ((smp.name||'') + ' ' + (smp.folder||'')).toUpperCase();
+  const has = re => re.test(t);
+  smp._type = has(/VOCAL|VOX|CHOP|ACAPELLA/) ? 'VOCALS' : has(/(^|[^A-Z])(BASS|808|SUB|REESE)/) ? 'BASS' : has(/DRUM|KICK|HAT|PERC|TOP|SNARE|CLAP|BREAK|GROOVE/) ? 'DRUMS' : has(/RISER|IMPACT|SWEEP|(^|[^A-Z])FX|DOWNLIFTER|UPLIFTER|NOISE/) ? 'FX' : has(/MELOD|LEAD|CHORD|SYNTH|PAD|GUITAR|KEY|BUBBLE|DROP|PLUCK|ARP|PIANO|BELL|STAB|HOOK|STRING|BRASS|FLUTE/) ? 'SYNTHS' : null;
+  return smp._type; }
+function libMatches(smp){ if(!!smp.hidden !== libShowHidden) return false; if(libType && typeOf(smp) !== libType) return false; if(!inSel(smp, libSel)) return false; const q = ($('librarySearch').value||'').trim().toLowerCase(); if(q){ const hay = (smp.displayName + ' ' + (smp.key||'') + ' ' + (smp.bpm||'') + ' ' + smp.folder + ' ' + smp.tags.join(' ')).toLowerCase(); if(!hay.includes(q)) return false; } for(const t of libTagFilter){ if(!smp.tags.includes(t)) return false; } return true; }
 function usb(label, sub, opts={}){
   const u = el('div','usb' + (opts.on?' on':'') + (opts.locked?' locked':'') + (opts.add?' add':'') + (opts.art?' art':'')); u.dataset.k = 'USB';
   if(opts.c) u.style.setProperty('--c', opts.c);
@@ -999,6 +1060,8 @@ function renderLibrary(){
   const here = samples.filter(s=>!s.hidden && inSel(s, libSel)); const have = new Set(here.flatMap(s=>s.tags));
   [...libTagFilter].forEach(t=>{ if(!have.has(t)) libTagFilter.delete(t); });
   tagsBox.innerHTML = '';
+  const typesHere = LIB_TYPES.filter(t=>here.some(s=>typeOf(s) === t)); if(libType && !typesHere.includes(libType)) libType = null;
+  if(typesHere.length > 1) typesHere.forEach(t=>{ const c = el('div','chip type' + (libType===t?' on':'')); c.textContent = t; c.dataset.k = 'TYPE ' + t; c.addEventListener('click', ()=>{ libType = libType === t ? null : t; libEdit = null; renderLibrary(); }); tagsBox.appendChild(c); });
   if(SHOW_MOODS) MOODS.filter(m=>have.has(m)).forEach(t=>{ const c = el('div','chip' + moodClass(t) + (libTagFilter.has(t)?' on':'')); c.textContent = t; c.dataset.k = 'MOOD'; c.addEventListener('click', ()=>{ if(libTagFilter.has(t)) libTagFilter.delete(t); else libTagFilter.add(t); libEdit = null; renderLibrary(); }); tagsBox.appendChild(c); });
   const nh = samples.filter(s=>s.hidden && inSel(s, libSel)).length;
   if(nh || libShowHidden){ const c = el('div','chip hid' + (libShowHidden?' on':'')); c.textContent = 'hidden ' + nh; c.addEventListener('click', ()=>{ libShowHidden = !libShowHidden; libEdit = null; renderLibrary(); }); tagsBox.appendChild(c); }
@@ -1037,7 +1100,7 @@ function libRow(smp){
 /* HOLD = edit (slim): name · (your own sounds: bpm/key) · folders · moods · hide/remove */
 function buildEdit(smp){
   const d = el('div','lib-detail');
-  const r1 = el('div','drow'); r1.innerHTML = '<label>NAME</label>'; const nameI = document.createElement('input'); nameI.type='text'; nameI.value = smp.displayName; nameI.style.flex='1'; nameI.addEventListener('change', ()=>{ smp.displayName = nameI.value.trim() || smp.displayName; saveSampleMeta(smp); renderLibrary(); }); r1.appendChild(nameI); d.appendChild(r1);
+  const r1 = el('div','drow'); r1.innerHTML = '<label>NAME</label>'; const nameI = document.createElement('input'); nameI.type='text'; nameI.value = smp.displayName; nameI.style.flex='1'; nameI.addEventListener('change', ()=>{ smp.displayName = nameI.value.trim() || smp.displayName; smp.userName = true; saveSampleMeta(smp); renderLibrary(); }); r1.appendChild(nameI); d.appendChild(r1);
   if(!smp.builtin){ const r2 = el('div','drow'); r2.innerHTML = '<label>BPM</label>'; const bpmI = document.createElement('input'); bpmI.type='number'; bpmI.value = smp.bpm||''; bpmI.style.width='64px'; bpmI.placeholder='?'; bpmI.addEventListener('change', ()=>{ smp.bpm = +bpmI.value || null; smp._gbpm = undefined; saveSampleMeta(smp); renderLibrary(); }); const kl = el('label'); kl.textContent = 'KEY'; const keyI = document.createElement('input'); keyI.type='text'; keyI.value = smp.key||''; keyI.style.width='64px'; keyI.placeholder='Fmin'; keyI.addEventListener('change', ()=>{ smp.key = keyI.value.trim() || null; saveSampleMeta(smp); renderLibrary(); }); r2.append(bpmI, kl, keyI); d.appendChild(r2); }
   const r3 = el('div','drow'); r3.innerHTML = '<label>FOLDER</label>'; const fb = el('div','tagbox');
   cfolders.forEach(f=>{ const on = f.ids.includes(smp.id); const ch = el('div','chip' + (on?' on':'')); ch.textContent = f.name; ch.addEventListener('click', ()=>{ if(on) f.ids = f.ids.filter(x=>x!==smp.id); else f.ids.push(smp.id); saveCFolders(); setStatus(on ? 'out of ' + f.name : smp.displayName + ' → ' + f.name); renderLibrary(); }); fb.appendChild(ch); });
@@ -1160,8 +1223,8 @@ async function addChannelFromSample(sample, opts={}){
   if(isRunning && !restoring) reschedule();
   if(!restoring){ scrollToRow(channels.length-1); if(!opts.quiet) selectChannel(ch.id); }
 }
-function removeChannel(ch){ ch.sources.forEach(s=>{ try{ s.stop(); }catch(e){} }); ch.sources = []; try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} channels = channels.filter(c=>c.id!==ch.id); if(sidechainTrigger===ch) sidechainTrigger=null; if(sel.chId===ch.id){ closeOptions(); sel = { chId:null, clipIdx:-1 }; } refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); }
-function addClip(ch){ const last = ch.clips.length ? ch.clips.reduce((m,c)=> Math.max(m, c.start+c.len), 0) : 0; ch.clips.push({ start:last, len:defaultClipLen(ch.sample), off:0, mute:false }); refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); }
+function removeChannel(ch){ [...(ch.sources||[]), ...(ch.nextSources||[])].forEach(s=>{ try{ s.stop(); }catch(e){} try{ s.disconnect(); }catch(e){} }); ch.sources = []; ch.nextSources = []; try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} channels = channels.filter(c=>c.id!==ch.id); if(sidechainTrigger===ch) sidechainTrigger=null; if(sel.chId===ch.id){ closeOptions(); sel = { chId:null, clipIdx:-1 }; } refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); }
+function addClip(ch){ const last = ch.clips.length ? ch.clips.reduce((m,c)=> Math.max(m, c.start+c.len), 0) : 0; ch.clips.push({ start:last, len:defaultClipLen(ch.sample), off:0, mute:false }); refreshTimeline(); drawAll(); if(isRunning) reschedule(); markDirty(); setTimeout(commit, 0); }
 function removeSelectedClip(){ const ch = channels.find(c=>c.id===sel.chId); if(!ch || sel.clipIdx<0 || !ch.clips[sel.clipIdx]) return; ch.clips.splice(sel.clipIdx, 1); sel.clipIdx = -1; refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); closeOptions(); }
 function filterQ(ch){ return (ch.sw && ch.sw.FILTER) ? 0.7 + Math.min(1, Math.abs(ch.filterVal)/20)*5.3 : 0.7; }
 function applyFilter(ch){ const v=ch.filterVal, t=ctx.currentTime, q = filterQ(ch); ch.lp.Q.setTargetAtTime(v<0 ? q : 0.7, t, 0.02); ch.hp.Q.setTargetAtTime(v>0 ? q : 0.7, t, 0.02); if(v<0){ ch.lp.frequency.setTargetAtTime(20000-(Math.abs(v)/100)*19700, t, 0.02); ch.hp.frequency.setTargetAtTime(20, t, 0.02); } else { ch.hp.frequency.setTargetAtTime(20+(v/100)*3000, t, 0.02); ch.lp.frequency.setTargetAtTime(20000, t, 0.02); } }
@@ -1175,7 +1238,7 @@ function selCh(){ return sel.chId ? findChannel(sel.chId) : null; }
 function selRowIdx(){ return sel.chId ? channels.findIndex(c=>c.id===sel.chId) : -1; }
 function selectChannel(id, clipIdx){ const changed = sel.chId !== id; sel = { chId:id, clipIdx: clipIdx ?? -1 }; if(changed){ renderRack(); if(thickIdx >= 0) showTip(); } renderPill(); drawTL(); renderInfo(); }
 function ensureSel(){ if(sel.chId && findChannel(sel.chId)) return; const ch = channels[0]; sel = { chId: ch ? ch.id : null, clipIdx:-1 }; renderRack(); renderPill(); }
-function renderPill(){ const ch = selCh(); $('pill').classList.toggle('off', !ch); $('pillTrig').classList.toggle('on', !!(ch && ch.scTrigger)); $('pillDuck').classList.toggle('on', !!(ch && ch.scDuck)); }
+function renderPill(){ const ch = selCh(); const lp = $('loopPill'); if(lp){ lp.classList.toggle('show', !!ch); if(ch){ const n = ch.sample.displayName; $('loopPillName').textContent = n; lp.title = n; } } $('pill').classList.toggle('off', !ch); $('pillTrig').classList.toggle('on', !!(ch && ch.scTrigger)); $('pillDuck').classList.toggle('on', !!(ch && ch.scDuck)); }
 function setTrigger(ch){ channels.forEach(c=>{ c.scTrigger = false; }); ch.scTrigger = true; ch.scDuck = false; sidechainTrigger = ch; refreshTimeline(); markDirty(); commit(); drawAll(); setStatus(ch.sample.displayName + ' is the TRIGGER'); }
 $('pillTrig').addEventListener('click', ()=>{ const ch = selCh(); if(!ch){ setStatus('tap a loop first'); return; }
   if(ch.scTrigger){ ch.scTrigger = false; sidechainTrigger = null; refreshTimeline(); markDirty(); commit(); drawAll(); return; }
@@ -1203,7 +1266,7 @@ function tripleDelete(ch, k){
   tl.classList.remove('shake'); void tl.offsetWidth; tl.classList.add('shake');
   try{ navigator.vibrate && navigator.vibrate(25); }catch(e){}
   if(ch.clips.length <= 1){ removeChannel(ch); showBubble('loop deleted', true); }
-  else { closeOptions(); ch.clips.splice(k, 1); if(sel.chId === ch.id) sel.clipIdx = -1; refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); drawTL(); showBubble('clip deleted', true); }
+  else { closeOptions(); ch.clips.splice(k, 1); if(sel.chId === ch.id) sel.clipIdx = -1; refreshTimeline(); drawAll(); if(isRunning) reschedule(); markDirty(); setTimeout(commit, 0); showBubble('clip deleted', true); }
 }
 function maybeTapHint(){ if(channels.length < 2) return; let seen = false; try{ seen = localStorage.getItem('tuner_tapHint2') === '1'; }catch(e){} if(seen) return; try{ localStorage.setItem('tuner_tapHint2','1'); }catch(e){} setTimeout(()=> showBubble('tap = select · <b>2</b> mute · <b>3</b> delete · hold = options', false, 6000), 400); }
 $('bubbleUndo').addEventListener('click', ()=>{ hideBubble(); undo(); });
@@ -1633,6 +1696,9 @@ $('tlStart').addEventListener('click', ()=>{ playBeat = 0; scrollX = 0; if(isRun
 $('tlZoomIn').addEventListener('click', ()=> setZoom(zoomX*1.4, tl.clientWidth/2));
 $('tlZoomOut').addEventListener('click', ()=> setZoom(zoomX/1.4, tl.clientWidth/2));
 /* ================= BOOT ================= */
+/* v10.23: always on the newest version — if the site has a newer one than this page, reload once onto it */
+async function checkVersion(){ try{ const r = await fetch('version.txt?t=' + Date.now(), { cache:'no-store' }); if(!r.ok) return; const v = (await r.text()).trim(); if(!v || v === APP_VERSION) return; let tried = ''; try{ tried = sessionStorage.getItem('tuner_upd') || ''; }catch(e){} if(tried === v) return; try{ sessionStorage.setItem('tuner_upd', v); }catch(e){} if(isRunning || channels.length && dirty) return; location.replace(location.pathname + '?v=' + encodeURIComponent(v)); }catch(e){} }
+setTimeout(checkVersion, 1500); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkVersion(); });
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 (async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); let lp = null; try{ lp = localStorage.getItem('tuner_lastProj'); }catch(e){} if(lp && !channels.length){ await loadProjectById(lp, { quiet:true }); } }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
 </script>

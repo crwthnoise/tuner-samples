@@ -5,6 +5,7 @@
 const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, 'samples');
 const AUDIO = /\.(wav|mp3|m4a|aac|aif|aiff|flac|ogg|caf)$/i;
+let META = {}; try { META = JSON.parse(fs.readFileSync(path.join(ROOT, 'meta.json'), 'utf8')); } catch (e) {}
 let overrides = {}; try { for (const o of JSON.parse(fs.readFileSync(path.join(ROOT, 'overrides.json'), 'utf8'))) if (o.file) overrides[o.file] = o; } catch (e) {}
 function meta(name) {
   let bpm = null, key = null;
@@ -43,7 +44,7 @@ const out = [];
     if (e.isDirectory()) walk(path.join(dir, e.name), r);
     else if (AUDIO.test(e.name)) {
       const o = overrides[r] || overrides[e.name] || {}; const m = meta(e.name);
-      out.push({ id: 'lib-' + r.replace(/[^a-z0-9]+/gi, '-').toLowerCase(), file: r, name: o.name || clean(e.name), folder: o.folder || (rel ? rel.split('/').join(' / ') : 'Library'), bpm: o.bpm ?? m.bpm, key: o.key ?? m.key, tags: o.tags || tags(e.name), peaks: wavPeaks(path.join(dir, e.name)) });
+      out.push({ id: 'lib-' + (META[r] ? r.replace(/\.m4a$/i, '.wav') : r).replace(/[^a-z0-9]+/gi, '-').toLowerCase(), file: r, name: e.name.replace(/\.[^.]+$/, '').replace(/_?\[[^\]]*\]|_?#[a-z0-9\-]+/gi, '').toUpperCase(),   /* v10.23: always the ORIGINAL file name, ALL CAPS */ folder: o.folder || (rel ? rel.split('/').join(' / ') : 'Library'), bpm: o.bpm ?? m.bpm, key: o.key ?? m.key, tags: o.tags || tags(e.name), peaks: (META[r] && META[r].peaks) || wavPeaks(path.join(dir, e.name)), ...(META[r] ? { frames: META[r].frames, sr: META[r].sr, fpAt: META[r].fpAt, fpScale: META[r].fpScale, fp: META[r].fp } : {}) });
     }
   }
 })(ROOT, '');

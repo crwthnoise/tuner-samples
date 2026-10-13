@@ -13,3 +13,7 @@ Upload on github.com (Add file → Upload files, inside the right subfolder). Th
 itself in about a minute and the new samples show up for everyone. Delete a file to remove it.
 Don't edit index.json — it is regenerated on every deploy. To rename or re-tag a file without
 renaming it, add a line to overrides.json.
+
+v10.23: loops are stored as small AAC .m4a files. A new .wav still works, but to make it ~10x smaller run
+  node tools/encode.js   (needs ffmpeg) — it encodes every .wav, writes meta.json (exact loop length + seam
+  fingerprint) and removes the .wav. Names shown in the app = the original file name, ALL CAPS.

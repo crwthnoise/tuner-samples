@@ -121,6 +121,10 @@
   .rk-m .mod{ transition:width .2s cubic-bezier(.2,.9,.3,1.1); }
   .rack.thicko .rk-m:not(.thick){ opacity:.3; }
   .rk-m.thick{ z-index:6; filter:drop-shadow(0 8px 14px #000); }
+  /* v10.26 HOLD → LIFT → SLIDE */
+  .rk-m.lift{ z-index:8; transition:none; transform:translateY(-6px) scale(1.14); filter:drop-shadow(0 10px 14px #000) brightness(1.15); cursor:grabbing; }
+  .rk-m.lift.rm{ opacity:.45; filter:drop-shadow(0 0 10px #d32f2f) grayscale(.6); }
+  .rack.lifting .rk-m:not(.lift){ opacity:.75; }
   .mod.card{ width:206px; height:330px; border-radius:6px; padding:16px 0 10px; }
   .mod.card .plate{ font-size:11px; line-height:14px; padding:2px 6px; max-width:180px; }
   .mod.card .sw2{ transform:scale(1.45); margin-top:14px; }
@@ -468,7 +472,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.25';
+const APP_VERSION = 'v10.26';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -538,7 +542,7 @@ function scheduleAutosave(){ if(!currentProjectId && !channels.length) return; i
 async function saveSampleAudio(sample, arrayBuf, mime){ const payload = { name:sample.name, mime:mime||'audio/wav', bpm:sample.bpm, key:sample.key }; if(Store.mode === 'idb') payload.buf = arrayBuf; else payload.base64 = abToB64(arrayBuf); await Store.set('sample:'+sample.id, payload); }
 function clearChannels(){ stopSources(); channels.forEach(ch=>{ try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} }); channels = []; sidechainTrigger = null; closeOptions(); }
 async function getProjectIndex(){ if(Store.mode==='none') return []; const idx = await Store.get('projects'); return Array.isArray(idx) ? idx : []; }
-function channelMeta(){ return channels.map(ch=>({ id:ch.id, sampleId:ch.sample.id, clips:ch.clips.map(c=>({start:c.start,len:c.len,off:c.off,mute:!!c.mute})), volume:ch.volume, filterVal:ch.filterVal, pitchSemitones:ch.pitchSemitones, scTrigger:ch.scTrigger, scDuck:ch.scDuck, mute:!!ch.mute, fx:ch.fx.slice(), sw:Object.assign({}, ch.sw), keyLock:!!ch.keyLock })); }
+function channelMeta(){ return channels.map(ch=>({ id:ch.id, sampleId:ch.sample.id, clips:ch.clips.map(c=>({start:c.start,len:c.len,off:c.off,mute:!!c.mute})), volume:ch.volume, filterVal:ch.filterVal, pitchSemitones:ch.pitchSemitones, scTrigger:ch.scTrigger, scDuck:ch.scDuck, mute:!!ch.mute, fx:ch.fx.slice(), sw:Object.assign({}, ch.sw), rack:ch.rack.slice(), keyLock:!!ch.keyLock })); }
 function settingsMeta(){ return { songKey:songKeyState, bpm, zoomX, zoomY, master:masterGain.gain.value, limiterOn, sc:{ depth:scDepth, thr:scThreshold, rel:scRelease, curve:scCurve } }; }
 function buildProjectPayload(name, forceB64){
   const usedIds = [...new Set(channels.map(c=>c.sample.id))], sampleList = [];
@@ -857,7 +861,7 @@ function restore(st){
     stopSources(); channels.forEach(ch=>{ try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} }); channels = []; sidechainTrigger = null; closeOptions();
     for(const c of o.ch){ const sample = samples.find(s=>s.id===c.sampleId); if(sample && sample.buffer) addChannelFromSample(sample, Object.assign({}, c, { persistedId:c.id, quiet:true })); }
     applySettings({ songKey:o.songKey, bpm:o.bpm, master:o.master, limiterOn:o.limiterOn, sc:o.sc, zoomX, zoomY });
-    refreshTimeline(); drawAll(); markDirty();
+    refreshTimeline(); renderRack(); drawAll(); markDirty();
     if(wasRunning) scheduleFrom(beat);
   } finally { restoring = false; }
 }
@@ -1146,7 +1150,7 @@ function satCurve(kind){ if(_curveCache[kind]) return _curveCache[kind]; const n
 /* PUMP: a sawtooth at the beat rate → shaped into a duck that hits on every beat and breathes back */
 function pumpCurve(){ if(_curveCache.pump) return _curveCache.pump; const n = 2048, c = new Float32Array(n); for(let i=0;i<n;i++){ const x = i/(n-1)*2-1; const p = x >= 0 ? x/2 : (x+2)/2; c[i] = Math.pow(1 - p, 2.2); } return (_curveCache.pump = c); }
 function startPump(n, ac, at){ try{ if(n.pumpOsc){ n.pumpOsc.stop(); n.pumpOsc.disconnect(); } }catch(e){} const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 1/(beatSec()*(n.half ? 2 : 1)); o.connect(n.pumpSh); o.start(Math.max(ac.currentTime, at)); n.pumpOsc = o; }
-function buildTune(ac){
+function buildTune(ac, order){
   const n = {}; const G = v=>{ const g = ac.createGain(); g.gain.value = v; return g; };
   const BQ = (type, f, q)=>{ const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if(q != null) b.Q.value = q; return b; };
   const COMP = ()=>{ const c = ac.createDynamicsCompressor(); c.threshold.value = 0; c.ratio.value = 1; c.knee.value = 6; c.attack.value = 0.005; c.release.value = 0.15; return c; };
@@ -1157,18 +1161,18 @@ function buildTune(ac){
   n.sub = BQ('lowshelf', 90); n.subComp = COMP();
   // UNTIRE: slow-attack comp lets the hits through first + presence = wakes the loop up
   n.unComp = COMP(); n.unComp.attack.value = 0.03; n.unComp.release.value = 0.12; n.unPres = BQ('peaking', 3500, 0.8); n.unMake = G(1); n.unAir = BQ('highshelf', 10000);
-  n.in.connect(n.flHp); n.flHp.connect(n.flMud); n.flMud.connect(n.flLow); n.flLow.connect(n.sub); n.sub.connect(n.subComp); n.subComp.connect(n.unComp); n.unComp.connect(n.unPres); n.unPres.connect(n.unAir); n.unAir.connect(n.unMake);
+  n.flHp.connect(n.flMud); n.flMud.connect(n.flLow); n.sub.connect(n.subComp); n.unComp.connect(n.unPres); n.unPres.connect(n.unAir); n.unAir.connect(n.unMake);
   // NEW ERA: blends into an older, darker, grittier era
   n.neSum = G(1); n.neDry = G(1); n.neHp = BQ('highpass', 20, 0.7); n.neLp = BQ('lowpass', 20000, 1.2); n.neSh = ac.createWaveShaper(); n.neSh.curve = satCurve('warm'); n.neSh.oversample = '2x'; n.neCr = ac.createWaveShaper(); n.neCr.curve = crushCurve(); n.neCrOn = G(0); n.neCrOff = G(1); n.neWet = G(0);
-  n.unMake.connect(n.neDry); n.neDry.connect(n.neSum); n.unMake.connect(n.neHp); n.neHp.connect(n.neLp); n.neLp.connect(n.neSh); n.neSh.connect(n.neCrOff); n.neCrOff.connect(n.neWet); n.neSh.connect(n.neCr); n.neCr.connect(n.neCrOn); n.neCrOn.connect(n.neWet); n.neWet.connect(n.neSum);
+  n.neIn = G(1); n.neIn.connect(n.neDry); n.neDry.connect(n.neSum); n.neIn.connect(n.neHp); n.neHp.connect(n.neLp); n.neLp.connect(n.neSh); n.neSh.connect(n.neCrOff); n.neCrOff.connect(n.neWet); n.neSh.connect(n.neCr); n.neCr.connect(n.neCrOn); n.neCrOn.connect(n.neWet); n.neWet.connect(n.neSum);
   // THREAT: drive + glue, in parallel
   n.thSum = G(1); n.thDry = G(1); n.thDrive = G(1); n.thSh = ac.createWaveShaper(); n.thSh.curve = satCurve('hard'); n.thSh.oversample = '4x'; n.thWet = G(0); n.thComp = COMP(); n.thTrim = G(1);
-  n.neSum.connect(n.thDry); n.thDry.connect(n.thSum); n.neSum.connect(n.thDrive); n.thDrive.connect(n.thSh); n.thSh.connect(n.thWet); n.thWet.connect(n.thSum); n.thSum.connect(n.thComp); n.thComp.connect(n.thTrim);
+  n.thIn = G(1); n.thIn.connect(n.thDry); n.thDry.connect(n.thSum); n.thIn.connect(n.thDrive); n.thDrive.connect(n.thSh); n.thSh.connect(n.thWet); n.thWet.connect(n.thSum); n.thSum.connect(n.thComp); n.thComp.connect(n.thTrim);
   // WIDE (stereo matrix, forced 2-ch so mono loops widen too) + LOADED (tempo echo rolls, sent into it)
   n.wIn = G(1); n.wIn.channelCount = 2; n.wIn.channelCountMode = 'explicit'; n.wIn.channelInterpretation = 'speakers';
-  n.thTrim.connect(n.wIn);
-  n.ldDelay = ac.createDelay(2); n.ldFb = G(0); n.ldWet = G(0);
-  n.thTrim.connect(n.ldDelay); n.ldDelay.connect(n.ldFb); n.ldFb.connect(n.ldDelay); n.ldDelay.connect(n.ldWet); n.ldWet.connect(n.wIn);
+  // LOADED: dry + tempo echo rolls
+  n.ldIn = G(1); n.ldSum = G(1); n.ldDelay = ac.createDelay(2); n.ldFb = G(0); n.ldWet = G(0);
+  n.ldIn.connect(n.ldSum); n.ldIn.connect(n.ldDelay); n.ldDelay.connect(n.ldFb); n.ldFb.connect(n.ldDelay); n.ldDelay.connect(n.ldWet); n.ldWet.connect(n.ldSum);
   n.split = ac.createChannelSplitter(2); n.merge = ac.createChannelMerger(2); n.wIn.connect(n.split);
   n.gLL = G(1); n.gRL = G(0); n.gLR = G(0); n.gRR = G(1);
   n.split.connect(n.gLL, 0); n.split.connect(n.gLR, 0); n.split.connect(n.gRL, 1); n.split.connect(n.gRR, 1);
@@ -1180,13 +1184,21 @@ function buildTune(ac){
   n.wDirect = G(1); n.wHi = G(0); n.mlG = G(0); n.mlSum = G(0.5);
   const BW = -3.0103; /* Web Audio LP/HP Q is in dB → -3.01 dB = Butterworth; two in a row = Linkwitz-Riley, LP+HP sums flat */
   n.hp1 = BQ('highpass', 120, BW); n.hp2 = BQ('highpass', 120, BW); n.lp1 = BQ('lowpass', 120, BW); n.lp2 = BQ('lowpass', 120, BW);
-  n.merge.connect(n.wDirect); n.wDirect.connect(n.pump);
-  n.merge.connect(n.hp1); n.hp1.connect(n.hp2); n.hp2.connect(n.wHi); n.wHi.connect(n.pump);
-  n.split.connect(n.mlSum, 0); n.split.connect(n.mlSum, 1); n.mlSum.connect(n.lp1); n.lp1.connect(n.lp2); n.lp2.connect(n.mlG); n.mlG.connect(n.pump);
-  n.pump.connect(n.out);
+  n.wOut = G(1); n.merge.connect(n.wDirect); n.wDirect.connect(n.wOut);
+  n.merge.connect(n.hp1); n.hp1.connect(n.hp2); n.hp2.connect(n.wHi); n.wHi.connect(n.wOut);
+  n.split.connect(n.mlSum, 0); n.split.connect(n.mlSum, 1); n.mlSum.connect(n.lp1); n.lp1.connect(n.lp2); n.lp2.connect(n.mlG); n.mlG.connect(n.wOut);
+  /* v10.26: every module is a block [in, out]; the loop's rack order = the signal order, LEFT → RIGHT */
+  n.blk = { 'FLOOR':[n.flHp, n.flLow], 'SUB':[n.sub, n.subComp], 'UNTIRE':[n.unComp, n.unMake], 'NEW ERA':[n.neIn, n.neSum], 'THREAT':[n.thIn, n.thTrim], 'LOADED':[n.ldIn, n.ldSum], 'WIDE':[n.wIn, n.wOut], 'PUMP':[n.pump, n.pump] };
+  wireTune(n, order);
   startPump(n, ac, 0);
   return n;
 }
+function wireTune(n, order){ order = order || FX_SLOTS; try{ n.in.disconnect(); }catch(e){} Object.values(n.blk).forEach(b=>{ try{ b[1].disconnect(); }catch(e){} });
+  let prev = n.in; order.forEach(k=>{ const b = n.blk[k]; if(!b) return; prev.connect(b[0]); prev = b[1]; }); prev.connect(n.out); n.order = order.slice(); }
+/* live re-wire without a click: dip the loop's output for a moment, swap the cables, bring it back */
+function rewireLive(ch){ const n = ch.tuneNodes; if(!n) return; const t = ctx.currentTime; n.out.gain.cancelScheduledValues(t); n.out.gain.setTargetAtTime(0, t, 0.004);
+  setTimeout(()=>{ wireTune(n, ch.rack); const t2 = ctx.currentTime; n.out.gain.cancelScheduledValues(t2); n.out.gain.setTargetAtTime(1, t2, 0.01); }, 30); }
+function migrateRack(r){ if(!Array.isArray(r)) return FX_SLOTS.slice(); const out = []; r.forEach(k=>{ if(FX_SLOTS.includes(k) && !out.includes(k)) out.push(k); }); return out; }
 function tuneParams(v, sw){ // one place for every number → live and export match
   const [wd, pm, sb, un, ld, fl, ne, th] = v || fxDefaults(); sw = sw || {};
   const k = 1 + wd*2.2, bs = beatSec(), ml = sw.WIDE ? 1 : 0, push = sw.THREAT ? 2 : 1;
@@ -1218,10 +1230,10 @@ async function addChannelFromSample(sample, opts={}){
   const gainNode = ctx.createGain(); gainNode.gain.value = 0;
   const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=20000; lp.Q.value=0.7;
   const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=20; hp.Q.value=0.7;
-  const tuneNodes = buildTune(ctx);
+  const rack0 = migrateRack(opts.rack); const tuneNodes = buildTune(ctx, rack0);
   gainNode.connect(lp); lp.connect(hp); hp.connect(tuneNodes.in); tuneNodes.out.connect(masterGain);
   const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; gainNode.connect(analyser);
-  const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, fx:migrateFx(opts.fx), sw:migrateSw(opts.sw), keyLock:!!opts.keyLock, tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
+  const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, fx:migrateFx(opts.fx), sw:migrateSw(opts.sw), rack:rack0, keyLock:!!opts.keyLock, tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
   if(!channels.length && !restoring && !opts.quiet && sample.bpm && sample.bpm !== bpm){ bpm = sample.bpm; $('bpmInput').value = bpm; renderBpm(); }   /* first loop sets the song BPM */
   rebuildBuffer(ch);
   if(ch.scTrigger){ channels.forEach(c=>c.scTrigger=false); sidechainTrigger = ch; }
@@ -1558,7 +1570,7 @@ async function renderArrangementOffline(sampleRate){
     if(isSilent(ch) || !ch.clips.length) return;
     const g = offline.createGain(); const lp = offline.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7; const hp = offline.createBiquadFilter(); hp.type='highpass'; hp.Q.value=0.7;
     if(ch.filterVal<0){ lp.Q.value = filterQ(ch); lp.frequency.value=20000-(Math.abs(ch.filterVal)/100)*19700; hp.frequency.value=20; } else { hp.frequency.value=20+(ch.filterVal/100)*3000; lp.frequency.value=20000; if(ch.filterVal>0) hp.Q.value = filterQ(ch); }
-    const oTune = buildTune(offline); setTune(oTune, ch.fx, offline, null, ch.sw); g.connect(lp); lp.connect(hp); hp.connect(oTune.in); oTune.out.connect(oMaster);
+    const oTune = buildTune(offline, ch.rack); setTune(oTune, ch.fx, offline, null, ch.sw); g.connect(lp); lp.connect(hp); hp.connect(oTune.in); oTune.out.connect(oMaster);
     const rate = playRate(ch), dur = ch.buffer.duration;
     ch.clips.forEach(c=>{ if(c.mute) return; const src = offline.createBufferSource(); src.buffer = ch.buffer; src.loop = true; src.detune.value = chPitch(ch)*100; src.connect(g); src.start(c.start*bs, (c.off*bs*rate) % dur); src.stop((c.start+c.len)*bs); });
     const ducks = ch.scDuck && sidechainTrigger && ch !== sidechainTrigger;
@@ -1593,9 +1605,9 @@ function pumpY(ph, d){ return PUMP_Y0 + d*Math.pow(1 - ph, 2.2)*PUMP_H; }
 function pumpFace(v){ const d = v*0.95; let pts = `0,${PUMP_Y0} 0,${pumpY(0,d).toFixed(2)}`; for(let j=1;j<=32;j++){ const ph = j/32; pts += ` ${(ph*100).toFixed(1)},${pumpY(ph,d).toFixed(2)}`; }
   const svg = `<line x1="0" x2="100" y1="${PUMP_Y0}" y2="${PUMP_Y0}" stroke="#4a1a1a" stroke-width="1" vector-effect="non-scaling-stroke"/><line x1="0" x2="100" y1="${PUMP_Y0+PUMP_H}" y2="${PUMP_Y0+PUMP_H}" stroke="#2a0e0e" stroke-width="1" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/><polygon points="${pts} 100,${PUMP_Y0}" fill="rgba(255,77,77,${.12+v*.3})"/><polyline points="${pts}" fill="none" stroke="${RED_HI}" stroke-width="${1.5+v}" stroke-linejoin="round" vector-effect="non-scaling-stroke" style="filter:drop-shadow(0 0 ${2+v*5}px ${RED_HI})"/>`;
   return `<div class="scr scan" style="inset:0 6% auto 6%;height:30%;background:#0a0303;border-color:#2a1414"><svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">${svg}</svg><i class="pumpDot" style="position:absolute;width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:50%;background:#fff;box-shadow:0 0 6px 2px ${RED_HI};display:none;z-index:2"></i></div><div style="position:absolute;left:0;right:0;top:34%;bottom:0"><div style="position:absolute;left:50%;top:4%;bottom:4%;width:22%;transform:translateX(-50%);background:#050403;border-radius:40px;box-shadow:inset 0 0 0 2px #2a2724"></div><div style="position:absolute;left:50%;width:78%;height:9%;transform:translateX(-50%);bottom:calc(${v*88}% + 1%);border-radius:3px;background:linear-gradient(#e8e2d8,#8a847a 60%,#4a453e);box-shadow:0 2px 3px #000,inset 0 1px 0 #fff6"><i style="position:absolute;left:10%;right:10%;top:50%;height:2px;transform:translateY(-50%);background:${RED_HI};box-shadow:0 0 5px ${RED_HI}"></i></div></div>`; }
-function updatePumpDot(){ const i = MODS.findIndex(m=>m.n==='PUMP'); const w = rackEls[i]; if(!w) return; const dot = w.querySelector('.pumpDot'); if(!dot) return; const ch = selCh();
+function updatePumpDot(){ const i = RACK.findIndex(m=>m.n==='PUMP'); const w = rackEls[i]; if(!w) return; const dot = w.querySelector('.pumpDot'); if(!dot) return; const ch = selCh();
   if(!isRunning || !ch){ dot.style.display = 'none'; return; }
-  const d = (ch.fx[MODS[i].fx]||0)*0.95, b = currentBeat()/((ch.sw && ch.sw.PUMP) ? 2 : 1), ph = b - Math.floor(b);
+  const d = (ch.fx[RACK[i].fx]||0)*0.95, b = currentBeat()/((ch.sw && ch.sw.PUMP) ? 2 : 1), ph = b - Math.floor(b);
   dot.style.display = ''; dot.style.left = (ph*100).toFixed(2) + '%'; dot.style.top = pumpY(ph, d).toFixed(2) + '%'; }
 /* every module breathes with the selected loop's level (cheap: one CSS var, brightness only) */
 let _rackLvl = -1; function updateRackLevel(){ const ch = selCh(); const v = (isRunning && ch && !ch.mute) ? Math.min(1, ch.lastPeakLevel||0) : 0; if(Math.abs(v - _rackLvl) < 0.03) return; _rackLvl = v; $('rack').style.setProperty('--lvl', v.toFixed(2)); }
@@ -1630,6 +1642,9 @@ const MODS = [
   Object.assign({}, CORE_LOOKS[2], { k:'pitch',  def:0.5 }),
   ...FX_LOOKS.map(m=> Object.assign({}, m, { k:'fx', fx:FX_SLOTS.indexOf(m.n), def:0 })),
 ];
+const MOD_BY = {}; MODS.forEach(m=>{ MOD_BY[m.n] = m; });
+let RACK = MODS.slice();   /* what's on screen = core 3 + the selected loop's own rack, in its order */
+function rackList(){ const ch = selCh(); if(!ch) return MODS.slice(); return MODS.slice(0, 3).concat(ch.rack.map(k=>MOD_BY[k]).filter(Boolean)); }
 /* what each module does + its 2nd control (ON/OFF, default OFF) — shown on the tap-card */
 const MOD_INFO = {
   'VOL':    { d:'how loud this loop is' },
@@ -1663,16 +1678,16 @@ const SCREWS = '<div class="screw" style="top:6px;left:6px"></div><div class="sc
 function boxHTML(m, v, on, thick){ const info = MOD_INFO[m.n], seat = info && info.s ? `<div class="sw2${on ? ' on' : ''}" style="--a:${m.acc}"><i></i></div>` + (thick ? `<div class="sw2l${on ? ' on' : ''}" style="--a:${m.acc}">${info.s}</div>` : '') : '<div class="seat"></div>'; return `<div class="mod ${thick ? 'card' : 'slot'}" style="background:${m.face}">${m.screws ? SCREWS : ''}<div class="plate" style="background:${m.acc};color:#000">${m.n}</div><div class="zone">${m.g(clamp(v,0,1))}</div>${seat}</div>`; }
 let rackEls = [];
 try{ applySeasonSkin(); }catch(e){}
-function drawModule(i){ const m = MODS[i], ch = selCh(); rackEls[i].innerHTML = boxHTML(m, modGet(m, ch), swGet(m, ch), thickIdx === i); }
-function renderRack(){ if(!rackEls.length) return; $('rack').classList.toggle('idle', !selCh()); MODS.forEach((m,i)=>drawModule(i)); }
-function layoutRack(){ const box = $('rack'); const W = box.clientWidth; if(!W) return; const n = MODS.length, gap = 2; const mw = (W - gap*(n-1))/n, sc = mw/66, H = Math.round(330*sc);
+function drawModule(i){ const m = RACK[i], ch = selCh(); rackEls[i].innerHTML = boxHTML(m, modGet(m, ch), swGet(m, ch), thickIdx === i); }
+function renderRack(){ if(!rackEls.length) return; const L = rackList(); if(L.map(m=>m.n).join('|') !== RACK.map(m=>m.n).join('|')){ RACK = L; if(thickIdx >= 0){ thickIdx = -1; $('thickTip').classList.remove('on'); } buildRack(); return; } $('rack').classList.toggle('idle', !selCh()); RACK.forEach((m,i)=>drawModule(i)); }
+function layoutRack(){ const box = $('rack'); const W = box.clientWidth; if(!W) return; const n = Math.max(11, RACK.length), gap = 2; const mw = (W - gap*(n-1))/n, sc = mw/66, H = Math.round(330*sc);
   box.style.setProperty('--rs', sc.toFixed(4)); box.style.height = H + 'px';
   box.classList.toggle('thicko', thickIdx >= 0);
   rackEls.forEach((w,i)=>{ let L = i*(mw + gap), Wd = mw; if(i === thickIdx){ Wd = 206*sc; L = clamp(L + mw/2 - Wd/2, 0, W - Wd); } w.style.left = L.toFixed(2) + 'px'; w.style.width = Wd.toFixed(2) + 'px'; w.style.height = H + 'px'; w.classList.toggle('thick', i === thickIdx); }); }
 /* TAP (no drag) = card · TAP the little switch = ON/OFF · DRAG = tune · DOUBLE-TAP = default */
 let thickIdx = -1, cardTimer = 0;
-function thickDesc(){ const m = MODS[thickIdx], ch = selCh(); if(!m) return ''; const info = MOD_INFO[m.n]; return m.n + ' — ' + info.d + (info.s ? ' · ' + info.s + (swGet(m, ch) ? ' ON' : ' OFF') : ''); }
-function showTip(){ const t = $('thickTip'); if(thickIdx < 0){ t.classList.remove('on'); return; } const m = MODS[thickIdx], ch = selCh(), info = MOD_INFO[m.n]; t.style.setProperty('--a', m.acc);
+function thickDesc(){ const m = RACK[thickIdx], ch = selCh(); if(!m) return ''; const info = MOD_INFO[m.n]; return m.n + ' — ' + info.d + (info.s ? ' · ' + info.s + (swGet(m, ch) ? ' ON' : ' OFF') : ''); }
+function showTip(){ const t = $('thickTip'); if(thickIdx < 0){ t.classList.remove('on'); return; } const m = RACK[thickIdx], ch = selCh(), info = MOD_INFO[m.n]; t.style.setProperty('--a', m.acc);
   $('thickTipT').innerHTML = `<b>${m.n}</b> ${info.d}` + (info.s ? `<br><b>${info.s}</b> ${info.sd}` : '');
   setTimeout(()=>{ if(thickIdx < 0) return; const r = rackEls[thickIdx].getBoundingClientRect(), tw = t.offsetWidth, th = t.offsetHeight; t.style.left = clamp(r.left + r.width/2 - tw/2, 8, innerWidth - tw - 8) + 'px'; t.style.top = Math.max(8, r.top - th - 8) + 'px'; t.classList.add('on'); }, 210); }
 $('thickTipX').addEventListener('click', e=>{ e.stopPropagation(); $('thickTip').classList.remove('on'); });
@@ -1682,12 +1697,36 @@ document.addEventListener('pointerdown', e=>{
   if(thickIdx >= 0 && !(rackEls[thickIdx] && rackEls[thickIdx].contains(e.target)) && !e.target.closest('.rk-m') && !e.target.closest('#thickTip')) closeThick();
   if(vzBig && !e.target.closest('#vizZone')) setVizBig(false);
 }, true);
-function bindModule(w, i){ const m = MODS[i]; let drag = null, lastTap = 0;
+function bindModule(w, i){ const m = RACK[i]; let drag = null, lastTap = 0, holdT = 0;
+  const CORE = 3;   /* VOL · FILTER · PITCH stay first, always */
+  /* v10.26 HOLD → LIFT → SLIDE: hold ½ sec, the module lifts. Slide left/right = move it (left → right = signal order).
+     Drag it UP off the rack = remove it from this loop. Up/down without holding = tune, like always. */
+  const slotW = ()=>{ const W = $('rack').clientWidth, n = Math.max(11, RACK.length); return (W - 2*(n-1))/n + 2; };
+  const liftTo = (d, e)=>{ const sw = slotW(), dx = e.clientX - d.x0, dy = e.clientY - d.y0, H = $('rack').clientHeight || 150;
+    w.style.left = (d.l0 + dx).toFixed(1) + 'px'; w.style.top = Math.min(0, dy).toFixed(1) + 'px';
+    d.rm = dy < -H*0.55; w.classList.toggle('rm', d.rm);
+    const to = d.rm ? -1 : clamp(Math.round((d.l0 + dx)/sw), CORE, RACK.length - 1);
+    if(to !== d.to){ d.to = to; const ord = RACK.map((_,k)=>k).filter(k=>k !== i); if(to >= 0) ord.splice(to, 0, i);
+      ord.forEach((k, pos)=>{ if(k !== i) rackEls[k].style.left = (pos*sw).toFixed(1) + 'px'; }); }
+    setStatus(d.rm ? 'let go = remove ' + m.n : 'move ' + m.n + ' → slot ' + (to - CORE + 1)); };
   w.addEventListener('pointerdown', e=>{ e.preventDefault(); const ch = selCh(); if(!ch){ setStatus(channels.length ? 'tap a loop first' : 'add a loop first — tap + or PACKS'); return; }
-    try{ w.setPointerCapture(e.pointerId); }catch(_){} const r = w.getBoundingClientRect(); drag = { y0:e.clientY, v0:modGet(m, ch), moved:false, ch, seat:!!MOD_INFO[m.n].s && (e.clientY - r.top) > r.height*0.82 }; w.classList.add('grab'); });
-  w.addEventListener('pointermove', e=>{ if(!drag) return; const dy = e.clientY - drag.y0; if(!drag.moved && Math.abs(dy) < 4) return; drag.moved = true; clearTimeout(cardTimer);
+    try{ w.setPointerCapture(e.pointerId); }catch(_){} const r = w.getBoundingClientRect(); drag = { x0:e.clientX, y0:e.clientY, v0:modGet(m, ch), moved:false, ch, seat:!!MOD_INFO[m.n].s && (e.clientY - r.top) > r.height*0.82 }; w.classList.add('grab');
+    clearTimeout(holdT);
+    if(i >= CORE && thickIdx < 0) holdT = setTimeout(()=>{ if(!drag || drag.moved) return; drag.lift = true; drag.l0 = parseFloat(w.style.left) || 0; drag.to = i; clearTimeout(cardTimer);
+      w.classList.remove('grab'); w.classList.add('lift'); $('rack').classList.add('lifting'); try{ navigator.vibrate && navigator.vibrate(12); }catch(_){} setStatus('slide to move · drag up to remove'); }, 480); });
+  w.addEventListener('pointermove', e=>{ if(!drag) return;
+    if(drag.lift){ liftTo(drag, e); return; }
+    const dy = e.clientY - drag.y0, dx = e.clientX - drag.x0; if(!drag.moved && Math.abs(dy) < 4){ if(Math.abs(dx) > 8) clearTimeout(holdT); return; }
+    drag.moved = true; clearTimeout(holdT); clearTimeout(cardTimer);
     const H = $('rack').clientHeight || 150; const v = clamp(drag.v0 - dy/(H*0.9), 0, 1); modSet(m, drag.ch, v); drawModule(i); setStatus(modLabel(m, drag.ch)); });
-  const end = ()=>{ if(!drag) return; const d = drag; drag = null; w.classList.remove('grab');
+  const end = ()=>{ clearTimeout(holdT); if(!drag) return; const d = drag; drag = null; w.classList.remove('grab');
+    if(d.lift){ w.classList.remove('lift','rm'); $('rack').classList.remove('lifting'); w.style.top = '';
+      const ch = d.ch, k = m.n;
+      if(d.rm){ ch.rack = ch.rack.filter(x=>x !== k); rewireLive(ch); markDirty(); commit(); renderRack(); showBubble(k + ' removed', true); setStatus(k + ' off this loop — add it back with ＋'); return; }
+      const from = i - CORE, to = d.to - CORE;
+      if(to !== from){ ch.rack.splice(from, 1); ch.rack.splice(to, 0, k); rewireLive(ch); markDirty(); commit(); renderRack(); setStatus('order: ' + ch.rack.join(' → ')); }
+      else { layoutRack(); setStatus(k + ' stays'); }
+      return; }
     if(!d.moved){
       if(d.seat){ swToggle(m, d.ch); drawModule(i); lastTap = 0; return; }   /* the little switch = ON/OFF, right on the module */
       const t = performance.now();
@@ -1697,7 +1736,7 @@ function bindModule(w, i){ const m = MODS[i]; let drag = null, lastTap = 0;
     commit(); };
   w.addEventListener('pointerup', end); w.addEventListener('pointercancel', end);
 }
-function buildRack(){ const box = $('rack'); box.innerHTML = ''; rackEls = MODS.map((m,i)=>{ const w = el('div','rk-m'); w.dataset.k = m.n; box.appendChild(w); bindModule(w, i); return w; }); layoutRack(); renderRack(); }
+function buildRack(){ const box = $('rack'); box.innerHTML = ''; rackEls = RACK.map((m,i)=>{ const w = el('div','rk-m'); w.dataset.k = m.n; box.appendChild(w); bindModule(w, i); return w; }); layoutRack(); $('rack').classList.toggle('idle', !selCh()); RACK.forEach((m,i)=>drawModule(i)); }
 buildRack();
 /* silver screws on every zone (like the module faceplates) */
 document.querySelectorAll('.z[data-screws]').forEach(z=>{ const all = z.dataset.screws === '4'; const spots = all ? [['top','left'],['top','right'],['bottom','left'],['bottom','right']] : [['bottom','left'],['bottom','right']]; spots.forEach(([v,h],i)=>{ const sc = el('i','zs'); sc.style[v] = '5px'; sc.style[h] = '5px'; sc.style.setProperty('--r', (20 + i*37) + 'deg'); z.appendChild(sc); }); });

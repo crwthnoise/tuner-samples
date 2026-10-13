@@ -19,6 +19,17 @@
       const r1 = R(), r2 = R(), r3 = R(); br(x2, y2, a + (r1 - .5)*.8, len*.76, d + 1); if(r2 < .6) br(x2, y2, a + (r3 - .5)*1.7, len*.6, d + 1); };
     for(let i=0;i<arms;i++){ const a = dir == null ? (i/arms)*Math.PI*2 + R()*.4 : dir + (i - (arms - 1)/2)*.55; br(cx, cy, a, 26 + R()*16, 0); }
     return out; }
+
+  /* fixed crack trees (built once): each segment knows how far it is from the impact point, so growing = revealing */
+  const A_X = 50, A_Y = 200, C_X = 58, C_Y = 70, VA = (292 - A_Y)/278, VC = (292 - C_Y)/278;
+  function tree(cx, cy, dirs, seed, len0){ const R = rng(seed), out = [];
+    const br = (x, y, a, len, d, dist)=>{ if(d > 5 || len < 4) return; const x2 = x + Math.cos(a)*len, y2 = y + Math.sin(a)*len; out.push([x, y, x2, y2, d, dist, len]);
+      const r1 = R(), r2 = R(), r3 = R(); br(x2, y2, a + (r1 - .5)*.7, len*.78, d + 1, dist + len); if(r2 < .55) br(x2, y2, a + (r3 - .5)*1.6, len*.6, d + 1, dist + len); };
+    dirs.forEach((a, i)=>br(cx, cy, a, len0*(.8 + R()*.4), 0, 0)); return out; }
+  const TREE_A = tree(A_X, A_Y, [-1.75,-1.2,-.5,.15,.75,1.4,2.05,2.7,-2.5], 11, 26);
+  const TREE_C = tree(C_X, C_Y, [.55,1.25,1.75,2.5,-.2,3.3], 17, 22);
+  function grownCracks(T, g){ if(g <= 0) return []; const r = g*150, out = [];
+    T.forEach(([x, y, x2, y2, d, dist, len])=>{ if(dist >= r) return; const k = Math.min(1, (r - dist)/len); out.push([x, y, x + (x2 - x)*k, y + (y2 - y)*k, d]); }); return out; }
   function cracks3d(S, hot){ const w = d=>Math.max(1, 4.6 - d*.75); let o = '';
     S.forEach(([a,b,c,d,k])=>o += `<line x1="${a+1.6}" y1="${b+1.8}" x2="${c+1.6}" y2="${d+1.8}" stroke="#000" stroke-width="${w(k)+2}" stroke-linecap="round" opacity=".85"/>`);
     S.forEach(([a,b,c,d,k])=>o += `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="#5a0b08" stroke-width="${w(k)+1.4}" stroke-linecap="round"/>`);
@@ -36,13 +47,13 @@
         <clipPath id="${u}C"><rect x="0" y="${y}" width="100" height="300"/></clipPath><filter id="${u}B"><feGaussianBlur stdDeviation="1.6"/></filter></defs>
         <rect x="0" y="${y}" width="100" height="${300 - y}" fill="url(#${u}G)"/>`;
       for(let i=0;i<=10;i++){ const yy = 292 - 278*i/10; s += `<line x1="3" x2="${i%5 ? 12 : 20}" y1="${yy}" y2="${yy}" stroke="${i >= 8 ? '#ff3b30' : '#6a625a'}" stroke-width="1.6"/>`; }
-      /* A: one burst point low in the glow — grows from the start. C: stems down from the line — only past halfway */
-      const A = segs(50, 240, 3 + Math.round(v*5), Math.min(1, v*1.15), 11, null);
-      const C = v > .5 ? segs(56, y, 2 + Math.round((v - .5)*4), (v - .5)/.5, 17, Math.PI/2) : [];
-      const S = A.concat(C), w = d=>Math.max(.9, 3 - d*.5);
-      let lines = ''; S.forEach(([a,b,c,d,k])=>lines += `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke-width="${w(k)}" stroke-linecap="round"/>`);
+      /* ONE fixed crack each — same shape every time, only revealed. A = impact point low (y 200): when the cracked edge passes it,
+         the lines spread out of that point. C = impact near the top (y 70): when the edge passes it, it slowly spreads from there. */
+      const S = grownCracks(TREE_A, Math.max(0, v - VA)/(1 - VA)*.95).concat(grownCracks(TREE_C, Math.max(0, v - VC)/(1 - VC)*.7)), w = d=>Math.max(.9, 3 - d*.5);
+      let lines = ''; S.forEach(([a,b,c,d,k])=>lines += `<line x1="${a.toFixed(1)}" y1="${b.toFixed(1)}" x2="${c.toFixed(1)}" y2="${d.toFixed(1)}" stroke-width="${w(k)}" stroke-linecap="round"/>`);
       s += `<g clip-path="url(#${u}C)"><g stroke="#000" opacity=".7" transform="translate(1.4 1.6)">${lines}</g><g stroke="#ff3b30" opacity=".8" filter="url(#${u}B)">${lines}</g><g stroke="${hot}">${lines}</g></g>`;
-      s += `<circle cx="50" cy="240" r="${4 + 16*v}" fill="url(#${u}O)"/>`;
+      if(v > VA) s += `<circle cx="${A_X}" cy="${A_Y}" r="${4 + 16*Math.min(1,(v - VA)*2)}" fill="url(#${u}O)"/>`;
+      if(v > VC) s += `<circle cx="${C_X}" cy="${C_Y}" r="${3 + 10*(v - VC)/(1 - VC)}" fill="url(#${u}O)"/>`;
       if(v > .8) s += `<rect x="0" y="0" width="100" height="70" fill="#ff3b30" opacity=".12"/>`;
       /* B: the glow's top edge = a cracked line (the fader cap) */
       const R = rng(31); let e = `M0 ${y}`; for(let x=0;x<=100;x+=7) e += ` L${x} ${(y + (R() - .5)*(6 + v*8)).toFixed(1)}`;

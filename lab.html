@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-/* MODULE LAB lab-6 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
+/* MODULE LAB lab-7 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
 :root{ --void:#0a0804; --red:#d32f2f; --green:#4fd1a5; --text:#f2ede2; --mute:#8a8176; --faint:#4a443d;
   --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --ui:'Jura','Arial Narrow',system-ui,sans-serif; color-scheme:dark; }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -55,8 +55,8 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 .scr{ position:absolute; inset:0 10%; background:#040605; border:2px solid #1a1a1a; border-radius:3px; box-shadow:inset 0 0 14px #000; overflow:hidden; }
 svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 </style>
-<script src="modules/sky.js?v=lab-6"></script>
-<script src="modules/rage.js?v=lab-6"></script>
+<script src="modules/sky.js?v=lab-7"></script>
+<script src="modules/rage.js?v=lab-7"></script>
 </head><body>
 <div class="z top">
   <h1><b>THREAT</b> TUNER<small>MODULE LAB</small></h1>
@@ -71,7 +71,7 @@ svg.f{ position:absolute; inset:0; width:100%; height:100%; }
   <button class="btn" id="sw">SWITCH</button>
   <button id="play" aria-label="play">▶</button>
 </div>
-<div class="note">lab-6 · module at real app size</div>
+<div class="note">lab-7 · module at real app size</div>
 <script>
 const $ = id=>document.getElementById(id);
 const clamp = (v,a,b)=>Math.min(b, Math.max(a, v));
@@ -106,14 +106,17 @@ const M = ()=>MODS[st.mod];
 
 /* ---------- audio ---------- */
 let ctx = null, chain = {}, dry, wetBus, src = null, ready = null, an = null, anBuf = null;
+function wake(){ /* called right inside the tap, before any await — phones only start sound inside the tap */
+  if(!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if(ctx.state !== 'running'){ try{ ctx.resume(); }catch(e){} } }
 async function boot(){ if(ready) return ready; ready = (async()=>{
-  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  wake();
   const files = new Set(); ORDER.forEach(k=>(MODS[k].worklets||[]).forEach(f=>files.add(f)));
-  for(const f of files) await ctx.audioWorklet.addModule(f + '?v=lab-6');
+  for(const f of files){ try{ await ctx.audioWorklet.addModule(f + '?v=lab-7'); }catch(e){ console.warn('worklet failed', f, e); } }   /* one bad file never kills PLAY */
   dry = ctx.createGain(); wetBus = ctx.createGain(); const out = ctx.createGain(); out.gain.value = 0.85;
   dry.connect(out); wetBus.connect(out); out.connect(ctx.destination); an = ctx.createAnalyser(); an.fftSize = 512; wetBus.connect(an);
-  ORDER.forEach(k=>{ chain[k] = MODS[k].build(ctx, st); });
-  route(); })(); return ready; }
+  ORDER.forEach(k=>{ try{ chain[k] = MODS[k].build(ctx, st); }catch(e){ console.warn('module failed', k, e); const g = ctx.createGain(); chain[k] = { in:g, out:g, set(){}, transport(){} }; } });
+  route(); })(); ready.catch(()=>{ ready = null; }); return ready; }
 function route(){ if(!ctx) return; ORDER.forEach(k=>{ try{ chain[k].out.disconnect(); }catch(e){} }); const c = chain[st.mod]; c.out.connect(wetBus);
   if(src){ try{ src.disconnect(); }catch(e){} src.connect(dry); src.connect(c.in); }
   apply(); }
@@ -138,7 +141,7 @@ async function getBuffer(s){ if(s._buf) return s._buf; const r = await fetch('sa
 async function start(){ await boot(); if(ctx.state !== 'running') await ctx.resume(); stopSrc();
   const s = LIB.find(x=>x.id === st.loop); if(!s) return; $('readout').textContent = 'loading…';
   const buf = await getBuffer(s), bs = 60/s.bpm, beats = Math.max(1, Math.round(buf.duration/bs)), T = ctx.currentTime + 0.08;
-  if(chain.QUIPU) chain.QUIPU.transport({ t0:T, bs, loopBeats:beats, seed:st.seed, reset:true });
+  if(chain.QUIPU && chain.QUIPU.transport) chain.QUIPU.transport({ t0:T, bs, loopBeats:beats, seed:st.seed, reset:true });
   src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; route(); src.start(T);
   st.playing = true; $('play').textContent = '■'; $('bpmLcd').innerHTML = s.bpm + '<i>BPM</i>'; readout(); }
 function stopSrc(){ if(src){ try{ src.stop(); }catch(e){} try{ src.disconnect(); }catch(e){} src = null; } }
@@ -166,7 +169,7 @@ const end = ()=>{ if(drag){ drag = null; save(); } }; band.addEventListener('poi
 $('sw').addEventListener('click', ()=>{ const m = M(); if(m.oneShot){ let n; do{ n = 1 + Math.floor(Math.random()*100000); }while(n === st.seed); st.seed = n; }
   else st.sw[st.mod] = !st.sw[st.mod]; apply(); draw(); readout(); save(); });
 $('ab').addEventListener('click', ()=>{ st.wet = !st.wet; $('ab').className = 'btn' + (st.wet ? '' : ' dry'); $('ab').textContent = st.wet ? 'A/B' : 'DRY'; apply(); readout(); save(); });
-$('play').addEventListener('click', ()=>{ if(st.playing) stop(); else start().catch(e=>{ $('readout').textContent = 'could not play: ' + e.message; }); });
+$('play').addEventListener('click', ()=>{ wake(); if(st.playing) stop(); else start().catch(e=>{ $('readout').textContent = 'could not play: ' + e.message; }); });
 $('loopSel').addEventListener('change', e=>{ st.loop = e.target.value; save(); if(st.playing) start(); });
 addEventListener('resize', ()=>{ layout(); draw(); });
 /* audio react: modules with .react get the output level each frame (cheap: one opacity change) */

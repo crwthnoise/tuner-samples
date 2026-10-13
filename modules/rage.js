@@ -21,12 +21,22 @@
     return out; }
 
   /* fixed crack trees (built once): each segment knows how far it is from the impact point, so growing = revealing */
-  const A_X = 50, A_Y = 200, C_X = 58, C_Y = 70, VA = (292 - A_Y)/278, VC = (292 - C_Y)/278;
+  const A_X = 46, A_Y = 252, C_X = 58, C_Y = 70, VA = (292 - A_Y)/278, VC = (292 - C_Y)/278;
   function tree(cx, cy, dirs, seed, len0){ const R = rng(seed), out = [];
     const br = (x, y, a, len, d, dist)=>{ if(d > 5 || len < 4) return; const x2 = x + Math.cos(a)*len, y2 = y + Math.sin(a)*len; out.push([x, y, x2, y2, d, dist, len]);
       const r1 = R(), r2 = R(), r3 = R(); br(x2, y2, a + (r1 - .5)*.7, len*.78, d + 1, dist + len); if(r2 < .55) br(x2, y2, a + (r3 - .5)*1.6, len*.6, d + 1, dist + len); };
     dirs.forEach((a, i)=>br(cx, cy, a, len0*(.8 + R()*.4), 0, 0)); return out; }
-  const TREE_A = tree(A_X, A_Y, [-1.75,-1.2,-.5,.15,.75,1.4,2.05,2.7,-2.5], 11, 26);
+  /* A (lab-8): the bottom crack breaks PIECE BY PIECE — one main crack runs up first, then the next one, then the branches split off one at a time.
+     Each piece gets a place in line (start..end on a 0..1 timeline) so it never all bursts out at once. */
+  function seqTree(cx, cy, seed){ const R = rng(seed), trunks = [], twigs = [];
+    const run = (x, y, a, len, n, arr, d)=>{ const pts = []; for(let i=0;i<n;i++){ const x2 = x + Math.cos(a)*len, y2 = y + Math.sin(a)*len; pts.push([x, y, x2, y2, d]); x = x2; y = y2; a += (R() - .5)*.55; len *= .9; } arr.push(pts); return pts; };
+    const t1 = run(cx, cy, -1.45, 17, 7, trunks, 0), t2 = run(cx, cy, -.35, 14, 5, trunks, 0), t3 = run(cx, cy, -2.6, 12, 4, trunks, 1);
+    [[t1,1],[t1,3],[t2,1],[t1,5],[t3,1],[t2,3]].forEach(([t, k], i)=>{ const [, , x, y] = t[k]; const side = i % 2 ? 1 : -1; run(x, y, Math.atan2(t[k][3] - t[k][1], t[k][2] - t[k][0]) + side*(.7 + R()*.4), 9 - i*.6, 2 + (i < 3 ? 1 : 0), twigs, 2); });
+    const pieces = []; trunks.concat(twigs).forEach(path=>path.forEach(sg=>pieces.push(sg)));
+    const total = pieces.reduce((a, [x, y, x2, y2])=>a + Math.hypot(x2 - x, y2 - y), 0); let acc = 0;
+    return pieces.map(([x, y, x2, y2, d])=>{ const L = Math.hypot(x2 - x, y2 - y), t0 = acc/total; acc += L; return [x, y, x2, y2, d, t0, acc/total]; }); }
+  const TREE_A = seqTree(A_X, A_Y, 11);
+  function seqCracks(T, g){ if(g <= 0) return []; const out = []; T.forEach(([x, y, x2, y2, d, t0, t1])=>{ if(g <= t0) return; const k = Math.min(1, (g - t0)/(t1 - t0)); out.push([x, y, x + (x2 - x)*k, y + (y2 - y)*k, d]); }); return out; }
   const TREE_C = tree(C_X, C_Y, [.55,1.25,1.75,2.5,-.2,3.3], 17, 22);
   function grownCracks(T, g){ if(g <= 0) return []; const r = g*150, out = [];
     T.forEach(([x, y, x2, y2, d, dist, len])=>{ if(dist >= r) return; const k = Math.min(1, (r - dist)/len); out.push([x, y, x + (x2 - x)*k, y + (y2 - y)*k, d]); }); return out; }
@@ -47,12 +57,12 @@
         <clipPath id="${u}C"><rect x="0" y="${y}" width="100" height="300"/></clipPath><filter id="${u}B"><feGaussianBlur stdDeviation="1.6"/></filter></defs>
         <rect x="0" y="${y}" width="100" height="${300 - y}" fill="url(#${u}G)"/>`;
       for(let i=0;i<=10;i++){ const yy = 292 - 278*i/10; s += `<line x1="3" x2="${i%5 ? 12 : 20}" y1="${yy}" y2="${yy}" stroke="${i >= 8 ? '#ff3b30' : '#6a625a'}" stroke-width="1.6"/>`; }
-      /* ONE fixed crack each — same shape every time, only revealed. A = impact point low (y 200): when the cracked edge passes it,
-         the lines spread out of that point. C = impact near the top (y 70): when the edge passes it, it slowly spreads from there. */
-      const S = grownCracks(TREE_A, Math.max(0, v - VA)/(1 - VA)*.95).concat(grownCracks(TREE_C, Math.max(0, v - VC)/(1 - VC)*.7)), w = d=>Math.max(.9, 3 - d*.5);
+      /* ONE fixed crack each — same shape every time, only revealed. A = impact point low (y 252, lab-8): when the edge passes it,
+         it breaks piece by piece (one crack line, then the next, then branches). C = impact near the top (y 70): when the edge passes it, it slowly spreads from there. */
+      const S = seqCracks(TREE_A, Math.min(1, Math.max(0, v - VA)/(.92 - VA))).concat(grownCracks(TREE_C, Math.max(0, v - VC)/(1 - VC)*.7)), w = d=>Math.max(.9, 3 - d*.5);
       let lines = ''; S.forEach(([a,b,c,d,k])=>lines += `<line x1="${a.toFixed(1)}" y1="${b.toFixed(1)}" x2="${c.toFixed(1)}" y2="${d.toFixed(1)}" stroke-width="${w(k)}" stroke-linecap="round"/>`);
       s += `<g clip-path="url(#${u}C)"><g stroke="#000" opacity=".7" transform="translate(1.4 1.6)">${lines}</g><g stroke="#ff3b30" opacity=".8" filter="url(#${u}B)">${lines}</g><g stroke="${hot}">${lines}</g></g>`;
-      if(v > VA) s += `<circle cx="${A_X}" cy="${A_Y}" r="${4 + 16*Math.min(1,(v - VA)*2)}" fill="url(#${u}O)"/>`;
+      if(v > VA) s += `<circle cx="${A_X}" cy="${A_Y}" r="${3 + 9*Math.min(1,(v - VA)*1.5)}" fill="url(#${u}O)"/>`;
       if(v > VC) s += `<circle cx="${C_X}" cy="${C_Y}" r="${3 + 10*(v - VC)/(1 - VC)}" fill="url(#${u}O)"/>`;
       if(v > .8) s += `<rect x="0" y="0" width="100" height="70" fill="#ff3b30" opacity=".12"/>`;
       /* B: the glow's top edge = a cracked line (the fader cap) */

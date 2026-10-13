@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-/* MODULE LAB lab-7 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
+/* MODULE LAB lab-8 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
 :root{ --void:#0a0804; --red:#d32f2f; --green:#4fd1a5; --text:#f2ede2; --mute:#8a8176; --faint:#4a443d;
   --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --ui:'Jura','Arial Narrow',system-ui,sans-serif; color-scheme:dark; }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -55,8 +55,8 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 .scr{ position:absolute; inset:0 10%; background:#040605; border:2px solid #1a1a1a; border-radius:3px; box-shadow:inset 0 0 14px #000; overflow:hidden; }
 svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 </style>
-<script src="modules/sky.js?v=lab-7"></script>
-<script src="modules/rage.js?v=lab-7"></script>
+<script src="modules/sky.js?v=lab-8"></script>
+<script src="modules/rage.js?v=lab-8"></script>
 </head><body>
 <div class="z top">
   <h1><b>THREAT</b> TUNER<small>MODULE LAB</small></h1>
@@ -71,7 +71,7 @@ svg.f{ position:absolute; inset:0; width:100%; height:100%; }
   <button class="btn" id="sw">SWITCH</button>
   <button id="play" aria-label="play">▶</button>
 </div>
-<div class="note">lab-7 · module at real app size</div>
+<div class="note">lab-8 · module at real app size</div>
 <script>
 const $ = id=>document.getElementById(id);
 const clamp = (v,a,b)=>Math.min(b, Math.max(a, v));
@@ -112,7 +112,7 @@ function wake(){ /* called right inside the tap, before any await — phones onl
 async function boot(){ if(ready) return ready; ready = (async()=>{
   wake();
   const files = new Set(); ORDER.forEach(k=>(MODS[k].worklets||[]).forEach(f=>files.add(f)));
-  for(const f of files){ try{ await ctx.audioWorklet.addModule(f + '?v=lab-7'); }catch(e){ console.warn('worklet failed', f, e); } }   /* one bad file never kills PLAY */
+  for(const f of files){ try{ await ctx.audioWorklet.addModule(f + '?v=lab-8'); }catch(e){ console.warn('worklet failed', f, e); } }   /* one bad file never kills PLAY */
   dry = ctx.createGain(); wetBus = ctx.createGain(); const out = ctx.createGain(); out.gain.value = 0.85;
   dry.connect(out); wetBus.connect(out); out.connect(ctx.destination); an = ctx.createAnalyser(); an.fftSize = 512; wetBus.connect(an);
   ORDER.forEach(k=>{ try{ chain[k] = MODS[k].build(ctx, st); }catch(e){ console.warn('module failed', k, e); const g = ctx.createGain(); chain[k] = { in:g, out:g, set(){}, transport(){} }; } });

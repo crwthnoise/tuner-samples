@@ -499,7 +499,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.27';
+const APP_VERSION = 'v10.28';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1255,7 +1255,11 @@ function addModule(x, card){ const ch = selCh(); if(!ch){ setStatus('tap a loop 
   const c = [...$('addGrid').children].find(e=>e.dataset.k === 'ADD MOD ' + x.n); if(c){ c.classList.add('pop'); } }
 function openAdd(){ if(!selCh()){ setStatus(channels.length ? 'tap a loop first' : 'add a loop first — tap + or PACKS'); return; } closeThick(); renderAddChips(); renderAddGrid(); $('addSheet').classList.add('open'); const a = document.querySelector('.rk-add'); if(a) a.classList.add('on'); }
 function closeAdd(){ $('addSheet').classList.remove('open'); const a = document.querySelector('.rk-add'); if(a) a.classList.remove('on'); }
-function migrateRack(r){ if(!Array.isArray(r)) return FX_SLOTS.slice(); const out = []; r.forEach(k=>{ if(FX_SLOTS.includes(k) && !out.includes(k)) out.push(k); }); return out; }
+/* v10.28 SMART STARTER RACK — a new loop comes in with the modules that fit its TYPE (faders at zero = no sound change until you push them) */
+const STARTER = { DRUMS:['UNTIRE','LOADED','THREAT'], BASS:['SUB','FLOOR','THREAT'], SYNTHS:['WIDE','NEW ERA'], VOCALS:['WIDE','UNTIRE'], FX:['WIDE','LOADED'] };
+function migrateRack(r, smp, fx){ if(Array.isArray(r)){ const out = []; r.forEach(k=>{ if(FX_SLOTS.includes(k) && !out.includes(k)) out.push(k); }); return out; }
+  if(Array.isArray(fx) && fx.some(x=>x > 0)) return FX_SLOTS.slice();   /* old project with tweaks = keep the old full rack so it sounds the same */
+  let t = null; try{ t = smp ? typeOf(smp) : null; }catch(e){} return (STARTER[t] || []).slice(); }
 function tuneParams(v, sw){ // one place for every number → live and export match
   const [wd, pm, sb, un, ld, fl, ne, th] = v || fxDefaults(); sw = sw || {};
   const k = 1 + wd*2.2, bs = beatSec(), ml = sw.WIDE ? 1 : 0, push = sw.THREAT ? 2 : 1;
@@ -1287,7 +1291,7 @@ async function addChannelFromSample(sample, opts={}){
   const gainNode = ctx.createGain(); gainNode.gain.value = 0;
   const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=20000; lp.Q.value=0.7;
   const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=20; hp.Q.value=0.7;
-  const rack0 = migrateRack(opts.rack); const tuneNodes = buildTune(ctx, rack0);
+  const rack0 = migrateRack(opts.rack, sample, opts.fx); const tuneNodes = buildTune(ctx, rack0);
   gainNode.connect(lp); lp.connect(hp); hp.connect(tuneNodes.in); tuneNodes.out.connect(masterGain);
   const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; gainNode.connect(analyser);
   const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, fx:migrateFx(opts.fx), sw:migrateSw(opts.sw), rack:rack0, keyLock:!!opts.keyLock, tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };

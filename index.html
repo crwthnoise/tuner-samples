@@ -499,7 +499,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.28';
+const APP_VERSION = 'v10.29';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -569,7 +569,7 @@ function scheduleAutosave(){ if(!currentProjectId && !channels.length) return; i
 async function saveSampleAudio(sample, arrayBuf, mime){ const payload = { name:sample.name, mime:mime||'audio/wav', bpm:sample.bpm, key:sample.key }; if(Store.mode === 'idb') payload.buf = arrayBuf; else payload.base64 = abToB64(arrayBuf); await Store.set('sample:'+sample.id, payload); }
 function clearChannels(){ stopSources(); channels.forEach(ch=>{ try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} }); channels = []; sidechainTrigger = null; closeOptions(); }
 async function getProjectIndex(){ if(Store.mode==='none') return []; const idx = await Store.get('projects'); return Array.isArray(idx) ? idx : []; }
-function channelMeta(){ return channels.map(ch=>({ id:ch.id, sampleId:ch.sample.id, clips:ch.clips.map(c=>({start:c.start,len:c.len,off:c.off,mute:!!c.mute})), volume:ch.volume, filterVal:ch.filterVal, pitchSemitones:ch.pitchSemitones, scTrigger:ch.scTrigger, scDuck:ch.scDuck, mute:!!ch.mute, fx:ch.fx.slice(), sw:Object.assign({}, ch.sw), rack:ch.rack.slice(), keyLock:!!ch.keyLock })); }
+function channelMeta(){ return channels.map(ch=>({ id:ch.id, sampleId:ch.sample.id, clips:ch.clips.map(c=>({start:c.start,len:c.len,off:c.off,mute:!!c.mute})), volume:ch.volume, filterVal:ch.filterVal, pitchSemitones:ch.pitchSemitones, scTrigger:ch.scTrigger, scDuck:ch.scDuck, mute:!!ch.mute, fx:ch.fx.slice(), sw:Object.assign({}, ch.sw), rack:ch.rack.slice(), qSeed:ch.qSeed, keyLock:!!ch.keyLock })); }
 function settingsMeta(){ return { songKey:songKeyState, bpm, zoomX, zoomY, master:masterGain.gain.value, limiterOn, sc:{ depth:scDepth, thr:scThreshold, rel:scRelease, curve:scCurve } }; }
 function buildProjectPayload(name, forceB64){
   const usedIds = [...new Set(channels.map(c=>c.sample.id))], sampleList = [];
@@ -1164,20 +1164,29 @@ function defaultClipLen(sample){ return loopBeats(sample); }
 /* ===== RACK FX — the 8 swappable modules of the stock recipe (rule 28/30), per loop, values 0..1 (0 = off).
    Same builder runs live AND in export, so export = what you hear.
    LOOKS FIRST (rule 17): these sounds are placeholders until Alex designs each one around its look. ===== */
-const FX_SLOTS = ['WIDE','PUMP','SUB','UNTIRE','LOADED','FLOOR','NEW ERA','THREAT'];
+const FX_SLOTS = ['WIDE','PUMP','SUB','UNTIRE','LOADED','FLOOR','NEW ERA','THREAT','QUIPU'];   /* v10.29: + QUIPU (new modules always go on the END so old saves keep their values) */
 function fxDefaults(){ return FX_SLOTS.map(()=>0); }
 /* 2nd controls (v10.14): every module's little seat = an ON/OFF switch, DEFAULT OFF. OFF = the module sounds exactly like before.
    ON only changes HOW the module works — at fader ZERO a module still does nothing (rule: zero = no effect). */
 const SW_KEYS = ['FILTER','PITCH','WIDE','PUMP','SUB','UNTIRE','LOADED','FLOOR','NEW ERA','THREAT'];
+/* ===== QUIPU (v10.29) — slice scrambler, built in the MODULE LAB. Sound = modules/quipu.worklet.js (same file the LAB uses). ===== */
+let quipuReady = null; function loadQuipu(ac){ if(!ac.audioWorklet) return Promise.resolve(false); return ac.audioWorklet.addModule('modules/quipu.worklet.js?v=' + APP_VERSION).then(()=>true, ()=>false); }
+quipuReady = loadQuipu(ctx); let quipuOK = false; quipuReady.then(ok=>{ quipuOK = ok; if(ok) channels.forEach(ch=>{ upgradeQuipu(ch); }); });
+function newQuipuSeed(){ return 1 + Math.floor(Math.random()*100000); }
+function makeQuipu(ac, o){ try{ return new AudioWorkletNode(ac, 'quipu', { numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], processorOptions:o }); }catch(e){ const g = ac.createGain(); g._fake = true; return g; } }
+function quipuOpts(ch, t0){ return { t0: t0 || 0, bs: beatSec(), loopBeats: ch ? loopBeats(ch.sample) : 4, seed: ch ? ch.qSeed : 1 }; }
+function upgradeQuipu(ch){ const n = ch.tuneNodes; if(!n || !n.quipu || !n.quipu._fake) return; const q = makeQuipu(ctx, quipuOpts(ch, quipuT0())); if(q._fake) return; n.quipu = q; n.blk.QUIPU = [q, q]; wireTune(n, n.order); applyTune(ch); }
+function quipuT0(){ return isRunning ? songStartTime - startBeat*beatSec() : 0; }
+function syncQuipu(ch, t0){ const n = ch.tuneNodes; if(n && n.quipu && n.quipu.port) n.quipu.port.postMessage({ t0, bs: beatSec(), loopBeats: loopBeats(ch.sample), seed: ch.qSeed }); }
 function migrateSw(o){ const out = {}; if(o && typeof o === 'object') SW_KEYS.forEach(k=>{ if(o[k]) out[k] = true; }); return out; }
-function migrateFx(v){ return (Array.isArray(v) && v.length === FX_SLOTS.length) ? v.map(x=>clamp(+x||0, 0, 1)) : fxDefaults(); }
+function migrateFx(v){ return Array.isArray(v) ? FX_SLOTS.map((_,i)=>clamp(+v[i]||0, 0, 1)) : fxDefaults(); }
 const _curveCache = {};
 function crushCurve(){ if(_curveCache.crush) return _curveCache.crush; const n = 4096, c = new Float32Array(n), st = 1/10; for(let i=0;i<n;i++){ const x = i/(n-1)*2-1; c[i] = Math.round(x/st)*st; } return (_curveCache.crush = c); }
 function satCurve(kind){ if(_curveCache[kind]) return _curveCache[kind]; const n = 2048, c = new Float32Array(n); for(let i=0;i<n;i++){ const x = i/(n-1)*2-1; c[i] = kind==='hard' ? Math.sign(x)*Math.pow(Math.abs(Math.tanh(x*1.6)), 0.6) : Math.tanh(x) + 0.08*x*x; } return (_curveCache[kind] = c); }
 /* PUMP: a sawtooth at the beat rate → shaped into a duck that hits on every beat and breathes back */
 function pumpCurve(){ if(_curveCache.pump) return _curveCache.pump; const n = 2048, c = new Float32Array(n); for(let i=0;i<n;i++){ const x = i/(n-1)*2-1; const p = x >= 0 ? x/2 : (x+2)/2; c[i] = Math.pow(1 - p, 2.2); } return (_curveCache.pump = c); }
 function startPump(n, ac, at){ try{ if(n.pumpOsc){ n.pumpOsc.stop(); n.pumpOsc.disconnect(); } }catch(e){} const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 1/(beatSec()*(n.half ? 2 : 1)); o.connect(n.pumpSh); o.start(Math.max(ac.currentTime, at)); n.pumpOsc = o; }
-function buildTune(ac, order){
+function buildTune(ac, order, qo){
   const n = {}; const G = v=>{ const g = ac.createGain(); g.gain.value = v; return g; };
   const BQ = (type, f, q)=>{ const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if(q != null) b.Q.value = q; return b; };
   const COMP = ()=>{ const c = ac.createDynamicsCompressor(); c.threshold.value = 0; c.ratio.value = 1; c.knee.value = 6; c.attack.value = 0.005; c.release.value = 0.15; return c; };
@@ -1215,7 +1224,8 @@ function buildTune(ac, order){
   n.merge.connect(n.hp1); n.hp1.connect(n.hp2); n.hp2.connect(n.wHi); n.wHi.connect(n.wOut);
   n.split.connect(n.mlSum, 0); n.split.connect(n.mlSum, 1); n.mlSum.connect(n.lp1); n.lp1.connect(n.lp2); n.lp2.connect(n.mlG); n.mlG.connect(n.wOut);
   /* v10.26: every module is a block [in, out]; the loop's rack order = the signal order, LEFT → RIGHT */
-  n.blk = { 'FLOOR':[n.flHp, n.flLow], 'SUB':[n.sub, n.subComp], 'UNTIRE':[n.unComp, n.unMake], 'NEW ERA':[n.neIn, n.neSum], 'THREAT':[n.thIn, n.thTrim], 'LOADED':[n.ldIn, n.ldSum], 'WIDE':[n.wIn, n.wOut], 'PUMP':[n.pump, n.pump] };
+  n.quipu = (ac === ctx && !quipuOK) ? (()=>{ const g = ac.createGain(); g._fake = true; return g; })() : makeQuipu(ac, qo || { t0:0, bs:beatSec(), loopBeats:4, seed:1 });
+  n.blk = { 'QUIPU':[n.quipu, n.quipu], 'FLOOR':[n.flHp, n.flLow], 'SUB':[n.sub, n.subComp], 'UNTIRE':[n.unComp, n.unMake], 'NEW ERA':[n.neIn, n.neSum], 'THREAT':[n.thIn, n.thTrim], 'LOADED':[n.ldIn, n.ldSum], 'WIDE':[n.wIn, n.wOut], 'PUMP':[n.pump, n.pump] };
   wireTune(n, order);
   startPump(n, ac, 0);
   return n;
@@ -1227,10 +1237,10 @@ function rewireLive(ch){ const n = ch.tuneNodes; if(!n) return; const t = ctx.cu
   setTimeout(()=>{ wireTune(n, ch.rack); const t2 = ctx.currentTime; n.out.gain.cancelScheduledValues(t2); n.out.gain.setTargetAtTime(1, t2, 0.01); }, 30); }
 /* v10.27 ＋ MODULES page — 5 categories × 4 new (+ the 8 already built). SOON = drawn + voted, sound not built yet. */
 const MOD_CATS = ['DRIVE','CHOP','SPACE','MOTION','TONE'];
-const MOD_CAT = { 'THREAT':'DRIVE','NEW ERA':'DRIVE','UNTIRE':'DRIVE', 'LOADED':'CHOP', 'WIDE':'SPACE', 'PUMP':'MOTION', 'SUB':'TONE','FLOOR':'TONE' };
+const MOD_CAT = { 'QUIPU':'CHOP', 'THREAT':'DRIVE','NEW ERA':'DRIVE','UNTIRE':'DRIVE', 'LOADED':'CHOP', 'WIDE':'SPACE', 'PUMP':'MOTION', 'SUB':'TONE','FLOOR':'TONE' };
 const SOON = [
   ['FLAME','DRIVE','#ff7a1a','our warmest saturator'], ['CRUDE','DRIVE','#d6b23a','raw hard clip, no polish'], ['PUNK','DRIVE','#e8c35a','crunch + shine'], ['RAGE','DRIVE','#ff0033','blown-speaker rage — clipped like a busted car speaker'],
-  ['SHRED','CHOP','#f2ede2','on-beat slicing, chopped clean to the grid'], ['QUIPU','CHOP','#e0a060','slice scrambler — re-rolls every bar, knob holds one you like'], ['GRINDER','CHOP','#ff5a1f','machine-gun stutter 1/16 → 1/64, pitch diving'], ['GLITCH','CHOP','#ff2a6d','buffer repeats, broken playback'],
+  ['SHRED','CHOP','#f2ede2','on-beat slicing, chopped clean to the grid'], ['GRINDER','CHOP','#ff5a1f','machine-gun stutter 1/16 → 1/64, pitch diving'], ['GLITCH','CHOP','#ff2a6d','buffer repeats, broken playback'],
   ['SKY','SPACE','#9ad0ff','huge shimmer reverb — opens up the sky'], ['ANDES','SPACE','#c7d2ff','ping-pong echo bouncing between the peaks'], ['FREEZE','SPACE','#a8e6ff','spectral freeze, holds a moment'], ['TUNNEL','SPACE','#ffaa55','dark filtered reverb — sound down a tunnel'],
   ['WOBBLE','MOTION','#2affea','dubstep wobble locked to tempo'], ['RISE','MOTION','#ffffff','riser — highpass + noise climbing'], ['BEND','MOTION','#ff3df2','808 glides, always in key'], ['CHICHA','MOTION','#ff3df2','Peruvian cumbia psychedelia — surf phaser + cumbia swing'],
   ['PRISM','TONE','#ffffff','splits the bands + detunes each one'], ['SECRET','TONE','#ffe2a0','a hidden air layer tucked under the loop'], ['GROWL','TONE','#b6ff3a','dubstep growl out of any sound'], ['PIXEL','TONE','#4fd1a5','bitcrush, chunkier the higher you go'],
@@ -1276,6 +1286,7 @@ function tuneParams(v, sw){ // one place for every number → live and export ma
   };
 }
 function setTune(n, v, ac, now, sw){ const p = tuneParams(v, sw); n.half = p.half; const set = (param, val)=>{ if(now == null) param.value = val; else param.setTargetAtTime(val, now, 0.03); };
+  if(n.quipu && n.quipu.parameters){ const qa = n.quipu.parameters.get('amount'); if(qa) set(qa, (v && v[FX_SLOTS.indexOf('QUIPU')]) || 0); }
   set(n.wDirect.gain, p.wDirect); set(n.wHi.gain, p.wHi); set(n.mlG.gain, p.mlG); set(n.sub.frequency, p.subF); set(n.unAir.gain, p.unAir); set(n.flHp.frequency, p.flHp); set(n.neCrOn.gain, p.crush ? 1 : 0); set(n.neCrOff.gain, p.crush ? 0 : 1);
   set(n.gLL.gain, p.gLL); set(n.gRL.gain, p.gRL); set(n.gLR.gain, p.gLR); set(n.gRR.gain, p.gRR); set(n.haasL.gain, p.haasL); set(n.haasR.gain, p.haasR);
   set(n.pumpDepth.gain, p.pumpDepth); if(n.pumpOsc) set(n.pumpOsc.frequency, p.pumpRate);
@@ -1294,11 +1305,11 @@ async function addChannelFromSample(sample, opts={}){
   const rack0 = migrateRack(opts.rack, sample, opts.fx); const tuneNodes = buildTune(ctx, rack0);
   gainNode.connect(lp); lp.connect(hp); hp.connect(tuneNodes.in); tuneNodes.out.connect(masterGain);
   const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; gainNode.connect(analyser);
-  const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, fx:migrateFx(opts.fx), sw:migrateSw(opts.sw), rack:rack0, keyLock:!!opts.keyLock, tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
+  const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, fx:migrateFx(opts.fx), sw:migrateSw(opts.sw), rack:rack0, qSeed:opts.qSeed || newQuipuSeed(), keyLock:!!opts.keyLock, tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
   if(!channels.length && !restoring && !opts.quiet && sample.bpm && sample.bpm !== bpm){ bpm = sample.bpm; $('bpmInput').value = bpm; renderBpm(); }   /* first loop sets the song BPM */
   rebuildBuffer(ch);
   if(ch.scTrigger){ channels.forEach(c=>c.scTrigger=false); sidechainTrigger = ch; }
-  channels.push(ch); applyFilter(ch); setTune(tuneNodes, ch.fx, ctx, null, ch.sw); refreshTimeline(); if(!restoring) maybeTapHint();
+  channels.push(ch); applyFilter(ch); setTune(tuneNodes, ch.fx, ctx, null, ch.sw); syncQuipu(ch, quipuT0()); refreshTimeline(); if(!restoring) maybeTapHint();
   if(!opts.quiet){ markDirty(); commit(); }
   if(isRunning && !restoring) reschedule();
   if(!restoring){ scrollToRow(channels.length-1); if(!opts.quiet){ selectChannel(ch.id); zoomToFit(); } }
@@ -1371,6 +1382,7 @@ function scheduleFrom(fromBeat){
   const bs = beatSec(), t0 = ctx.currentTime + 0.05; songStartTime = t0; startBeat = fromBeat;
   channels.forEach(ch=>{ const rate = playRate(ch), dur = ch.buffer.duration; ch.clips.forEach(c=>{ const end = c.start + c.len; if(c.mute || end <= fromBeat) return; const src = ctx.createBufferSource(); src.buffer = ch.buffer; src.loop = true; src.detune.value = chPitch(ch)*100; src.connect(ch.gainNode); const startAt = t0 + Math.max(0, c.start - fromBeat)*bs; const into = Math.max(0, fromBeat - c.start); const offset = ((into + c.off)*bs*rate) % dur; src.start(startAt, offset); src.stop(t0 + (end - fromBeat)*bs); ch.sources.push(src); }); });
   const pumpAt = t0 + (Math.ceil(fromBeat - 1e-6) - fromBeat)*bs, pumpAt2 = t0 + (2*Math.ceil(fromBeat/2 - 1e-6) - fromBeat)*bs; channels.forEach(ch=>{ if(ch.tuneNodes) startPump(ch.tuneNodes, ctx, ch.tuneNodes.half ? pumpAt2 : pumpAt); });
+  channels.forEach(ch=>syncQuipu(ch, t0 - fromBeat*bs));   /* QUIPU knows where the bars are */
   duckNow = 0; releaseStart = -99; wasHot = false;
 }
 function reschedule(){ if(!isRunning) return; scheduleFrom(currentBeat()); }
@@ -1631,12 +1643,13 @@ async function renderArrangementOffline(sampleRate){
   await hqSettle();   /* export = always the HQ stretch */
   const bs = beatSec(), totalLen = songEndBeats()*bs;
   const offline = new OfflineAudioContext(2, Math.ceil(totalLen*sampleRate), sampleRate); const oMaster = buildOfflineMasterChain(offline);
+  if(channels.some(c=>c.rack.includes('QUIPU'))) await loadQuipu(offline);
   const STEP = 0.002; const track = duckTrackFor(totalLen, STEP);
   channels.forEach(ch=>{
     if(isSilent(ch) || !ch.clips.length) return;
     const g = offline.createGain(); const lp = offline.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7; const hp = offline.createBiquadFilter(); hp.type='highpass'; hp.Q.value=0.7;
     if(ch.filterVal<0){ lp.Q.value = filterQ(ch); lp.frequency.value=20000-(Math.abs(ch.filterVal)/100)*19700; hp.frequency.value=20; } else { hp.frequency.value=20+(ch.filterVal/100)*3000; lp.frequency.value=20000; if(ch.filterVal>0) hp.Q.value = filterQ(ch); }
-    const oTune = buildTune(offline, ch.rack); setTune(oTune, ch.fx, offline, null, ch.sw); g.connect(lp); lp.connect(hp); hp.connect(oTune.in); oTune.out.connect(oMaster);
+    const oTune = buildTune(offline, ch.rack, quipuOpts(ch, 0)); setTune(oTune, ch.fx, offline, null, ch.sw); g.connect(lp); lp.connect(hp); hp.connect(oTune.in); oTune.out.connect(oMaster);
     const rate = playRate(ch), dur = ch.buffer.duration;
     ch.clips.forEach(c=>{ if(c.mute) return; const src = offline.createBufferSource(); src.buffer = ch.buffer; src.loop = true; src.detune.value = chPitch(ch)*100; src.connect(g); src.start(c.start*bs, (c.off*bs*rate) % dur); src.stop((c.start+c.len)*bs); });
     const ducks = ch.scDuck && sidechainTrigger && ch !== sidechainTrigger;
@@ -1678,6 +1691,14 @@ function updatePumpDot(){ const i = RACK.findIndex(m=>m.n==='PUMP'); const w = r
 /* every module breathes with the selected loop's level (cheap: one CSS var, brightness only) */
 let _rackLvl = -1; function updateRackLevel(){ const ch = selCh(); const v = (isRunning && ch && !ch.mute) ? Math.min(1, ch.lastPeakLevel||0) : 0; if(Math.abs(v - _rackLvl) < 0.03) return; _rackLvl = v; $('rack').style.setProperty('--lvl', v.toFixed(2)); }
 const FX_LOOKS=[
+ {n:'QUIPU',v:.5,acc:'#e0a060',face:'repeating-linear-gradient(90deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px),linear-gradient(#2a1810 0 9%,#7a2a18 9% 11%,#2a1810 11% 86%,#7a2a18 86% 88%,#2a1810 88%)',what:'woven plate + hanging cords; knot on cord i = the slice that plays there (look v1, MOCKS/QUIPU_look_v1.png)',screws:1,
+  g:v=>{ const ch = (typeof selCh === 'function') ? selCh() : null, seed = ch ? ch.qSeed : 7, S = 8, cols = ['#e8dcc4','#e0a060','#c84a28','#8a5a30','#f2ede2','#b07840','#d8b880','#a03a20'];
+    const H = (a,b)=>{ let h = Math.imul(a|0,374761393) ^ Math.imul(b|0,668265263) ^ Math.imul(seed|0,2246822519); h = Math.imul(h ^ (h>>>13),1274126177); h ^= h>>>16; return (h>>>0)/4294967296; };
+    let s = '<line x1="2" y1="8" x2="98" y2="8" stroke="#e8dcc4" stroke-width="4"/>';
+    for(let i=0;i<S;i++){ const x = 7 + i*12.3; s += `<line x1="${x}" y1="8" x2="${x}" y2="296" stroke="${cols[i]}" stroke-width="2.4" opacity=".85"/>`; }
+    for(let i=0;i<S;i++){ const swap = H(i,1) < v, m = swap ? Math.floor(H(i,2)*S) : i, x = 7 + i*12.3, y = 26 + m*32;
+      s += `<rect x="${x-5}" y="${y-6}" width="10" height="12" rx="4" fill="${swap ? '#ffcf8a' : '#3a2414'}" stroke="${swap ? '#e0a060' : '#6a4a2a'}" stroke-width="1.5" ${swap ? 'style="filter:drop-shadow(0 0 4px #e0a060)"' : ''}/>`; }
+    return `<div class="scr" style="background:#060403;border-color:#120a06"><svg class="f" viewBox="0 0 100 300" preserveAspectRatio="none">${s}</svg></div>`; }},
  {n:'WIDE',v:.6,acc:'#7fd0ff',face:'linear-gradient(#141c22,#0a0e12)',what:'stereo width, pushes out to the sides',
   g:v=>`<div style="position:absolute;inset:0 6%;">${R(12,k=>{const lit=k<v*12;const w=6+k*3.4;const c=lit?'#7fd0ff':'#16202a';return `<div style="position:absolute;bottom:${k*8.2}%;left:${50-w}%;width:${w*2}%;height:6%;display:flex;justify-content:space-between"><i style="width:22%;background:${c};${lit?'box-shadow:0 0 6px #7fd0ff':''}"></i><i style="width:22%;background:${c};${lit?'box-shadow:0 0 6px #7fd0ff':''}"></i></div>`})}</div>`},
  {n:'PUMP',v:.55,acc:''+RED_HI+'',face:'#140808',what:'duck-curve screen on top (one beat: dip + swell, the dot rides it live) + a slider under it',screws:1,
@@ -1724,9 +1745,11 @@ const MOD_INFO = {
   'FLOOR':  { d:'clears the mud and plants the low end', s:'CLEAN', sd:'cuts the rumble you can\'t hear but your speakers feel' },
   'NEW ERA':{ d:'older, darker, grittier — up = further back in time', s:'CRUSH', sd:'bit-crushed grit, like an old sampler' },
   'THREAT': { d:'the signature — drive + glue in one fader', s:'PUSH', sd:'double the drive' },
+  'QUIPU':  { d:'chops the loop into 8 and swaps slices — up = more chops, same pattern', s:'🎲', sd:'tap = new random pattern' },
 };
 function swGet(m, ch){ if(!ch || !MOD_INFO[m.n].s) return false; if(m.n === 'PITCH') return !!ch.keyLock; return !!(ch.sw && ch.sw[m.n]); }
 function swToggle(m, ch){ if(!MOD_INFO[m.n].s) return;
+  if(m.n === 'QUIPU'){ ch.qSeed = newQuipuSeed(); syncQuipu(ch, quipuT0()); markDirty(); commit(); setStatus('QUIPU · new pattern 🎲'); renderRack(); return; }
   if(m.n === 'PITCH'){ ch.keyLock = !ch.keyLock; rebuildBuffer(ch); if(isRunning) reschedule(); drawTL(); }
   else { ch.sw = ch.sw || {}; if(ch.sw[m.n]) delete ch.sw[m.n]; else ch.sw[m.n] = true;
     if(m.n === 'FILTER') applyFilter(ch); else { applyTune(ch); if(m.n === 'PUMP' && isRunning && ch.tuneNodes){ const bs = beatSec(), b = currentBeat(), nb = ch.sw.PUMP ? 2*Math.ceil(b/2) : Math.ceil(b); startPump(ch.tuneNodes, ctx, ctx.currentTime + (nb - b)*bs); } } }

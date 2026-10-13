@@ -12,10 +12,14 @@
         d[i] = lp*env; } }
     irCache.set(key, b); return b; }
   const SKY = {
-    name:'SKY', acc:'#9ad0ff', face:'#070a12', screws:false, cat:'SPACE',
+    name:'SKY', acc:'#dfe6f2', screws:false, cat:'SPACE',
     desc:'huge reverb — opens up the sky', sw:'SHIMMER', swd:'the tail sparkles an octave up',
     worklets:['modules/shift.worklet.js'],
-    g(v){ return `<div class="scr" style="background:linear-gradient(0deg,#ff9a5a 0%,#6a5a9a ${30+v*20}%,#0a1430 100%)"><div style="position:absolute;left:50%;bottom:${v*70-10}%;width:40%;aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:radial-gradient(#fff6d8,#ffd27a 60%,transparent 72%);box-shadow:0 0 30px #ffd27a"></div>${[0,1,2,3].map(k=>`<div style="position:absolute;top:${10+k*20}%;${k%2?'right':'left'}:${-10-v*40}%;width:70%;height:12%;border-radius:50%;background:#dfe6f2;filter:blur(3px);opacity:.75"></div>`).join('')}</div>`; },
+    face:'linear-gradient(#20242c,#0e1014)',
+    /* look B · CLOUD SEA (picked 13 Oct): above the clouds — up = the cloud sea rises and swallows the screen */
+    g(v){ let s = ''; const top = 290 - v*250; for(let k=0;k<6;k++){ const y = top + k*22; s += `<path d="M-10 ${y} Q 15 ${y-14} 35 ${y} T 75 ${y} T 115 ${y} L115 310 L-10 310Z" fill="#cfd6e2" opacity="${.18 + k*.12}"/>`; }
+      s += `<path d="M60 0 L100 0 L100 120 Q 70 90 60 0Z" fill="#ffffff" opacity=".05"/><circle cx="30" cy="40" r="7" fill="#f2ede2" opacity=".85"/>`;
+      return `<div class="scr" style="background:linear-gradient(#0a0e18,#2a3348)"><svg class="f" viewBox="0 0 100 300" preserveAspectRatio="none">${s}</svg></div>`; },
     build(ac){ const G = v=>{ const g = ac.createGain(); g.gain.value = v; return g; }; const n = {};
       n.in = G(1); n.out = G(1); n.dry = G(1); n.wet = G(0);
       n.hp = ac.createBiquadFilter(); n.hp.type = 'highpass'; n.hp.frequency.value = 220; n.hp.Q.value = 0.6;   /* lows stay clean, no mud */

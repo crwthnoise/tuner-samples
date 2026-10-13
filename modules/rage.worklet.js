@@ -2,7 +2,7 @@
    so the fader changes the CHARACTER, not just the volume. Input 0 = processed sound, input 1 = the clean reference. */
 class RageMatch extends AudioWorkletProcessor {
   static get parameterDescriptors(){ return [{ name:'boost', defaultValue:1, minValue:0, maxValue:4, automationRate:'k-rate' }]; }
-  constructor(){ super(); this.eIn = 1e-6; this.eRef = 1e-6; this.g = 1; const tc = 0.25*sampleRate/128; this.k = 1/tc; this.gk = 1/(0.06*sampleRate/128); }
+  constructor(){ super(); this.eIn = 1e-6; this.eRef = 1e-6; this.g = 1; const tc = 0.25*sampleRate/128; this.k = 1/tc; this.gk = 1/(0.06*sampleRate/128); this.tick = 0; }
   process(inputs, outputs, params){
     const sig = inputs[0], ref = inputs[1], out = outputs[0]; if(!out || !out.length) return true;
     let es = 0, er = 0, n = 0;
@@ -17,6 +17,7 @@ class RageMatch extends AudioWorkletProcessor {
     for(let c=0;c<out.length;c++){ const o = out[c], s = sig && sig.length ? sig[Math.min(c, sig.length-1)] : null;
       if(!s){ o.fill(0); continue; }
       for(let i=0;i<o.length;i++){ const g = g0 + (g1 - g0)*(i/o.length); o[i] = s[i]*g; } }
+    if(++this.tick % 12 === 0) this.port.postMessage({ g:this.g });   /* the LAB's CHAIN panel shows this live */
     return true; }
 }
 registerProcessor('ragematch', RageMatch);

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-/* MODULE LAB lab-8 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
+/* MODULE LAB lab-9 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
 :root{ --void:#0a0804; --red:#d32f2f; --green:#4fd1a5; --text:#f2ede2; --mute:#8a8176; --faint:#4a443d;
   --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --ui:'Jura','Arial Narrow',system-ui,sans-serif; color-scheme:dark; }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -42,6 +42,25 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 #ab.dry{ color:var(--text); border-color:#5a5550; }
 #play{ flex:none; width:88px; height:88px; border-radius:50%; border:3px solid var(--red); background:radial-gradient(circle,#2a2622,#0e0c0a 70%); box-shadow:0 0 18px #d32f2f55,inset 0 0 0 6px #0a0908; color:var(--text); font-size:30px; cursor:pointer; }
 .note{ font:500 10px var(--mono); color:var(--faint); text-align:center; }
+/* CHAIN panel (lab-9) — for designing the sound: every unit + its live settings + meters. LAB only, never in the app. */
+#chain{ padding:6px 10px; font:500 10px var(--mono); }
+#chain h3{ margin:0; display:flex; align-items:center; gap:8px; font:700 10px var(--mono); letter-spacing:.2em; color:var(--mute); cursor:pointer; }
+#chain h3 span{ flex:1; }
+#meters{ display:grid; grid-template-columns:repeat(5,1fr); gap:5px; margin-top:6px; }
+.mt{ font:700 7px var(--mono); color:var(--mute); letter-spacing:.1em; }
+.mt div{ height:6px; background:#060505; border-radius:2px; overflow:hidden; margin-top:2px; }
+.mt b{ display:block; height:100%; width:0; background:var(--c); }
+.mt em{ font-style:normal; color:var(--text); float:right; }
+#units{ margin-top:6px; display:flex; flex-direction:column; gap:2px; }
+.un{ display:grid; grid-template-columns:14px 74px 1fr; gap:4px; align-items:baseline; line-height:13px; }
+.un i{ font-style:normal; color:var(--faint); }
+.un b{ color:var(--a); font-weight:700; }
+.un span{ color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.un.off b, .un.off span{ color:var(--faint); }
+.un small{ display:none; grid-column:3; color:var(--faint); font-size:8.5px; line-height:10px; margin-top:-1px; }
+.un.open small{ display:block; }
+.un{ cursor:pointer; }
+#chain.shut #units, #chain.shut #meters{ display:none; }
 /* module box — same CSS as the app */
 .mod{ position:relative; display:flex; flex-direction:column; align-items:center; box-shadow:0 6px 14px #000,inset 0 1px 0 rgba(255,255,255,.1); overflow:hidden; border:1px solid #000; font-family:var(--ui); }
 .slot{ width:66px; height:330px; border-radius:4px; padding:16px 0 10px; }
@@ -55,8 +74,8 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 .scr{ position:absolute; inset:0 10%; background:#040605; border:2px solid #1a1a1a; border-radius:3px; box-shadow:inset 0 0 14px #000; overflow:hidden; }
 svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 </style>
-<script src="modules/sky.js?v=lab-8"></script>
-<script src="modules/rage.js?v=lab-8"></script>
+<script src="modules/sky.js?v=lab-9"></script>
+<script src="modules/rage.js?v=lab-9"></script>
 </head><body>
 <div class="z top">
   <h1><b>THREAT</b> TUNER<small>MODULE LAB</small></h1>
@@ -65,13 +84,14 @@ svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 <div class="chips" id="chips"></div>
 <div class="z" id="band"><div class="ghost"></div><div class="ghost"></div><div id="slot"></div><div class="ghost"></div><div class="ghost"></div></div>
 <div class="readout" id="readout">drag up / down anywhere in the rack</div>
+<div class="z" id="chain"><h3 id="chainH"><span>🔧 CHAIN</span><em id="chainT">▾</em></h3><div id="meters"></div><div id="units"></div></div>
 <div class="row"><label>LOOP</label><select id="loopSel"></select></div>
 <div class="dock">
   <button class="btn" id="ab">A/B</button>
   <button class="btn" id="sw">SWITCH</button>
   <button id="play" aria-label="play">▶</button>
 </div>
-<div class="note">lab-8 · module at real app size</div>
+<div class="note">lab-9 · module at real app size</div>
 <script>
 const $ = id=>document.getElementById(id);
 const clamp = (v,a,b)=>Math.min(b, Math.max(a, v));
@@ -112,12 +132,13 @@ function wake(){ /* called right inside the tap, before any await — phones onl
 async function boot(){ if(ready) return ready; ready = (async()=>{
   wake();
   const files = new Set(); ORDER.forEach(k=>(MODS[k].worklets||[]).forEach(f=>files.add(f)));
-  for(const f of files){ try{ await ctx.audioWorklet.addModule(f + '?v=lab-8'); }catch(e){ console.warn('worklet failed', f, e); } }   /* one bad file never kills PLAY */
+  for(const f of files){ try{ await ctx.audioWorklet.addModule(f + '?v=lab-9'); }catch(e){ console.warn('worklet failed', f, e); } }   /* one bad file never kills PLAY */
   dry = ctx.createGain(); wetBus = ctx.createGain(); const out = ctx.createGain(); out.gain.value = 0.85;
   dry.connect(out); wetBus.connect(out); out.connect(ctx.destination); an = ctx.createAnalyser(); an.fftSize = 512; wetBus.connect(an);
   ORDER.forEach(k=>{ try{ chain[k] = MODS[k].build(ctx, st); }catch(e){ console.warn('module failed', k, e); const g = ctx.createGain(); chain[k] = { in:g, out:g, set(){}, transport(){} }; } });
+  ORDER.forEach(k=>{ const n = chain[k]._n; if(!n || !n.taps) return; chain[k]._an = {}; Object.entries(n.taps).forEach(([name, node])=>{ const a = ctx.createAnalyser(); a.fftSize = 1024; try{ node.connect(a); }catch(e){} chain[k]._an[name] = a; }); });
   route(); })(); ready.catch(()=>{ ready = null; }); return ready; }
-function route(){ if(!ctx) return; ORDER.forEach(k=>{ try{ chain[k].out.disconnect(); }catch(e){} }); const c = chain[st.mod]; c.out.connect(wetBus);
+function route(){ if(!ctx) return; ORDER.forEach(k=>{ try{ chain[k].out.disconnect(); }catch(e){} }); const c = chain[st.mod]; c.out.connect(wetBus); if(c._an && c._an.OUT) c.out.connect(c._an.OUT);   /* disconnect() above also drops the OUT meter */
   if(src){ try{ src.disconnect(); }catch(e){} src.connect(dry); src.connect(c.in); }
   apply(); }
 function apply(){ if(!ctx) return; const c = chain[st.mod]; c.set(st.v[st.mod], !!st.sw[st.mod]); const t = ctx.currentTime;
@@ -155,7 +176,7 @@ function draw(){ const m = M(), v = st.v[st.mod], on = !!st.sw[st.mod];
   $('slot').innerHTML = `<div class="mod slot" style="background:${m.face}">${m.screws ? SCREWS : ''}<div class="plate" style="background:${m.acc};color:#000">${m.name}</div><div class="zone">${m.g(clamp(v,0,1), st)}</div><div class="sw2${on ? ' on' : ''}" style="--a:${m.acc}"><i></i></div></div>`;
   $('sw').textContent = m.sw || 'SWITCH'; $('sw').classList.toggle('on', !m.oneShot && on); }
 function readout(){ const m = M(); $('readout').innerHTML = `${m.name} <b>${Math.round(st.v[st.mod]*100)}%</b>` + (!m.oneShot && st.sw[st.mod] ? ` · <b>${m.sw}</b>` : '') + (st.wet ? '' : ' · A = DRY'); }
-function chips(){ $('chips').innerHTML = ''; ORDER.forEach(k=>{ const b = document.createElement('button'); b.textContent = k; b.style.setProperty('--a', MODS[k].acc); b.className = st.mod === k ? 'on' : ''; b.addEventListener('click', ()=>{ st.mod = k; chips(); route(); draw(); readout(); save(); }); $('chips').appendChild(b); }); }
+function chips(){ $('chips').innerHTML = ''; ORDER.forEach(k=>{ const b = document.createElement('button'); b.textContent = k; b.style.setProperty('--a', MODS[k].acc); b.className = st.mod === k ? 'on' : ''; b.addEventListener('click', ()=>{ st.mod = k; chips(); route(); draw(); readout(); save(); chainShow(); }); $('chips').appendChild(b); }); }
 
 /* drag anywhere in the rack band = the fader (no scrolling, no zoom) */
 let drag = null;
@@ -176,6 +197,25 @@ addEventListener('resize', ()=>{ layout(); draw(); });
 (function tick(){ requestAnimationFrame(tick); const m = M(); if(!m.react || !an) return; if(!anBuf) anBuf = new Float32Array(an.fftSize);
   let lvl = 0; if(st.playing && st.wet){ an.getFloatTimeDomainData(anBuf); let e = 0; for(let i=0;i<anBuf.length;i++) e += anBuf[i]*anBuf[i]; lvl = Math.sqrt(e/anBuf.length)*3; }
   m.react($('slot'), lvl); })();
-layout(); chips(); draw(); readout(); loadLib();
+/* ---------- CHAIN panel: what RAGE is really doing (units, settings, meters) ---------- */
+const MC = { LOWS:'#4fd1a5', 'CLEAN HI':'#8a8176', RAGED:'#ff3b30', SCREAM:'#ffb347', OUT:'#f2ede2' };
+let chainOpen = true; try{ chainOpen = localStorage.getItem('labChain') !== '0'; }catch(e){}
+function chainShow(){
+  $('chain').style.display = st.mod === 'RAGE' ? '' : 'none'; $('chain').classList.toggle('shut', !chainOpen); $('chainT').textContent = chainOpen ? '▾' : '▸'; }
+$('chainH').addEventListener('click', ()=>{ chainOpen = !chainOpen; try{ localStorage.setItem('labChain', chainOpen ? '1' : '0'); }catch(e){} chainShow(); });
+$('meters').innerHTML = Object.keys(MC).map(k=>`<div class="mt" style="--c:${MC[k]}">${k}<em id="mv${k.replace(' ','')}">—</em><div><b id="mb${k.replace(' ','')}"></b></div></div>`).join('');
+function infoRows(){ const n = chain[st.mod] && chain[st.mod]._n; let rows = n && n.info ? n.info() : null;
+  if(!rows){ $('units').innerHTML = '<div class="un"><i></i><b></b><span>press ▶ to see the chain live</span></div>'; return; }
+  $('units').innerHTML = rows.map((r, i)=>`<div class="un${r.off ? ' off' : ''}${openNotes[r.u] ? ' open' : ''}" data-u="${r.u}"><i>${r.u === 'SCREAM' ? '+' : i + 1}</i><b>${r.u}</b><span>${r.s}</span>${r.note ? `<small>${r.note}</small>` : ''}</div>`).join(''); }
+let openNotes = {}; try{ openNotes = JSON.parse(localStorage.getItem('labNotes') || '{}'); }catch(e){}
+$('units').addEventListener('click', e=>{ const r = e.target.closest('.un'); if(!r || !r.dataset.u) return; openNotes[r.dataset.u] = !openNotes[r.dataset.u]; r.classList.toggle('open'); try{ localStorage.setItem('labNotes', JSON.stringify(openNotes)); }catch(_){} });
+const mBuf = new Float32Array(1024); let lastInfo = 0;
+(function meters(t){ requestAnimationFrame(meters); if(st.mod !== 'RAGE' || !chainOpen) return; const c = chain[st.mod];
+  if(t - lastInfo > 150){ lastInfo = t; infoRows(); }
+  if(!c || !c._an) return;
+  Object.keys(MC).forEach(k=>{ const a = c._an[k]; if(!a) return; let e = 0; if(st.playing){ a.getFloatTimeDomainData(mBuf); for(let i=0;i<mBuf.length;i++) e += mBuf[i]*mBuf[i]; }
+    const db = e > 0 ? 10*Math.log10(e/mBuf.length) : -99, w = clamp((db + 48)/48, 0, 1);
+    $('mb' + k.replace(' ','')).style.width = (w*100).toFixed(1) + '%'; $('mv' + k.replace(' ','')).textContent = db > -60 ? Math.round(db) : '—'; }); })(0);
+layout(); chips(); draw(); readout(); loadLib(); chainShow();
 </script>
 </body></html>

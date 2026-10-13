@@ -31,7 +31,8 @@
   function seqTree(cx, cy, seed){ const R = rng(seed), trunks = [], twigs = [];
     const run = (x, y, a, len, n, arr, d)=>{ const pts = []; for(let i=0;i<n;i++){ const x2 = x + Math.cos(a)*len, y2 = y + Math.sin(a)*len; pts.push([x, y, x2, y2, d]); x = x2; y = y2; a += (R() - .5)*.55; len *= .9; } arr.push(pts); return pts; };
     const t1 = run(cx, cy, -1.45, 17, 7, trunks, 0), t2 = run(cx, cy, -.35, 14, 5, trunks, 0), t3 = run(cx, cy, -2.6, 12, 4, trunks, 1);
-    [[t1,1],[t1,3],[t2,1],[t1,5],[t3,1],[t2,3]].forEach(([t, k], i)=>{ const [, , x, y] = t[k]; const side = i % 2 ? 1 : -1; run(x, y, Math.atan2(t[k][3] - t[k][1], t[k][2] - t[k][0]) + side*(.7 + R()*.4), 9 - i*.6, 2 + (i < 3 ? 1 : 0), twigs, 2); });
+    [[t1,1],[t1,3],[t2,1],[t1,5],[t3,1],[t2,3],[t1,2],[t2,2],[t3,2],[t1,4]].forEach(([t, k], i)=>{ const [, , x, y] = t[k]; const side = i % 2 ? 1 : -1; const tw = run(x, y, Math.atan2(t[k][3] - t[k][1], t[k][2] - t[k][0]) + side*(.7 + R()*.4), Math.max(4.5, 9 - i*.5), 2 + (i < 3 ? 1 : 0), twigs, 2);
+      if(i < 6){ const [, , xx, yy] = tw[0], aa = Math.atan2(tw[0][3] - tw[0][1], tw[0][2] - tw[0][0]); run(xx, yy, aa - side*(.8 + R()*.3), 5, 2, twigs, 3); } });   /* lab-9: a few tiny sub-cracks, like the top one */
     const pieces = []; trunks.concat(twigs).forEach(path=>path.forEach(sg=>pieces.push(sg)));
     const total = pieces.reduce((a, [x, y, x2, y2])=>a + Math.hypot(x2 - x, y2 - y), 0); let acc = 0;
     return pieces.map(([x, y, x2, y2, d])=>{ const L = Math.hypot(x2 - x, y2 - y), t0 = acc/total; acc += L; return [x, y, x2, y2, d, t0, acc/total]; }); }
@@ -96,7 +97,24 @@
         s(n.tone.frequency, 3200 + v*6800);                                   /* opens up as it rages */
         s(n.dry.gain, Math.cos(x*Math.PI/2)); s(n.wet.gain, Math.sin(x*Math.PI/2));   /* equal-power blend = no dip */
         if(n.match) s(n.match.parameters.get('boost'), 1 + v*0.3);            /* a touch louder as you push it (~+2 dB at top) */
-        s(n.sDrive.gain, sw ? 2 + d*14 : 0); s(n.sG.gain, sw ? 0.6 + v*0.5 : 0); };
+        s(n.sDrive.gain, sw ? 4 + d*20 : 0); s(n.sG.gain, sw ? 1.3 + v*1.1 : 0);    /* lab-9: SCREAM louder (was 2+14d / .6+.5v) */
+        n._v = v; n._sw = !!sw; };
+      /* LAB only — what each unit is doing right now (the CHAIN panel). Not shown in the app. */
+      n.taps = { LOWS:n.lp2, 'CLEAN HI':n.dry, RAGED:n.wet, SCREAM:n.sG, OUT:n.out };
+      if(n.match && n.match.port) n.match.port.onmessage = e=>{ n._mg = e.data.g; };
+      n.info = ()=>{ const v = n._v || 0, sw = n._sw, d = Math.pow(v, 1.4), x = Math.min(1, v*2.5), dr = 1 + d*38, db = g=>(20*Math.log10(Math.max(1e-6, g))).toFixed(1);
+        const hz = f=>f >= 1000 ? (f/1000).toFixed(1) + 'k' : Math.round(f) + '';
+        return [
+          { u:'SPLIT', s:'crossover 120 Hz · LR4 24 dB/oct', note:'lows ↓ go straight out clean · highs → the chain' },
+          { u:'BELL EQ', s:'+4 dB @ 1.4k · Q 0.8', note:'bite before the clip' },
+          { u:'DRIVE', s:dr.toFixed(1) + 'x  (+' + db(dr) + ' dB)', note:'1x → 39x, curve v^1.4' },
+          { u:'CLIPPER', s:'tanh soft clip · asym 0.12 · 4x OS', note:'warm, even + odd harmonics' },
+          { u:'TONE', s:'lowpass ' + hz(3200 + v*6800) + ' · 12 dB/oct', note:'opens 3.2k → 10k' },
+          { u:'DC BLOCK', s:'highpass 25 Hz' },
+          { u:'LEVEL MATCH', s:n._mg ? db(n._mg) + ' dB  (target +' + db(1 + v*.3) + ')' : 'target +' + db(1 + v*.3) + ' dB', note:'auto-gain: raged highs ≈ clean highs. No compressor.' },
+          { u:'BLEND', s:'clean ' + Math.round(Math.cos(x*Math.PI/2)**2*100) + '% · raged ' + Math.round(Math.sin(x*Math.PI/2)**2*100) + '%', note:'equal power, full rage from 40%' },
+          { u:'SCREAM', s:sw ? 'drive ' + (4 + d*20).toFixed(1) + 'x → full-wave rectify (octave up) → HP 300 → mix ' + db(1.3 + v*1.1) + ' dB' : 'off', off:!sw, note:'parallel, into TONE' },
+        ]; };
       return n; },
   };
   (window.TUNER_MODS = window.TUNER_MODS || {}).RAGE = RAGE;

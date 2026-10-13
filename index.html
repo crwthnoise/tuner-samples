@@ -121,6 +121,33 @@
   .rk-m .mod{ transition:width .2s cubic-bezier(.2,.9,.3,1.1); }
   .rack.thicko .rk-m:not(.thick){ opacity:.3; }
   .rk-m.thick{ z-index:6; filter:drop-shadow(0 8px 14px #000); }
+  /* v10.27 ＋ slot at the end of the rack + the MODULES page (over the timeline) */
+  .rk-add{ position:absolute; top:0; border-radius:4px; border:1px dashed #4a443d; background:repeating-linear-gradient(0deg,#120f0c 0 10px,#0c0a08 10px 12px); display:flex; align-items:center; justify-content:center; color:#8a8176; font:700 18px var(--mono); cursor:pointer; transition:left .2s, width .2s, opacity .2s; }
+  .rk-add:active, .rk-add.on{ color:#f2ede2; border-color:#d32f2f; box-shadow:0 0 12px #d32f2f66; }
+  .rack.idle .rk-add{ opacity:.3; }
+  #addSheet{ position:absolute; inset:0; z-index:12; background:#0b0a08; border-radius:6px; display:flex; flex-direction:column; padding:10px 10px 0; opacity:0; pointer-events:none; transform:translateY(8px); transition:opacity .18s, transform .18s; }
+  #addSheet.open{ opacity:1; pointer-events:auto; transform:none; }
+  #addSheet .ah{ display:flex; align-items:center; gap:8px; }
+  #addSheet .ah strong{ flex:1; font:700 11px var(--mono); letter-spacing:.18em; color:#f2ede2; }
+  #addSheet .ah strong b{ color:#d32f2f; }
+  #addSheet .ah button{ background:none; border:none; color:#8a8176; font:700 18px var(--mono); padding:2px 6px; cursor:pointer; }
+  #addChips{ display:flex; gap:5px; overflow-x:auto; padding:8px 0; scrollbar-width:none; }
+  #addChips::-webkit-scrollbar{ display:none; }
+  #addChips button{ flex:none; font:700 10px var(--mono); letter-spacing:.12em; color:#8a8176; background:#15120f; border:1px solid #2a2724; border-radius:999px; padding:6px 10px; cursor:pointer; }
+  #addChips button.on{ color:#000; background:#f2ede2; border-color:#f2ede2; }
+  #addGrid{ flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:2px 0 12px; align-content:start; }
+  .am{ position:relative; display:flex; gap:7px; align-items:stretch; background:#13110e; border:1px solid #24201c; border-radius:6px; padding:6px; cursor:pointer; min-width:0; }
+  .am .face{ flex:none; width:17px; height:83px; position:relative; overflow:hidden; border-radius:3px; }
+  .am .face > .mod{ transform:scale(.25); transform-origin:top left; pointer-events:none; }
+  .am .face.soon{ width:17px; background:linear-gradient(#1a1714,#0d0b09); border:1px solid #2a2622; box-shadow:inset 0 0 0 1px #000; }
+  .am .face.soon i{ position:absolute; left:50%; top:14%; bottom:14%; width:3px; margin-left:-1.5px; background:var(--a); opacity:.35; border-radius:2px; }
+  .am .tx{ min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .am .amn{ font:700 10px var(--mono); letter-spacing:.06em; color:var(--a); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .am .amd{ font:500 9px/1.3 var(--ui); color:#8a8176; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .am .tag{ position:absolute; right:5px; bottom:5px; font:700 8px var(--mono); letter-spacing:.1em; color:#4a443d; }
+  .am.in{ opacity:.45; } .am.in .tag{ color:#4fd1a5; }
+  .am.soon{ cursor:default; } .am.soon .amn{ opacity:.6; }
+  .am.pop{ animation:amPop .35s ease; } @keyframes amPop{ 40%{ transform:scale(.94); box-shadow:0 0 16px var(--a); } }
   /* v10.26 HOLD → LIFT → SLIDE */
   .rk-m.lift{ z-index:8; transition:none; transform:translateY(-6px) scale(1.14); filter:drop-shadow(0 10px 14px #000) brightness(1.15); cursor:grabbing; }
   .rk-m.lift.rm{ opacity:.45; filter:drop-shadow(0 0 10px #d32f2f) grayscale(.6); }
@@ -366,7 +393,7 @@
 </div>
 
 <!-- 2 · TIMELINE -->
-<div class="z tlz" id="tlZone"><canvas id="tl"></canvas><div class="tlctl"><button id="tlStart" data-k="TO START" title="back to start">⏮&#xFE0E;</button><button id="tlZoomOut" data-k="ZOOM-" title="zoom out">−</button><button id="tlZoomIn" data-k="ZOOM+" title="zoom in">+</button></div></div>
+<div class="z tlz" id="tlZone"><div id="addSheet"><div class="ah"><strong><b>＋</b> MODULES</strong><button id="addX" data-k="ADD ✕" aria-label="close">✕</button></div><div id="addChips"></div><div id="addGrid"></div></div><canvas id="tl"></canvas><div class="tlctl"><button id="tlStart" data-k="TO START" title="back to start">⏮&#xFE0E;</button><button id="tlZoomOut" data-k="ZOOM-" title="zoom out">−</button><button id="tlZoomIn" data-k="ZOOM+" title="zoom in">+</button></div></div>
 <!-- 2b · VISUALIZER (v10.12) — tap = bigger / smaller -->
 <div class="vizz" id="vizZone" data-k="VIZ"><canvas id="vizCv"></canvas><span class="vz-tag">SPECTRUM <em>· slow avg</em></span><div class="vz-lufs"><b id="vzStrip">—</b><i>LUFS</i></div><div class="vz-meters"><div class="vz-m" id="vzM"><b>—</b><i>NOW</i><u>MOMENTARY</u></div><div class="vz-m" id="vzS"><b>—</b><i>3 SEC</i><u>SHORT-TERM</u></div><div class="vz-m" id="vzI"><b>—</b><i>SONG</i><u>INTEGRATED</u></div><div class="vz-m" id="vzP"><b>—</b><i>PEAK</i><u>TRUE PEAK</u></div></div></div>
 
@@ -472,7 +499,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.26';
+const APP_VERSION = 'v10.27';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1198,6 +1225,36 @@ function wireTune(n, order){ order = order || FX_SLOTS; try{ n.in.disconnect(); 
 /* live re-wire without a click: dip the loop's output for a moment, swap the cables, bring it back */
 function rewireLive(ch){ const n = ch.tuneNodes; if(!n) return; const t = ctx.currentTime; n.out.gain.cancelScheduledValues(t); n.out.gain.setTargetAtTime(0, t, 0.004);
   setTimeout(()=>{ wireTune(n, ch.rack); const t2 = ctx.currentTime; n.out.gain.cancelScheduledValues(t2); n.out.gain.setTargetAtTime(1, t2, 0.01); }, 30); }
+/* v10.27 ＋ MODULES page — 5 categories × 4 new (+ the 8 already built). SOON = drawn + voted, sound not built yet. */
+const MOD_CATS = ['DRIVE','CHOP','SPACE','MOTION','TONE'];
+const MOD_CAT = { 'THREAT':'DRIVE','NEW ERA':'DRIVE','UNTIRE':'DRIVE', 'LOADED':'CHOP', 'WIDE':'SPACE', 'PUMP':'MOTION', 'SUB':'TONE','FLOOR':'TONE' };
+const SOON = [
+  ['FLAME','DRIVE','#ff7a1a','our warmest saturator'], ['CRUDE','DRIVE','#d6b23a','raw hard clip, no polish'], ['PUNK','DRIVE','#e8c35a','crunch + shine'], ['RAGE','DRIVE','#ff0033','blown-speaker rage — clipped like a busted car speaker'],
+  ['SHRED','CHOP','#f2ede2','on-beat slicing, chopped clean to the grid'], ['QUIPU','CHOP','#e0a060','slice scrambler — re-rolls every bar, knob holds one you like'], ['GRINDER','CHOP','#ff5a1f','machine-gun stutter 1/16 → 1/64, pitch diving'], ['GLITCH','CHOP','#ff2a6d','buffer repeats, broken playback'],
+  ['SKY','SPACE','#9ad0ff','huge shimmer reverb — opens up the sky'], ['ANDES','SPACE','#c7d2ff','ping-pong echo bouncing between the peaks'], ['FREEZE','SPACE','#a8e6ff','spectral freeze, holds a moment'], ['TUNNEL','SPACE','#ffaa55','dark filtered reverb — sound down a tunnel'],
+  ['WOBBLE','MOTION','#2affea','dubstep wobble locked to tempo'], ['RISE','MOTION','#ffffff','riser — highpass + noise climbing'], ['BEND','MOTION','#ff3df2','808 glides, always in key'], ['CHICHA','MOTION','#ff3df2','Peruvian cumbia psychedelia — surf phaser + cumbia swing'],
+  ['PRISM','TONE','#ffffff','splits the bands + detunes each one'], ['SECRET','TONE','#ffe2a0','a hidden air layer tucked under the loop'], ['GROWL','TONE','#b6ff3a','dubstep growl out of any sound'], ['PIXEL','TONE','#4fd1a5','bitcrush, chunkier the higher you go'],
+];
+let addCat = 'ALL';
+function renderAddChips(){ const c = $('addChips'); c.innerHTML = ''; ['ALL', ...MOD_CATS].forEach(k=>{ const b = el('button', addCat === k ? 'on' : ''); b.textContent = k; b.dataset.k = 'ADD ' + k; b.addEventListener('click', ()=>{ addCat = k; renderAddChips(); renderAddGrid(); }); c.appendChild(b); }); }
+function renderAddGrid(){ const g = $('addGrid'); g.innerHTML = ''; const ch = selCh();
+  const built = FX_SLOTS.map(n=>({ n, cat:MOD_CAT[n], m:MOD_BY[n] }));
+  const all = []; MOD_CATS.forEach(c=>{ built.filter(b=>b.cat === c).forEach(b=>all.push(b)); SOON.filter(x=>x[1] === c).forEach(x=>all.push({ n:x[0], cat:c, soon:true, acc:x[2], d:x[3] })); });
+  all.filter(x=>addCat === 'ALL' || x.cat === addCat).forEach(x=>{
+    const inLoop = !x.soon && ch && ch.rack.includes(x.n) && (x.n !== 'PUMP' || (ch.scDuck && !ch.scTrigger));
+    const card = el('div', 'am' + (x.soon ? ' soon' : '') + (inLoop ? ' in' : '')); card.dataset.k = 'ADD MOD ' + x.n; card.style.setProperty('--a', x.soon ? x.acc : x.m.acc);
+    const face = el('div', 'face' + (x.soon ? ' soon' : '')); if(x.soon) face.innerHTML = '<i></i>'; else face.innerHTML = boxHTML(x.m, 0.6, false, false);
+    const tx = el('div', 'tx'); const nm = el('div', 'amn'); nm.textContent = x.n; const ds = el('div', 'amd'); ds.textContent = x.soon ? x.d : MOD_INFO[x.n].d; tx.append(nm, ds);
+    const tag = el('div', 'tag'); tag.textContent = x.soon ? 'SOON' : inLoop ? '✓ ON' : '＋'; card.append(face, tx, tag);
+    card.addEventListener('click', ()=> addModule(x, card)); g.appendChild(card); }); }
+function addModule(x, card){ const ch = selCh(); if(!ch){ setStatus('tap a loop first'); return; }
+  if(x.soon){ setStatus(x.n + ' — coming soon'); return; }
+  if(x.n === 'PUMP' && !(ch.scDuck && !ch.scTrigger)){ setStatus('PUMP only works on a DUCKED loop — turn on DUCKED'); showBubble('PUMP = DUCKED loops only', false, 1800); return; }
+  if(ch.rack.includes(x.n)){ setStatus(x.n + ' is already on — hold it in the rack to move or remove'); return; }
+  ch.rack.push(x.n); rewireLive(ch); markDirty(); commit(); renderRack(); renderAddGrid(); setStatus(x.n + ' added — hold + slide it where you want it');
+  const c = [...$('addGrid').children].find(e=>e.dataset.k === 'ADD MOD ' + x.n); if(c){ c.classList.add('pop'); } }
+function openAdd(){ if(!selCh()){ setStatus(channels.length ? 'tap a loop first' : 'add a loop first — tap + or PACKS'); return; } closeThick(); renderAddChips(); renderAddGrid(); $('addSheet').classList.add('open'); const a = document.querySelector('.rk-add'); if(a) a.classList.add('on'); }
+function closeAdd(){ $('addSheet').classList.remove('open'); const a = document.querySelector('.rk-add'); if(a) a.classList.remove('on'); }
 function migrateRack(r){ if(!Array.isArray(r)) return FX_SLOTS.slice(); const out = []; r.forEach(k=>{ if(FX_SLOTS.includes(k) && !out.includes(k)) out.push(k); }); return out; }
 function tuneParams(v, sw){ // one place for every number → live and export match
   const [wd, pm, sb, un, ld, fl, ne, th] = v || fxDefaults(); sw = sw || {};
@@ -1205,7 +1262,7 @@ function tuneParams(v, sw){ // one place for every number → live and export ma
   return {
     gLL:0.5 + 0.5*k, gRL:0.5 - 0.5*k, gLR:0.5 - 0.5*k, gRR:0.5 + 0.5*k, haasL:wd*0.5, haasR:-wd*0.5,
     wDirect:1 - ml, wHi:ml, mlG:ml,
-    pumpDepth:-pm*0.95, pumpRate:1/(bs*(sw.PUMP ? 2 : 1)), half:!!sw.PUMP,
+    pumpDepth:0, pumpRate:1/(bs*(sw.PUMP ? 2 : 1)), half:!!sw.PUMP,
     sub:sb*14, subF:sw.SUB ? 55 : 90, subThr:-sb*24, subRatio:1 + sb*6,
     unThr:-un*34, unRatio:1 + un*8, unPres:un*7, unMake:1 + un*0.9, unAir:sw.UNTIRE ? un*6 : 0,
     ldTime:bs*(ld < 0.34 ? 0.5 : ld < 0.67 ? 0.25 : 0.125)*(sw.LOADED ? 1.5 : 1), ldFb:ld*0.7, ldWet:ld*0.85,
@@ -1255,16 +1312,18 @@ function toggleClipMute(ch, k){ const c = ch.clips[k]; if(!c) return; c.mute = !
 function findChannel(id){ return channels.find(c=>c.id===id); }
 function selCh(){ return sel.chId ? findChannel(sel.chId) : null; }
 function selRowIdx(){ return sel.chId ? channels.findIndex(c=>c.id===sel.chId) : -1; }
-function selectChannel(id, clipIdx){ const changed = sel.chId !== id; sel = { chId:id, clipIdx: clipIdx ?? -1 }; if(changed){ renderRack(); if(thickIdx >= 0) showTip(); } renderPill(); drawTL(); renderInfo(); }
+function selectChannel(id, clipIdx){ const changed = sel.chId !== id; sel = { chId:id, clipIdx: clipIdx ?? -1 }; if(changed){ renderRack(); if(thickIdx >= 0) showTip(); if($('addSheet').classList.contains('open')) renderAddGrid(); } renderPill(); drawTL(); renderInfo(); }
 function ensureSel(){ if(sel.chId && findChannel(sel.chId)) return; const ch = channels[0]; sel = { chId: ch ? ch.id : null, clipIdx:-1 }; renderRack(); renderPill(); }
 function renderPill(){ const ch = selCh(); const lp = $('loopPill'); if(lp){ lp.classList.toggle('show', !!ch); if(ch){ const n = ch.sample.displayName; $('loopPillName').textContent = n; lp.title = n; } } $('pill').classList.toggle('off', !ch); $('pillTrig').classList.toggle('on', !!(ch && ch.scTrigger)); $('pillDuck').classList.toggle('on', !!(ch && ch.scDuck)); }
-function setTrigger(ch){ channels.forEach(c=>{ c.scTrigger = false; }); ch.scTrigger = true; ch.scDuck = false; sidechainTrigger = ch; refreshTimeline(); markDirty(); commit(); drawAll(); setStatus(ch.sample.displayName + ' is the TRIGGER'); }
+function setTrigger(ch){ channels.forEach(c=>{ c.scTrigger = false; }); ch.scTrigger = true; ch.scDuck = false; sidechainTrigger = ch; renderRack(); refreshTimeline(); markDirty(); commit(); drawAll(); setStatus(ch.sample.displayName + ' is the TRIGGER'); }
 $('pillTrig').addEventListener('click', ()=>{ const ch = selCh(); if(!ch){ setStatus('tap a loop first'); return; }
-  if(ch.scTrigger){ ch.scTrigger = false; sidechainTrigger = null; refreshTimeline(); markDirty(); commit(); drawAll(); return; }
+  if(ch.scTrigger){ ch.scTrigger = false; sidechainTrigger = null; renderRack(); refreshTimeline(); markDirty(); commit(); drawAll(); return; }
   if(sidechainTrigger && sidechainTrigger !== ch){ ask('are you sure you want to switch triggers?', ()=> setTrigger(ch)); return; }
   setTrigger(ch); });
 $('pillDuck').addEventListener('click', ()=>{ const ch = selCh(); if(!ch){ setStatus('tap a loop first'); return; }
   ch.scDuck = !ch.scDuck; if(ch.scDuck && ch.scTrigger){ ch.scTrigger = false; if(sidechainTrigger===ch) sidechainTrigger = null; }
+  if(ch.scDuck){ const pi = FX_SLOTS.indexOf('PUMP'); if(!ch.rack.includes('PUMP')){ ch.rack.push('PUMP'); rewireLive(ch); } if(!(ch.fx[pi] > 0)) ch.fx[pi] = scDepth/0.95 > 1 ? 1 : scDepth/0.95; }
+  renderRack();
   if(ch.scDuck && !sidechainTrigger) setStatus('DUCKED — now pick a TRIGGER loop');
   refreshTimeline(); markDirty(); commit(); drawTL(); });
 
@@ -1314,7 +1373,9 @@ function reschedule(){ if(!isRunning) return; scheduleFrom(currentBeat()); }
 function anySolo(){ return channels.some(c=>c.solo); }
 function isSilent(ch){ return ch.mute || (anySolo() && !ch.solo); }
 function triggerHot(){ return !!(sidechainTrigger && !sidechainTrigger.mute && trigLevel > scThreshold); }
-function updateChannelGain(ch){ let target = (isRunning && !isSilent(ch)) ? ch.volume : 0; let tau = 0.01; if(isRunning && ch.scDuck && ch !== sidechainTrigger && duckNow > 0){ target *= (1 - duckNow); tau = ATTACK; } ch.gainNode.gain.setTargetAtTime(target, ctx.currentTime, tau); }
+function pumpAmt(ch){ return ch.rack.includes('PUMP') ? (ch.fx[FX_SLOTS.indexOf('PUMP')] || 0)*0.95 : 0; }   /* v10.27: PUMP fader = how hard THIS loop ducks under the trigger */
+function duckShape(d){ return Math.min(1, d / Math.max(0.001, scDepth)); }
+function updateChannelGain(ch){ let target = (isRunning && !isSilent(ch)) ? ch.volume : 0; let tau = 0.01; if(isRunning && ch.scDuck && ch !== sidechainTrigger && duckNow > 0){ target *= (1 - duckShape(duckNow)*pumpAmt(ch)); tau = ATTACK; } ch.gainNode.gain.setTargetAtTime(target, ctx.currentTime, tau); }
 function advanceSidechain(now, beat){ if(!sidechainTrigger){ duckNow = 0; trigLevel = 0; wasHot = false; return; } const pos = samplePosAt(sidechainTrigger, beat); trigPos = pos < 0 ? 0 : pos; trigLevel = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); const hot = triggerHot(); if(hot){ duckNow = scDepth; releaseStart = now; } else { const p = (now - releaseStart) / Math.max(0.001, scRelease); duckNow = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } wasHot = hot; }
 let playheadRaf = null, songTimer = null;
 function tick(){ const now = ctx.currentTime; const end = songEndBeats(); const endAt = songStartTime + (end - startBeat)*beatSec(); if(!nextPass && endAt - now < 0.25 && endAt > now) queueNextPass(endAt); if(nextPass && now >= nextPass.at){ songStartTime = nextPass.at; startBeat = 0; channels.forEach(ch=>{ ch.sources = ch.nextSources || []; ch.nextSources = null; }); nextPass = null; } const beat = currentBeat(); if(beat >= end){ scheduleFrom(0); return; } advanceSidechain(now, beat); channels.forEach(ch=>{ ch.lastPeakLevel = peakOf(ch.analyser, ch.dataArray); updateChannelGain(ch); }); }
@@ -1325,6 +1386,7 @@ async function ensureRunning(fromBeat){
   if(ctx.state !== 'running'){ setStatus('audio blocked — tap PLAY again'); return; }
   if(!channels.length){ setStatus('add loops first'); return; }
   if(isRunning){ scheduleFrom(fromBeat ?? currentBeat()); return; }
+  stopPreview();   /* v10.27: PLAY stops any library preview — no overlap */
   isRunning = true; setPlay(true); vzResetSong();
   scheduleFrom(fromBeat ?? playBeat);
   songTimer = setInterval(tick, 40);
@@ -1576,7 +1638,7 @@ async function renderArrangementOffline(sampleRate){
     const ducks = ch.scDuck && sidechainTrigger && ch !== sidechainTrigger;
     if(!ducks){ g.gain.setValueAtTime(ch.volume, 0); return; }
     g.gain.setValueAtTime(ch.volume, 0); let last = -1, lastT = 0;
-    for(let i=0;i<track.length;i++){ const t = i*STEP; if(t > totalLen) break; const v = ch.volume * (1 - track[i]); if(last < 0 || Math.abs(v - last) > 0.0015){ if(last >= 0 && t - lastT > STEP*1.5) g.gain.linearRampToValueAtTime(last, t - STEP); g.gain.linearRampToValueAtTime(v, t); last = v; lastT = t; } }
+    for(let i=0;i<track.length;i++){ const t = i*STEP; if(t > totalLen) break; const v = ch.volume * (1 - duckShape(track[i])*pumpAmt(ch)); if(last < 0 || Math.abs(v - last) > 0.0015){ if(last >= 0 && t - lastT > STEP*1.5) g.gain.linearRampToValueAtTime(last, t - STEP); g.gain.linearRampToValueAtTime(v, t); last = v; lastT = t; } }
     if(last >= 0 && lastT < totalLen) g.gain.linearRampToValueAtTime(last, totalLen);
   });
   return offline.startRendering();
@@ -1644,14 +1706,14 @@ const MODS = [
 ];
 const MOD_BY = {}; MODS.forEach(m=>{ MOD_BY[m.n] = m; });
 let RACK = MODS.slice();   /* what's on screen = core 3 + the selected loop's own rack, in its order */
-function rackList(){ const ch = selCh(); if(!ch) return MODS.slice(); return MODS.slice(0, 3).concat(ch.rack.map(k=>MOD_BY[k]).filter(Boolean)); }
+function rackList(){ const ch = selCh(); if(!ch) return MODS.slice(); const duck = ch.scDuck && !ch.scTrigger; return MODS.slice(0, 3).concat(ch.rack.filter(k=>k !== 'PUMP' || duck).map(k=>MOD_BY[k]).filter(Boolean)); }
 /* what each module does + its 2nd control (ON/OFF, default OFF) — shown on the tap-card */
 const MOD_INFO = {
   'VOL':    { d:'how loud this loop is' },
   'FILTER': { d:'down = darker · middle = clean · up = thinner', s:'RES', sd:'a sharp peak where it cuts — that DJ whistle' },
   'PITCH':  { d:'moves the loop up or down in semitones', s:'KEY LOCK', sd:'keeps the loop in its own key — the song key won\'t move it' },
   'WIDE':   { d:'pushes the loop out to the sides', s:'MONO LOW', sd:'keeps everything under 120 Hz in the middle — hits harder on phones + clubs' },
-  'PUMP':   { d:'ducks on every beat and breathes back', s:'HALF', sd:'pumps every 2 beats instead of every beat' },
+  'PUMP':   { d:'how hard this loop ducks under the TRIGGER — only on DUCKED loops' },
   'SUB':    { d:'fattens and evens out the low end', s:'DEEP', sd:'moves the boost lower — more rumble, less boom' },
   'UNTIRE': { d:'punch — wakes a tired loop up', s:'AIR', sd:'adds sparkle on top' },
   'LOADED': { d:'tempo echo rolls — 1/8 → 1/16 → 1/32 as you go up', s:'DOTTED', sd:'dotted echoes — bouncier rolls' },
@@ -1680,10 +1742,10 @@ let rackEls = [];
 try{ applySeasonSkin(); }catch(e){}
 function drawModule(i){ const m = RACK[i], ch = selCh(); rackEls[i].innerHTML = boxHTML(m, modGet(m, ch), swGet(m, ch), thickIdx === i); }
 function renderRack(){ if(!rackEls.length) return; const L = rackList(); if(L.map(m=>m.n).join('|') !== RACK.map(m=>m.n).join('|')){ RACK = L; if(thickIdx >= 0){ thickIdx = -1; $('thickTip').classList.remove('on'); } buildRack(); return; } $('rack').classList.toggle('idle', !selCh()); RACK.forEach((m,i)=>drawModule(i)); }
-function layoutRack(){ const box = $('rack'); const W = box.clientWidth; if(!W) return; const n = Math.max(11, RACK.length), gap = 2; const mw = (W - gap*(n-1))/n, sc = mw/66, H = Math.round(330*sc);
+function layoutRack(){ const box = $('rack'); const W = box.clientWidth; if(!W) return; const n = Math.max(12, RACK.length + 1), gap = 2; const mw = (W - gap*(n-1))/n, sc = mw/66, H = Math.round(330*sc);
   box.style.setProperty('--rs', sc.toFixed(4)); box.style.height = H + 'px';
   box.classList.toggle('thicko', thickIdx >= 0);
-  rackEls.forEach((w,i)=>{ let L = i*(mw + gap), Wd = mw; if(i === thickIdx){ Wd = 206*sc; L = clamp(L + mw/2 - Wd/2, 0, W - Wd); } w.style.left = L.toFixed(2) + 'px'; w.style.width = Wd.toFixed(2) + 'px'; w.style.height = H + 'px'; w.classList.toggle('thick', i === thickIdx); }); }
+  rackEls.forEach((w,i)=>{ let L = i*(mw + gap), Wd = mw; if(i === thickIdx){ Wd = 206*sc; L = clamp(L + mw/2 - Wd/2, 0, W - Wd); } w.style.left = L.toFixed(2) + 'px'; w.style.width = Wd.toFixed(2) + 'px'; w.style.height = H + 'px'; w.classList.toggle('thick', i === thickIdx); }); const ad = box.querySelector('.rk-add'); if(ad){ ad.style.left = (RACK.length*(mw + gap)).toFixed(2) + 'px'; ad.style.width = mw.toFixed(2) + 'px'; ad.style.height = H + 'px'; } }
 /* TAP (no drag) = card · TAP the little switch = ON/OFF · DRAG = tune · DOUBLE-TAP = default */
 let thickIdx = -1, cardTimer = 0;
 function thickDesc(){ const m = RACK[thickIdx], ch = selCh(); if(!m) return ''; const info = MOD_INFO[m.n]; return m.n + ' — ' + info.d + (info.s ? ' · ' + info.s + (swGet(m, ch) ? ' ON' : ' OFF') : ''); }
@@ -1696,12 +1758,13 @@ function closeThick(){ clearTimeout(cardTimer); $('thickTip').classList.remove('
 document.addEventListener('pointerdown', e=>{
   if(thickIdx >= 0 && !(rackEls[thickIdx] && rackEls[thickIdx].contains(e.target)) && !e.target.closest('.rk-m') && !e.target.closest('#thickTip')) closeThick();
   if(vzBig && !e.target.closest('#vizZone')) setVizBig(false);
+  if($('addSheet').classList.contains('open') && !e.target.closest('#addSheet') && !e.target.closest('.rk-add') && !e.target.closest('.rk-m')) closeAdd();
 }, true);
 function bindModule(w, i){ const m = RACK[i]; let drag = null, lastTap = 0, holdT = 0;
   const CORE = 3;   /* VOL · FILTER · PITCH stay first, always */
   /* v10.26 HOLD → LIFT → SLIDE: hold ½ sec, the module lifts. Slide left/right = move it (left → right = signal order).
      Drag it UP off the rack = remove it from this loop. Up/down without holding = tune, like always. */
-  const slotW = ()=>{ const W = $('rack').clientWidth, n = Math.max(11, RACK.length); return (W - 2*(n-1))/n + 2; };
+  const slotW = ()=>{ const W = $('rack').clientWidth, n = Math.max(12, RACK.length + 1); return (W - 2*(n-1))/n + 2; };
   const liftTo = (d, e)=>{ const sw = slotW(), dx = e.clientX - d.x0, dy = e.clientY - d.y0, H = $('rack').clientHeight || 150;
     w.style.left = (d.l0 + dx).toFixed(1) + 'px'; w.style.top = Math.min(0, dy).toFixed(1) + 'px';
     d.rm = dy < -H*0.55; w.classList.toggle('rm', d.rm);
@@ -1723,8 +1786,8 @@ function bindModule(w, i){ const m = RACK[i]; let drag = null, lastTap = 0, hold
     if(d.lift){ w.classList.remove('lift','rm'); $('rack').classList.remove('lifting'); w.style.top = '';
       const ch = d.ch, k = m.n;
       if(d.rm){ ch.rack = ch.rack.filter(x=>x !== k); rewireLive(ch); markDirty(); commit(); renderRack(); showBubble(k + ' removed', true); setStatus(k + ' off this loop — add it back with ＋'); return; }
-      const from = i - CORE, to = d.to - CORE;
-      if(to !== from){ ch.rack.splice(from, 1); ch.rack.splice(to, 0, k); rewireLive(ch); markDirty(); commit(); renderRack(); setStatus('order: ' + ch.rack.join(' → ')); }
+      const vis = RACK.slice(CORE).map(x=>x.n).filter(x=>x !== k); const to = d.to - CORE;
+      if(d.to !== i){ const next = vis[to]; ch.rack = ch.rack.filter(x=>x !== k); const at = next ? ch.rack.indexOf(next) : ch.rack.length; ch.rack.splice(at < 0 ? ch.rack.length : at, 0, k); rewireLive(ch); markDirty(); commit(); renderRack(); setStatus('order: ' + ch.rack.join(' → ')); }
       else { layoutRack(); setStatus(k + ' stays'); }
       return; }
     if(!d.moved){
@@ -1736,7 +1799,8 @@ function bindModule(w, i){ const m = RACK[i]; let drag = null, lastTap = 0, hold
     commit(); };
   w.addEventListener('pointerup', end); w.addEventListener('pointercancel', end);
 }
-function buildRack(){ const box = $('rack'); box.innerHTML = ''; rackEls = RACK.map((m,i)=>{ const w = el('div','rk-m'); w.dataset.k = m.n; box.appendChild(w); bindModule(w, i); return w; }); layoutRack(); $('rack').classList.toggle('idle', !selCh()); RACK.forEach((m,i)=>drawModule(i)); }
+function buildRack(){ const box = $('rack'); box.innerHTML = ''; rackEls = RACK.map((m,i)=>{ const w = el('div','rk-m'); w.dataset.k = m.n; box.appendChild(w); bindModule(w, i); return w; }); const ad = el('div','rk-add' + ($('addSheet').classList.contains('open') ? ' on' : '')); ad.textContent = '＋'; ad.dataset.k = 'RACK ＋'; ad.addEventListener('click', ()=>{ $('addSheet').classList.contains('open') ? closeAdd() : openAdd(); }); box.appendChild(ad); layoutRack(); $('rack').classList.toggle('idle', !selCh()); RACK.forEach((m,i)=>drawModule(i)); }
+$('addX').addEventListener('click', closeAdd);
 buildRack();
 /* silver screws on every zone (like the module faceplates) */
 document.querySelectorAll('.z[data-screws]').forEach(z=>{ const all = z.dataset.screws === '4'; const spots = all ? [['top','left'],['top','right'],['bottom','left'],['bottom','right']] : [['bottom','left'],['bottom','right']]; spots.forEach(([v,h],i)=>{ const sc = el('i','zs'); sc.style[v] = '5px'; sc.style[h] = '5px'; sc.style.setProperty('--r', (20 + i*37) + 'deg'); z.appendChild(sc); }); });

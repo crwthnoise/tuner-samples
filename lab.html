@@ -1,98 +1,124 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>TUNER · Module Lab</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-/* MODULE LAB — one loop, one module, A/B. Same sound code as TUNER (modules/*.worklet.js). */
-:root{ --void:#0a0804; --panel:#1a1612; --panel2:#2a2218; --red:#d32f2f; --green:#4fd1a5; --text:#f2ede2; --mute:#8a8176; --faint:#4a443d; --acc:#e0a060;
+/* MODULE LAB lab-5 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
+:root{ --void:#0a0804; --red:#d32f2f; --green:#4fd1a5; --text:#f2ede2; --mute:#8a8176; --faint:#4a443d;
   --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --ui:'Jura','Arial Narrow',system-ui,sans-serif; color-scheme:dark; }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html,body{ margin:0; height:100%; background:var(--void); color:var(--text); font-family:var(--ui); overscroll-behavior:none; touch-action:manipulation; overflow:hidden; }
-body{ position:fixed; inset:0; }   /* lab-4: the page never scrolls or zooms — sliding only moves the module */
-body{ display:flex; flex-direction:column; padding:calc(env(safe-area-inset-top,0px) + 10px) 16px calc(env(safe-area-inset-bottom,0px) + 12px); gap:10px; max-width:520px; margin:0 auto; user-select:none; -webkit-user-select:none; }
+html,body{ margin:0; height:100%; background:var(--void); color:var(--text); font-family:var(--ui); overflow:hidden; overscroll-behavior:none; touch-action:none; }
+body{ position:fixed; inset:0; display:flex; flex-direction:column; gap:10px; padding:calc(env(safe-area-inset-top,0px) + 10px) 16px calc(env(safe-area-inset-bottom,0px) + 12px); max-width:520px; margin:0 auto; user-select:none; -webkit-user-select:none; }
 .z{ position:relative; background:linear-gradient(#1c1a17,#0e0d0b); border-radius:10px; box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 10px #000; padding:10px 12px; }
 .top{ display:flex; align-items:center; gap:10px; }
 .top h1{ margin:0; flex:1; font:700 15px var(--ui); letter-spacing:.32em; }
-.top h1 b{ color:var(--red); font-weight:700; }
+.top h1 b{ color:var(--red); }
 .top h1 small{ display:block; font:300 9px var(--ui); letter-spacing:.5em; color:var(--mute); margin-top:2px; }
 .lcd{ background:#040605; border:2px solid #1a1a1a; border-radius:6px; padding:5px 8px; font:700 15px var(--mono); color:var(--green); text-shadow:0 0 6px #4fd1a588; min-width:60px; text-align:center; }
 .lcd i{ display:block; font:700 7px var(--mono); color:#2f7a60; letter-spacing:.2em; font-style:normal; text-shadow:none; }
-.stage{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:12px; touch-action:none; cursor:ns-resize; }
-#card{ width:calc(250px*var(--k,1)); height:calc(400px*var(--k,1)); flex:none; }
-#card .qmod{ transform:scale(var(--k,1)); transform-origin:top left; }
-#card{ touch-action:none; cursor:ns-resize; }
-.readout{ font:700 11px var(--mono); color:var(--mute); text-align:center; letter-spacing:.06em; min-height:14px; }
-.readout b{ color:var(--acc); }
-.row{ display:flex; gap:6px; align-items:center; }
-.row label{ font:700 9px var(--mono); letter-spacing:.18em; color:var(--mute); width:68px; flex:none; }
-.seg{ display:flex; flex:1; gap:4px; }
-.seg button,.btn{ flex:1; height:36px; border-radius:7px; border:1px solid #2a2724; background:linear-gradient(#22201c,#141210); color:var(--mute); font:700 12px var(--mono); letter-spacing:.08em; cursor:pointer; box-shadow:0 2px 0 #000; }
-.seg button.on{ color:#000; background:var(--acc); border-color:var(--acc); }
-select{ flex:1; min-width:0; width:100%; text-overflow:ellipsis; height:36px; border-radius:7px; border:1px solid #2a2724; background:#141210; color:var(--text); font:700 11px var(--mono); padding:0 8px; }
-.dock{ display:flex; gap:10px; align-items:stretch; }
-#ab{ flex:1; height:74px; font-size:15px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; }
-#ab small{ font:500 9px var(--mono); letter-spacing:.14em; color:var(--faint); }
+.chips{ display:flex; gap:6px; }
+.chips button{ flex:1; height:40px; border-radius:8px; border:1px solid #2a2724; background:linear-gradient(#22201c,#141210); color:var(--mute); font:700 13px var(--mono); letter-spacing:.14em; cursor:pointer; }
+.chips button.on{ color:#000; background:var(--a,#f2ede2); border-color:var(--a,#f2ede2); }
+/* the rack band: whole band = slider (drag up/down anywhere), module sits at real app size */
+#band{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center; gap:2px; touch-action:none; cursor:ns-resize; }
+.ghost{ width:var(--mw); height:var(--mh); border-radius:4px; border:1px dashed #2a2622; opacity:.5; flex:none; }
+#slot{ width:var(--mw); height:var(--mh); position:relative; flex:none; }
+#slot > .mod{ transform:scale(var(--rs)); transform-origin:top left; pointer-events:none; }
+.readout{ font:700 12px var(--mono); color:var(--mute); text-align:center; letter-spacing:.06em; min-height:16px; }
+.readout b{ color:var(--a); }
+.row{ display:flex; gap:8px; align-items:center; }
+.row label{ font:700 9px var(--mono); letter-spacing:.18em; color:var(--mute); flex:none; }
+select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:1px solid #2a2724; background:#141210; color:var(--text); font:700 11px var(--mono); padding:0 8px; text-overflow:ellipsis; }
+.dock{ display:flex; gap:10px; align-items:center; }
+.btn{ height:40px; border-radius:7px; border:1px solid #2a2724; background:linear-gradient(#22201c,#141210); color:var(--mute); font:700 12px var(--mono); letter-spacing:.08em; cursor:pointer; box-shadow:0 2px 0 #000; }
+#sw{ flex:1; height:74px; font-size:14px; }
+#sw.on{ color:#000; background:var(--a); border-color:var(--a); box-shadow:0 0 16px var(--a); }
+#ab{ width:74px; height:74px; font-size:13px; }
 #ab.dry{ color:var(--text); border-color:#5a5550; }
-#ab.wet{ color:#000; background:var(--acc); border-color:var(--acc); }
-#ab.wet small{ color:#3a2410; }
-#play{ flex:none; width:88px; height:88px; border-radius:50%; border:3px solid var(--red); background:radial-gradient(circle,#2a2622,#0e0c0a 70%); box-shadow:0 0 18px #d32f2f55,inset 0 0 0 6px #0a0908; color:var(--text); font-size:30px; cursor:pointer; margin-top:-14px; }
-#play.on{ box-shadow:0 0 26px #d32f2faa,inset 0 0 0 6px #0a0908; }
+#play{ flex:none; width:88px; height:88px; border-radius:50%; border:3px solid var(--red); background:radial-gradient(circle,#2a2622,#0e0c0a 70%); box-shadow:0 0 18px #d32f2f55,inset 0 0 0 6px #0a0908; color:var(--text); font-size:30px; cursor:pointer; }
 .note{ font:500 10px var(--mono); color:var(--faint); text-align:center; }
-.note b{ color:var(--mute); }
+/* module box — same CSS as the app */
+.mod{ position:relative; display:flex; flex-direction:column; align-items:center; box-shadow:0 6px 14px #000,inset 0 1px 0 rgba(255,255,255,.1); overflow:hidden; border:1px solid #000; font-family:var(--ui); }
+.slot{ width:66px; height:330px; border-radius:4px; padding:16px 0 10px; }
+.screw{ position:absolute; width:6px; height:6px; border-radius:50%; background:radial-gradient(circle at 35% 35%,#d8d2c8,#6a645c 60%,#2a2622); z-index:4; }
+.plate{ font-weight:700; white-space:nowrap; z-index:5; font-size:7px; letter-spacing:.5px; line-height:10px; padding:2px 3px; margin-bottom:8px; max-width:58px; overflow:hidden; border-radius:2px; }
+.zone{ flex:1; width:100%; position:relative; container-type:size; overflow:hidden; }
+.sw2{ width:46px; height:26px; margin-top:8px; border-radius:13px; position:relative; z-index:5; background:linear-gradient(#0c0b0a,#1a1816); box-shadow:inset 0 2px 3px #000,0 0 0 1px #3a3630; }
+.sw2 i{ position:absolute; top:50%; left:50%; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; background:#2a2622; box-shadow:inset 0 1px 1px #000; }
+.sw2.on{ box-shadow:inset 0 2px 3px #000,0 0 0 1.5px var(--a),0 0 10px var(--a); }
+.sw2.on i{ background:var(--a); box-shadow:0 0 8px 2px var(--a); }
+.scr{ position:absolute; inset:0 10%; background:#040605; border:2px solid #1a1a1a; border-radius:3px; box-shadow:inset 0 0 14px #000; overflow:hidden; }
+svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 </style>
+<script src="modules/sky.js?v=lab-5"></script>
 </head><body>
 <div class="z top">
   <h1><b>THREAT</b> TUNER<small>MODULE LAB</small></h1>
   <div class="lcd" id="bpmLcd">—<i>BPM</i></div>
-  <div class="lcd" id="barLcd">—<i>BAR</i></div>
 </div>
-
-<div class="z stage" id="stage"><div id="card"></div></div>
-<div class="readout" id="readout">drag up = more chops · PATTERN = next pattern</div>
-
-<div class="z" style="display:flex;flex-direction:column;gap:7px">
-  <div class="row"><label>LOOP</label><select id="loopSel"></select></div>
-</div>
-
+<div class="chips" id="chips"></div>
+<div class="z" id="band"><div class="ghost"></div><div class="ghost"></div><div id="slot"></div><div class="ghost"></div><div class="ghost"></div></div>
+<div class="readout" id="readout">drag up / down anywhere in the rack</div>
+<div class="row"><label>LOOP</label><select id="loopSel"></select></div>
 <div class="dock">
-  <button class="btn wet" id="ab">B · QUIPU<small>TAP = A / B</small></button>
+  <button class="btn" id="ab">A/B</button>
+  <button class="btn" id="sw">SWITCH</button>
   <button id="play" aria-label="play">▶</button>
 </div>
-<div class="note">LAB build <b id="ver"></b> · same sound code as the app</div>
-
+<div class="note">lab-5 · module at real app size</div>
 <script>
-const LAB_VERSION = 'lab-4';
-document.getElementById('ver').textContent = LAB_VERSION;
 const $ = id=>document.getElementById(id);
-const ACC = '#e0a060', COLS = ['#e8dcc4','#e0a060','#c84a28','#8a5a30','#f2ede2','#b07840','#d8b880','#a03a20'];
-/* same hash as the worklet → the face shows exactly what you hear */
+const clamp = (v,a,b)=>Math.min(b, Math.max(a, v));
+const SCREWS = '<div class="screw" style="top:6px;left:6px"></div><div class="screw" style="top:6px;right:6px"></div><div class="screw" style="bottom:6px;left:6px"></div><div class="screw" style="bottom:6px;right:6px"></div>';
 function quipuHash(a, b, seed){ let h = Math.imul(a|0, 374761393) ^ Math.imul(b|0, 668265263) ^ Math.imul(seed|0, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
 
-const st = { amount:0.5, hold:false, slices:8, reroll:0, seed:1, wet:true, playing:false, bar:-1, slice:-1, heldKey:-1 };
-try{ const s = JSON.parse(localStorage.getItem('lab_quipu') || '{}'); Object.assign(st, s, { playing:false, bar:-1, slice:-1, heldKey:-1, slices:8, reroll:0, hold:false }); }catch(e){}   /* lab-3: one fixed pattern, PATTERN button = next one — 8 slices, new set every bar */
-function save(){ try{ localStorage.setItem('lab_quipu', JSON.stringify({ amount:st.amount, hold:st.hold, slices:st.slices, reroll:st.reroll, seed:st.seed, wet:st.wet, loop:st.loop })); }catch(e){} }
+/* ---------- the modules on the bench ---------- */
+const MODS = {
+  QUIPU: { name:'QUIPU', acc:'#e0a060', screws:true, sw:'🎲 PATTERN', oneShot:true,
+    face:'repeating-linear-gradient(90deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px),linear-gradient(#2a1810 0 9%,#7a2a18 9% 11%,#2a1810 11% 86%,#7a2a18 86% 88%,#2a1810 88%)',
+    worklets:['modules/quipu.worklet.js'],
+    g(v, st){ const seed = st.seed, S = 8, cols = ['#e8dcc4','#e0a060','#c84a28','#8a5a30','#f2ede2','#b07840','#d8b880','#a03a20'];
+      let s = '<line x1="2" y1="8" x2="98" y2="8" stroke="#e8dcc4" stroke-width="4"/>';
+      for(let i=0;i<S;i++){ const x = 7 + i*12.3; s += `<line x1="${x}" y1="8" x2="${x}" y2="296" stroke="${i === st.slice ? '#fff' : cols[i]}" stroke-width="${i === st.slice ? 4 : 2.4}" opacity=".9"/>`; }
+      for(let i=0;i<S;i++){ const swap = quipuHash(i,1,seed) < v, m = swap ? Math.floor(quipuHash(i,2,seed)*S) : i, x = 7 + i*12.3, y = 26 + m*32;
+        s += `<rect x="${x-5}" y="${y-6}" width="10" height="12" rx="4" fill="${swap ? '#ffcf8a' : '#3a2414'}" stroke="${swap ? '#e0a060' : '#6a4a2a'}" stroke-width="1.5"/>`; }
+      return `<div class="scr" style="background:#060403;border-color:#120a06"><svg class="f" viewBox="0 0 100 300" preserveAspectRatio="none">${s}</svg></div>`; },
+    build(ac, st){ const node = new AudioWorkletNode(ac, 'quipu', { numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2] });
+      node.port.onmessage = e=>{ if(e.data.pos){ st.slice = +e.data.pos.split(':')[1]; draw(); } };
+      return { in:node, out:node, node, set(v){ node.parameters.get('amount').setTargetAtTime(v, ac.currentTime, 0.01); node.parameters.get('reroll').value = 0; node.port.postMessage({ seed:st.seed }); },
+        transport(o){ node.port.postMessage(o); } }; },
+  },
+  SKY: Object.assign({}, window.TUNER_MODS.SKY, { build(ac){ const n = window.TUNER_MODS.SKY.build(ac); return { in:n.in, out:n.out, set(v, sw){ n.set(v, sw, ac.currentTime); } }; } }),
+};
+const ORDER = ['QUIPU','SKY'];
 
-/* ---------- AUDIO ---------- */
-let ctx = null, node = null, dry = null, wetG = null, src = null, cur = null, ready = null;
+const st = { mod:'SKY', v:{ QUIPU:.5, SKY:.6 }, sw:{ SKY:false }, seed:7, slice:-1, wet:true, playing:false, loop:null };
+try{ const s = JSON.parse(localStorage.getItem('lab5') || '{}'); Object.assign(st, s, { playing:false, slice:-1 }); }catch(e){}
+function save(){ try{ localStorage.setItem('lab5', JSON.stringify({ mod:st.mod, v:st.v, sw:st.sw, seed:st.seed, wet:st.wet, loop:st.loop })); }catch(e){} }
+const M = ()=>MODS[st.mod];
+
+/* ---------- audio ---------- */
+let ctx = null, chain = {}, dry, wetBus, src = null, ready = null;
 async function boot(){ if(ready) return ready; ready = (async()=>{
   ctx = new (window.AudioContext || window.webkitAudioContext)();
-  await ctx.audioWorklet.addModule('modules/quipu.worklet.js?v=' + LAB_VERSION);
-  node = new AudioWorkletNode(ctx, 'quipu', { numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2] });
-  node.port.onmessage = e=>{ const d = e.data; if(d.pos){ const [b, i] = d.pos.split(':').map(Number); st.bar = b; st.slice = i; st.heldKey = d.held; draw(); } };
-  dry = ctx.createGain(); wetG = ctx.createGain(); const out = ctx.createGain(); out.gain.value = 0.9;
-  node.connect(wetG); wetG.connect(out); dry.connect(out); out.connect(ctx.destination);
-  applyParams(); })(); return ready; }
-function applyParams(){ if(!node) return; const P = node.parameters, t = ctx.currentTime;
-  P.get('amount').setTargetAtTime(st.amount, t, 0.01); P.get('hold').setValueAtTime(st.hold ? 1 : 0, t); P.get('slices').setValueAtTime(st.slices, t); P.get('reroll').setValueAtTime(st.reroll, t);
-  node.port.postMessage({ seed:st.seed });
-  wetG.gain.setTargetAtTime(st.wet ? 1 : 0, t, 0.005); dry.gain.setTargetAtTime(st.wet ? 0 : 1, t, 0.005); }
+  const files = new Set(); ORDER.forEach(k=>(MODS[k].worklets||[]).forEach(f=>files.add(f)));
+  for(const f of files) await ctx.audioWorklet.addModule(f + '?v=lab-5');
+  dry = ctx.createGain(); wetBus = ctx.createGain(); const out = ctx.createGain(); out.gain.value = 0.85;
+  dry.connect(out); wetBus.connect(out); out.connect(ctx.destination);
+  ORDER.forEach(k=>{ chain[k] = MODS[k].build(ctx, st); });
+  route(); })(); return ready; }
+function route(){ if(!ctx) return; ORDER.forEach(k=>{ try{ chain[k].out.disconnect(); }catch(e){} }); const c = chain[st.mod]; c.out.connect(wetBus);
+  if(src){ try{ src.disconnect(); }catch(e){} src.connect(dry); src.connect(c.in); }
+  apply(); }
+function apply(){ if(!ctx) return; const c = chain[st.mod]; c.set(st.v[st.mod], !!st.sw[st.mod]); const t = ctx.currentTime;
+  wetBus.gain.setTargetAtTime(st.wet ? 1 : 0, t, 0.006); dry.gain.setTargetAtTime(st.wet ? 0 : 1, t, 0.006); }
 
-/* ---------- LOOPS (same library as the app: samples/index.json, AAC trimmed seamless with the fingerprint) ---------- */
+/* ---------- loops (same library + seamless AAC trim as the app) ---------- */
 let LIB = [];
 function fpDecode(b64){ const t = atob(b64), u = new Uint8Array(t.length); for(let i=0;i<t.length;i++) u[i] = t.charCodeAt(i); return new Int16Array(u.buffer); }
 function trimLoop(s, ab){ if(!s.frames || !s.fp) return ab; const ratio = ab.sampleRate/(s.sr || 44100), len = Math.round(s.frames*ratio); if(len < 16 || ab.length < len) return ab;
@@ -105,81 +131,42 @@ function trimLoop(s, ab){ if(!s.frames || !s.fp) return ab; const ratio = ab.sam
 async function loadLib(){ try{ const r = await fetch('samples/index.json', { cache:'no-cache' }); LIB = (await r.json()).filter(s=>s.file && s.bpm); }catch(e){ LIB = []; }
   const sel = $('loopSel'); sel.innerHTML = ''; const folders = {}; LIB.forEach((s, k)=>{ (folders[s.folder || '—'] = folders[s.folder || '—'] || []).push(k); });
   Object.keys(folders).sort().forEach(f=>{ const g = document.createElement('optgroup'); g.label = f; folders[f].forEach(k=>{ const o = document.createElement('option'); o.value = LIB[k].id; o.textContent = LIB[k].name + ' · ' + LIB[k].bpm; g.appendChild(o); }); sel.appendChild(g); });
-  const pick = LIB.find(s=>s.id === st.loop) || LIB.find(s=>/drum/i.test(s.folder || '') && /loop|groove|break|drum/i.test(s.name)) || LIB.find(s=>/drum/i.test(s.folder || '')) || LIB[0];
-  if(pick){ sel.value = pick.id; st.loop = pick.id; } }
+  const pick = LIB.find(s=>s.id === st.loop) || LIB.find(s=>/drum/i.test(s.folder || '')) || LIB[0]; if(pick){ sel.value = pick.id; st.loop = pick.id; } }
 async function getBuffer(s){ if(s._buf) return s._buf; const r = await fetch('samples/' + s.file.split('/').map(encodeURIComponent).join('/')); const ab = await ctx.decodeAudioData(await r.arrayBuffer()); s._buf = trimLoop(s, ab); return s._buf; }
 async function start(){ await boot(); if(ctx.state !== 'running') await ctx.resume(); stopSrc();
-  const s = LIB.find(x=>x.id === st.loop); if(!s) return; $('readout').textContent = 'loading ' + s.name + '…';
-  const buf = await getBuffer(s); cur = s; const bs = 60/s.bpm, beats = Math.max(1, Math.round(buf.duration/bs));
-  const T = ctx.currentTime + 0.08; node.port.postMessage({ t0:T, bs, loopBeats:beats, seed:st.seed, reset:true });
-  src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(node); src.connect(dry); src.start(T);
-  st.playing = true; $('play').classList.add('on'); $('play').textContent = '■'; $('bpmLcd').innerHTML = s.bpm + '<i>BPM</i>'; renderReadout(); }
+  const s = LIB.find(x=>x.id === st.loop); if(!s) return; $('readout').textContent = 'loading…';
+  const buf = await getBuffer(s), bs = 60/s.bpm, beats = Math.max(1, Math.round(buf.duration/bs)), T = ctx.currentTime + 0.08;
+  if(chain.QUIPU) chain.QUIPU.transport({ t0:T, bs, loopBeats:beats, seed:st.seed, reset:true });
+  src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; route(); src.start(T);
+  st.playing = true; $('play').textContent = '■'; $('bpmLcd').innerHTML = s.bpm + '<i>BPM</i>'; readout(); }
 function stopSrc(){ if(src){ try{ src.stop(); }catch(e){} try{ src.disconnect(); }catch(e){} src = null; } }
-function stop(){ stopSrc(); st.playing = false; st.bar = -1; st.slice = -1; $('play').classList.remove('on'); $('play').textContent = '▶'; $('barLcd').innerHTML = '—<i>BAR</i>'; draw(); }
+function stop(){ stopSrc(); st.playing = false; st.slice = -1; $('play').textContent = '▶'; draw(); }
 
-/* ---------- THE FACE (look v1: woven plate + hanging cords; knot on cord i = the slice that plays there) ---------- */
-function mapping(){ const S = st.slices, key = 0; const m = [];
-  for(let i=0;i<S;i++){ const swap = quipuHash(key*64 + i, 1, st.seed) < st.amount; const kk = key*64 + i; m.push(swap ? Math.floor(quipuHash(kk, 2, st.seed)*S) : i); } return m; }
-function draw(){ const S = st.slices, m = mapping(), W = 230, H = 300, top = 14, gap = (W - 20)/(S - 1);
-  let svg = `<line x1="4" y1="${top}" x2="${W-4}" y2="${top}" stroke="${st.hold ? ACC : '#e8dcc4'}" stroke-width="${st.hold ? 5 : 3.5}" ${st.hold ? `style="filter:drop-shadow(0 0 6px ${ACC})"` : ''}/>`;
-  for(let i=0;i<S;i++){ const x = 10 + i*gap, play = i === st.slice && st.playing; svg += `<path d="M${x} ${top} Q${x + (i%2 ? 2 : -2)} ${H*0.55} ${x} ${H-6}" fill="none" stroke="${play ? '#fff' : COLS[i%8]}" stroke-width="${play ? 3 : (S > 8 ? 1.6 : 2.2)}" opacity="${play ? 1 : .8}" ${play ? 'style="filter:drop-shadow(0 0 5px #fff)"' : ''}/>`; }
-  for(let i=0;i<S;i++){ const x = 10 + i*gap, k = m[i], moved = k !== i, home = top + 26 + (k % 8)*((H - 60)/8) + (S > 8 && k >= 8 ? 14 : 0), r = S > 8 ? 6 : 8;
-    const lit = moved || (i === st.slice && st.playing);
-    svg += `<circle cx="${x}" cy="${home}" r="${r}" fill="${moved ? '#ffcf8a' : '#3a2414'}" stroke="${lit ? ACC : '#6a4a2a'}" stroke-width="1.6" ${moved ? `style="filter:drop-shadow(0 0 5px ${ACC})"` : ''}/>
-      <text x="${x}" y="${home + (S > 8 ? 3 : 3.5)}" font-size="${S > 8 ? 7 : 9}" text-anchor="middle" font-family="JetBrains Mono,monospace" font-weight="700" fill="${moved ? '#1a0e06' : '#a07a50'}">${k + 1}</text>`; }
-  $('card').innerHTML = `<div class="qmod">${['top:7px;left:7px','top:7px;right:7px','bottom:7px;left:7px','bottom:7px;right:7px'].map(p=>`<i class="screw" style="${p}"></i>`).join('')}
-    <div class="qplate">QUIPU</div>
-    <div class="qzone"><div class="qscr"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg></div>
-    <div class="qrail"><div class="qbead" style="bottom:calc(${st.amount*100}% - 4px)"></div></div></div>
-    <div class="qpat" id="seat"><span>🎲 PATTERN</span></div></div>`;
-  if(st.bar >= 0) $('barLcd').innerHTML = (st.bar + 1) + '<i>BAR</i>'; }
-function renderReadout(){ $('readout').innerHTML = `QUIPU <b>${Math.round(st.amount*100)}%</b>${st.wet ? '' : ' · <b>A = DRY</b>'}`; }
+/* ---------- draw: the module at app size (rack of 12 on a phone) ---------- */
+function layout(){ const W = Math.min(innerWidth, 520) - 32 - 24, n = 12, mw = (W - 2*(n-1))/n, rs = mw/66, mh = 330*rs;
+  document.documentElement.style.setProperty('--mw', mw.toFixed(2) + 'px'); document.documentElement.style.setProperty('--mh', mh.toFixed(1) + 'px'); document.documentElement.style.setProperty('--rs', rs.toFixed(4)); }
+function draw(){ const m = M(), v = st.v[st.mod], on = !!st.sw[st.mod];
+  document.documentElement.style.setProperty('--a', m.acc);
+  $('slot').innerHTML = `<div class="mod slot" style="background:${m.face}">${m.screws ? SCREWS : ''}<div class="plate" style="background:${m.acc};color:#000">${m.name}</div><div class="zone">${m.g(clamp(v,0,1), st)}</div><div class="sw2${on ? ' on' : ''}" style="--a:${m.acc}"><i></i></div></div>`;
+  $('sw').textContent = m.sw || 'SWITCH'; $('sw').classList.toggle('on', !m.oneShot && on); }
+function readout(){ const m = M(); $('readout').innerHTML = `${m.name} <b>${Math.round(st.v[st.mod]*100)}%</b>` + (!m.oneShot && st.sw[st.mod] ? ` · <b>${m.sw}</b>` : '') + (st.wet ? '' : ' · A = DRY'); }
+function chips(){ $('chips').innerHTML = ''; ORDER.forEach(k=>{ const b = document.createElement('button'); b.textContent = k; b.style.setProperty('--a', MODS[k].acc); b.className = st.mod === k ? 'on' : ''; b.addEventListener('click', ()=>{ st.mod = k; chips(); route(); draw(); readout(); save(); }); $('chips').appendChild(b); }); }
 
-/* card: drag = amount · tap the switch = HOLD · double-tap = 0 */
-let drag = null, lastTap = 0;
-$('stage').addEventListener('pointerdown', e=>{ e.preventDefault(); try{ $('stage').setPointerCapture(e.pointerId); }catch(_){} const onSeat = !!e.target.closest('#seat'); drag = { y0:e.clientY, v0:st.amount, moved:false, seat:onSeat }; });
-$('stage').addEventListener('pointermove', e=>{ if(!drag) return; const dy = e.clientY - drag.y0; if(!drag.moved && Math.abs(dy) < 4) return; drag.moved = true;
-  st.amount = Math.min(1, Math.max(0, drag.v0 - dy/260)); applyParams(); draw(); renderReadout(); });
-const end = ()=>{ if(!drag) return; const d = drag; drag = null;
-  if(!d.moved){ if(d.seat){ let n; do{ n = 1 + Math.floor(Math.random()*100000); }while(n === st.seed); st.seed = n; applyParams(); }
-    else { const t = performance.now(); if(t - lastTap < 320){ st.amount = 0; applyParams(); lastTap = 0; } else lastTap = t; } draw(); renderReadout(); }
-  save(); };
-$('stage').addEventListener('pointerup', end); $('stage').addEventListener('pointercancel', end);
+/* drag anywhere in the rack band = the fader (no scrolling, no zoom) */
+let drag = null;
+const band = $('band');
+band.addEventListener('touchstart', e=>e.preventDefault(), { passive:false });
 document.addEventListener('touchmove', e=>{ if(!e.target.closest('select')) e.preventDefault(); }, { passive:false });
-/* fit the module to the space so nothing hangs off the screen */
-function fit(){ const z = $('stage'), h = z.clientHeight - 24, w = z.clientWidth - 24; $('card').style.setProperty('--k', Math.min(1, h/400, w/250).toFixed(3)); }
-addEventListener('resize', fit); setTimeout(fit, 0);
+band.addEventListener('pointerdown', e=>{ try{ band.setPointerCapture(e.pointerId); }catch(_){} drag = { y0:e.clientY, v0:st.v[st.mod] }; });
+band.addEventListener('pointermove', e=>{ if(!drag) return; const H = band.clientHeight * 0.8; st.v[st.mod] = clamp(drag.v0 - (e.clientY - drag.y0)/H, 0, 1); apply(); draw(); readout(); });
+const end = ()=>{ if(drag){ drag = null; save(); } }; band.addEventListener('pointerup', end); band.addEventListener('pointercancel', end);
 
-document.querySelectorAll('.seg[data-p]').forEach(g=>{ const p = g.dataset.p; g.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on', +b.dataset.v === st[p]);
-  b.addEventListener('click', ()=>{ st[p] = +b.dataset.v; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x === b)); applyParams(); draw(); renderReadout(); save(); }); }); });
-if($('seedBtn')) $('seedBtn').addEventListener('click', ()=>{ st.seed = (st.seed % 9999) + 1 + Math.floor(Math.random()*50); applyParams(); draw(); renderReadout(); save(); });
-$('ab').addEventListener('click', ()=>{ st.wet = !st.wet; $('ab').className = 'btn ' + (st.wet ? 'wet' : 'dry'); $('ab').innerHTML = (st.wet ? 'B · QUIPU' : 'A · DRY') + '<small>TAP = A / B</small>'; applyParams(); renderReadout(); save(); });
+$('sw').addEventListener('click', ()=>{ const m = M(); if(m.oneShot){ let n; do{ n = 1 + Math.floor(Math.random()*100000); }while(n === st.seed); st.seed = n; }
+  else st.sw[st.mod] = !st.sw[st.mod]; apply(); draw(); readout(); save(); });
+$('ab').addEventListener('click', ()=>{ st.wet = !st.wet; $('ab').className = 'btn' + (st.wet ? '' : ' dry'); $('ab').textContent = st.wet ? 'A/B' : 'DRY'; apply(); readout(); save(); });
 $('play').addEventListener('click', ()=>{ if(st.playing) stop(); else start().catch(e=>{ $('readout').textContent = 'could not play: ' + e.message; }); });
 $('loopSel').addEventListener('change', e=>{ st.loop = e.target.value; save(); if(st.playing) start(); });
-$('ab').className = 'btn ' + (st.wet ? 'wet' : 'dry'); $('ab').innerHTML = (st.wet ? 'B · QUIPU' : 'A · DRY') + '<small>TAP = A / B</small>';
-loadLib(); draw(); renderReadout();
+addEventListener('resize', ()=>{ layout(); draw(); });
+layout(); chips(); draw(); readout(); loadLib();
 </script>
-<style>
-/* QUIPU face — look v1 (MOCKS/QUIPU_look_v1.png) */
-.qmod{ position:relative; width:250px; height:400px; border-radius:12px; border:1px solid #000; overflow:hidden; display:flex; flex-direction:column; align-items:center; padding:24px 0 12px;
-  box-shadow:0 8px 18px #000,inset 0 1px 0 rgba(255,255,255,.1);
-  background:repeating-linear-gradient(90deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px),linear-gradient(#2a1810 0 9%,#7a2a18 9% 11%,#2a1810 11% 86%,#7a2a18 86% 88%,#2a1810 88%); }
-.qmod::before,.qmod::after{ content:''; position:absolute; left:0; right:0; height:14px; background:conic-gradient(from 45deg at 50% 50%,#e0a060 0 25%,transparent 0 50%,#c84a28 0 75%,transparent 0) 0 0/14px 14px; opacity:.55; }
-.qmod::before{ top:3px; } .qmod::after{ bottom:3px; }
-.screw{ position:absolute; width:9px; height:9px; border-radius:50%; background:radial-gradient(circle at 35% 35%,#d8d2c8,#6a645c 60%,#2a2622); z-index:4; }
-.qplate{ font:900 13px var(--ui); letter-spacing:.2em; padding:3px 8px; border-radius:2px; background:var(--acc); color:#1a0e06; z-index:5; margin-bottom:9px; }
-.qzone{ flex:1; width:100%; position:relative; }
-.qscr{ position:absolute; inset:0 11%; background:#060403; border:2px solid #120a06; border-radius:5px; box-shadow:inset 0 0 14px #000; overflow:hidden; }
-.qscr svg{ position:absolute; inset:0; width:100%; height:100%; }
-.qrail{ position:absolute; right:4%; top:2%; bottom:2%; width:3px; background:#1e140c; border-radius:2px; }
-.qbead{ position:absolute; right:-5px; width:13px; height:8px; border-radius:3px; background:var(--acc); box-shadow:0 0 9px var(--acc); }
-.qseat{ width:34px; height:34px; border-radius:50%; margin-top:9px; z-index:5; border:1px solid #3a2a18; background:#120a06; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-.qseat i{ width:40%; height:40%; border-radius:50%; background:#2a1a10; }
-.qseat.on i{ background:var(--acc); box-shadow:0 0 12px var(--acc); }
-.qpat{ margin-top:8px; z-index:5; width:118px; height:46px; border-radius:9px; border:2px solid var(--acc); background:linear-gradient(#2a1a10,#140a06); box-shadow:0 0 12px #e0a06055,inset 0 1px 0 rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }
-.qpat b{ font:700 20px var(--mono); color:var(--acc); text-shadow:0 0 8px #e0a06088; min-width:26px; text-align:right; }
-.qpat span{ font:700 13px var(--mono); letter-spacing:.16em; color:#f2ede2; }
-.qpat:active{ transform:scale(.96); background:var(--acc); } .qpat:active b,.qpat:active span{ color:#1a0e06; }
-.qsl{ font:700 8px var(--mono); color:var(--acc); letter-spacing:.14em; margin-top:3px; z-index:5; opacity:.5; } .qsl.on{ opacity:1; }
-</style>
 </body></html>

@@ -54,9 +54,6 @@ select{ flex:1; min-width:0; width:100%; text-overflow:ellipsis; height:36px; bo
 
 <div class="z" style="display:flex;flex-direction:column;gap:7px">
   <div class="row"><label>LOOP</label><select id="loopSel"></select></div>
-  <div class="row"><label>SLICES</label><div class="seg" data-p="slices"><button data-v="8" class="on">8</button><button data-v="16">16</button></div></div>
-  <div class="row"><label>RE-ROLL</label><div class="seg" data-p="reroll"><button data-v="1" class="on">1 BAR</button><button data-v="2">2 BARS</button><button data-v="4">4 BARS</button></div></div>
-  <div class="row"><label>PATTERN</label><div class="seg"><button id="seedBtn">🎲 NEW SET</button></div></div>
 </div>
 
 <div class="dock">
@@ -66,7 +63,7 @@ select{ flex:1; min-width:0; width:100%; text-overflow:ellipsis; height:36px; bo
 <div class="note">LAB build <b id="ver"></b> · same sound code as the app</div>
 
 <script>
-const LAB_VERSION = 'lab-1';
+const LAB_VERSION = 'lab-2';
 document.getElementById('ver').textContent = LAB_VERSION;
 const $ = id=>document.getElementById(id);
 const ACC = '#e0a060', COLS = ['#e8dcc4','#e0a060','#c84a28','#8a5a30','#f2ede2','#b07840','#d8b880','#a03a20'];
@@ -74,7 +71,7 @@ const ACC = '#e0a060', COLS = ['#e8dcc4','#e0a060','#c84a28','#8a5a30','#f2ede2'
 function quipuHash(a, b, seed){ let h = Math.imul(a|0, 374761393) ^ Math.imul(b|0, 668265263) ^ Math.imul(seed|0, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
 
 const st = { amount:0.5, hold:false, slices:8, reroll:1, seed:1, wet:true, playing:false, bar:-1, slice:-1, heldKey:-1 };
-try{ const s = JSON.parse(localStorage.getItem('lab_quipu') || '{}'); Object.assign(st, s, { playing:false, bar:-1, slice:-1, heldKey:-1 }); }catch(e){}
+try{ const s = JSON.parse(localStorage.getItem('lab_quipu') || '{}'); Object.assign(st, s, { playing:false, bar:-1, slice:-1, heldKey:-1, slices:8, reroll:1 }); }catch(e){}   /* lab-2: kept simple — 8 slices, new set every bar */
 function save(){ try{ localStorage.setItem('lab_quipu', JSON.stringify({ amount:st.amount, hold:st.hold, slices:st.slices, reroll:st.reroll, seed:st.seed, wet:st.wet, loop:st.loop })); }catch(e){} }
 
 /* ---------- AUDIO ---------- */
@@ -133,7 +130,7 @@ function draw(){ const S = st.slices, m = mapping(), W = 230, H = 300, top = 14,
     <div class="qrail"><div class="qbead" style="bottom:calc(${st.amount*100}% - 4px)"></div></div></div>
     <div class="qseat ${st.hold ? 'on' : ''}" id="seat"><i></i></div><div class="qsl ${st.hold ? 'on' : ''}">HOLD</div></div>`;
   if(st.bar >= 0) $('barLcd').innerHTML = (st.bar + 1) + '<i>BAR</i>'; }
-function renderReadout(){ $('readout').innerHTML = `QUIPU <b>${Math.round(st.amount*100)}%</b> · ${st.slices} slices · new set every ${st.reroll} bar${st.reroll > 1 ? 's' : ''}${st.hold ? ' · <b>HOLD</b>' : ''}${st.wet ? '' : ' · <b>A = DRY</b>'}`; }
+function renderReadout(){ $('readout').innerHTML = `QUIPU <b>${Math.round(st.amount*100)}%</b>${st.hold ? ' · <b>HOLD</b>' : ''}${st.wet ? '' : ' · <b>A = DRY</b>'}`; }
 
 /* card: drag = amount · tap the switch = HOLD · double-tap = 0 */
 let drag = null, lastTap = 0;
@@ -148,7 +145,7 @@ $('card').addEventListener('pointerup', end); $('card').addEventListener('pointe
 
 document.querySelectorAll('.seg[data-p]').forEach(g=>{ const p = g.dataset.p; g.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on', +b.dataset.v === st[p]);
   b.addEventListener('click', ()=>{ st[p] = +b.dataset.v; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x === b)); applyParams(); draw(); renderReadout(); save(); }); }); });
-$('seedBtn').addEventListener('click', ()=>{ st.seed = (st.seed % 9999) + 1 + Math.floor(Math.random()*50); applyParams(); draw(); renderReadout(); save(); });
+if($('seedBtn')) $('seedBtn').addEventListener('click', ()=>{ st.seed = (st.seed % 9999) + 1 + Math.floor(Math.random()*50); applyParams(); draw(); renderReadout(); save(); });
 $('ab').addEventListener('click', ()=>{ st.wet = !st.wet; $('ab').className = 'btn ' + (st.wet ? 'wet' : 'dry'); $('ab').innerHTML = (st.wet ? 'B · QUIPU' : 'A · DRY') + '<small>TAP = A / B</small>'; applyParams(); renderReadout(); save(); });
 $('play').addEventListener('click', ()=>{ if(st.playing) stop(); else start().catch(e=>{ $('readout').textContent = 'could not play: ' + e.message; }); });
 $('loopSel').addEventListener('change', e=>{ st.loop = e.target.value; save(); if(st.playing) start(); });

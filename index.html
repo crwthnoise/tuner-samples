@@ -180,6 +180,9 @@
   /* ---------- SHEETS (cover rack + dock only — never the timeline) ---------- */
   .sheet{ position:fixed; left:0; right:0; bottom:0; top:var(--sheetTop,45%); z-index:30; background:#110f0d; border-top:4px solid var(--rail); border-radius:12px 12px 0 0; box-shadow:0 -10px 30px #000; transform:translateY(105%); transition:transform .24s ease; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:10px calc(14px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left)); }
   .sheet.open{ transform:none; }
+  #packsSheet{ top:var(--packsTop,40%); bottom:var(--packsBot,140px); border-radius:12px; border-bottom:4px solid var(--rail); transform:translateY(calc(100% + var(--packsBot,140px) + 20px)); }
+  #packsSheet.open{ transform:none; }
+  #dock{ z-index:31; }
   .sheet.small{ top:auto; }
   .sh-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
   .sh-head strong{ flex:1; min-width:0; font:700 11px var(--mono); letter-spacing:.14em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -465,7 +468,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.23';
+const APP_VERSION = 'v10.24';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -798,7 +801,11 @@ $('limiterToggle').addEventListener('click', ()=>{ setLimiter(!limiterOn); markD
 })();
 
 /* SHEETS — they cover the rack + dock, never the timeline */
-function sheetTop(){ const r = $('rackZone').getBoundingClientRect(); document.documentElement.style.setProperty('--sheetTop', Math.max(90, Math.round(r.top)) + 'px'); }
+function sheetTop(){ const r = $('rackZone').getBoundingClientRect(); document.documentElement.style.setProperty('--sheetTop', Math.max(90, Math.round(r.top)) + 'px');
+  /* v10.24: PACKS slides up from behind the dock and stops above it — PLAY + PACKS stay visible; it starts at the spectrum strip so the list keeps its room */
+  const v = $('tlZone').getBoundingClientRect(), d = $('dock').getBoundingClientRect(), H = window.innerHeight;
+  document.documentElement.style.setProperty('--packsTop', Math.max(60, Math.round(v.top + v.height*0.35)) + 'px'); document.documentElement.style.setProperty('--packsBot', Math.max(0, Math.round(H - d.top)) + 'px'); }
+window.addEventListener('resize', ()=>{ try{ sheetTop(); }catch(e){} });
 function openSheet(id){ document.querySelectorAll('.sheet.open').forEach(s=>{ if(s.id !== id) closeSheet(s.id); }); sheetTop(); $(id).classList.add('open'); if(id === 'setSheet') requestAnimationFrame(drawAll); }
 function closeSheet(id){ const s = $(id); if(!s || !s.classList.contains('open')) return; s.classList.remove('open'); if(id === 'packsSheet'){ stopPreview(); libEdit = null; libNaming = null; } }
 document.querySelectorAll('[data-close]').forEach(b=> b.addEventListener('click', ()=> closeSheet(b.dataset.close)));
@@ -1221,10 +1228,10 @@ async function addChannelFromSample(sample, opts={}){
   channels.push(ch); applyFilter(ch); setTune(tuneNodes, ch.fx, ctx, null, ch.sw); refreshTimeline(); if(!restoring) maybeTapHint();
   if(!opts.quiet){ markDirty(); commit(); }
   if(isRunning && !restoring) reschedule();
-  if(!restoring){ scrollToRow(channels.length-1); if(!opts.quiet) selectChannel(ch.id); }
+  if(!restoring){ scrollToRow(channels.length-1); if(!opts.quiet){ selectChannel(ch.id); zoomToFit(); } }
 }
 function removeChannel(ch){ [...(ch.sources||[]), ...(ch.nextSources||[])].forEach(s=>{ try{ s.stop(); }catch(e){} try{ s.disconnect(); }catch(e){} }); ch.sources = []; ch.nextSources = []; try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} channels = channels.filter(c=>c.id!==ch.id); if(sidechainTrigger===ch) sidechainTrigger=null; if(sel.chId===ch.id){ closeOptions(); sel = { chId:null, clipIdx:-1 }; } refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); }
-function addClip(ch){ const last = ch.clips.length ? ch.clips.reduce((m,c)=> Math.max(m, c.start+c.len), 0) : 0; ch.clips.push({ start:last, len:defaultClipLen(ch.sample), off:0, mute:false }); refreshTimeline(); drawAll(); if(isRunning) reschedule(); markDirty(); setTimeout(commit, 0); }
+function addClip(ch){ const last = ch.clips.length ? ch.clips.reduce((m,c)=> Math.max(m, c.start+c.len), 0) : 0; ch.clips.push({ start:last, len:defaultClipLen(ch.sample), off:0, mute:false }); refreshTimeline(); zoomToFit(); drawAll(); if(isRunning) reschedule(); markDirty(); setTimeout(commit, 0); }
 function removeSelectedClip(){ const ch = channels.find(c=>c.id===sel.chId); if(!ch || sel.clipIdx<0 || !ch.clips[sel.clipIdx]) return; ch.clips.splice(sel.clipIdx, 1); sel.clipIdx = -1; refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); closeOptions(); }
 function filterQ(ch){ return (ch.sw && ch.sw.FILTER) ? 0.7 + Math.min(1, Math.abs(ch.filterVal)/20)*5.3 : 0.7; }
 function applyFilter(ch){ const v=ch.filterVal, t=ctx.currentTime, q = filterQ(ch); ch.lp.Q.setTargetAtTime(v<0 ? q : 0.7, t, 0.02); ch.hp.Q.setTargetAtTime(v>0 ? q : 0.7, t, 0.02); if(v<0){ ch.lp.frequency.setTargetAtTime(20000-(Math.abs(v)/100)*19700, t, 0.02); ch.hp.frequency.setTargetAtTime(20, t, 0.02); } else { ch.hp.frequency.setTargetAtTime(20+(v/100)*3000, t, 0.02); ch.lp.frequency.setTargetAtTime(20000, t, 0.02); } }
@@ -1261,11 +1268,16 @@ $('optRemove').addEventListener('click', ()=>{ const ch = selCh(); if(!ch) retur
 let bubbleTimer = null;
 function showBubble(txt, withUndo, ms){ const b = $('bubble'); $('bubbleTxt').innerHTML = txt; const isRedo = withUndo === 'redo'; $('bubbleUndo').style.display = withUndo && !isRedo ? '' : 'none'; $('bubbleRedo').style.display = isRedo ? '' : 'none'; b.classList.toggle('hint', !withUndo); b.classList.add('show'); clearTimeout(bubbleTimer); bubbleTimer = setTimeout(()=> b.classList.remove('show'), ms || 4000); }
 function hideBubble(){ clearTimeout(bubbleTimer); $('bubble').classList.remove('show'); }
+/* v10.24 CLEAR BOARD: 3 taps on empty timeline space = everything off the timeline (UNDO in the bubble brings it back) */
+let emptyTaps = 0, emptyTapAt = 0;
+function clearBoard(){ if(!channels.length) return; if(isRunning) stopAll(); stopSources(); try{ navigator.vibrate && navigator.vibrate([20,40,20]); }catch(e){} clearChannels(); sel = { chId:null, clipIdx:-1 }; refreshTimeline(); drawAll(); requestAnimationFrame(()=>drawAll()); markDirty(); setTimeout(commit, 0); showBubble('timeline cleared', true, 6000); }
+/* v10.24 AUTO ZOOM: adding a loop or a clone zooms the timeline so the whole song fits */
+function zoomToFit(){ const w = tl.clientWidth || 320; zoomX = clamp(w / (songEndBeats() + BAR*0.25), minZoomX(), 96); scrollX = 0; clampScroll(); drawTL(); }
 function tripleDelete(ch, k){
   if(!ch || !ch.clips[k]) return;
-  tl.classList.remove('shake'); void tl.offsetWidth; tl.classList.add('shake');
+  /* v10.24: no shake on the canvas — on iPhone a moving canvas didn't repaint until the next tap */
   try{ navigator.vibrate && navigator.vibrate(25); }catch(e){}
-  if(ch.clips.length <= 1){ removeChannel(ch); showBubble('loop deleted', true); }
+  if(true){ removeChannel(ch); requestAnimationFrame(()=>drawAll()); showBubble('track deleted', true); }   /* v10.24: 3 taps = the WHOLE track, every clone */
   else { closeOptions(); ch.clips.splice(k, 1); if(sel.chId === ch.id) sel.clipIdx = -1; refreshTimeline(); drawAll(); if(isRunning) reschedule(); markDirty(); setTimeout(commit, 0); showBubble('clip deleted', true); }
 }
 function maybeTapHint(){ if(channels.length < 2) return; let seen = false; try{ seen = localStorage.getItem('tuner_tapHint2') === '1'; }catch(e){} if(seen) return; try{ localStorage.setItem('tuner_tapHint2','1'); }catch(e){} setTimeout(()=> showBubble('tap = select · <b>2</b> mute · <b>3</b> delete · hold = options', false, 6000), 400); }
@@ -1516,8 +1528,9 @@ function endPtr(e){
     if(pendingTap) clearTimeout(pendingTap.t);
     if(n === 1) selectChannel(ch.id, k);
     if(n >= 3){ pendingTap = null; tripleDelete(ch, k); }
-    else { pendingTap = { ch, k, n, t:setTimeout(()=>{ pendingTap = null; if(n === 2) toggleClipMute(ch, k); }, 260) }; }
+    else { pendingTap = { ch, k, n, t:setTimeout(()=>{ pendingTap = null; if(n === 2) toggleClipMute(ch, k); }, 330) }; }
   }
+  if(ht.kind === 'empty' || ht.kind === 'row'){ const now = performance.now(); emptyTaps = (now - emptyTapAt < 400) ? emptyTaps + 1 : 1; emptyTapAt = now; if(emptyTaps >= 3){ emptyTaps = 0; clearBoard(); return; } }
   else if(ht.kind === 'add'){ selectChannel(ht.ch.id); addClip(ht.ch); }
   else if(ht.kind === 'row'){ selectChannel(ht.ch.id); }
 }

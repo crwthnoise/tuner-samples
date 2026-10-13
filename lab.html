@@ -50,7 +50,7 @@ select{ flex:1; min-width:0; width:100%; text-overflow:ellipsis; height:36px; bo
 </div>
 
 <div class="z stage"><div id="card"></div></div>
-<div class="readout" id="readout">drag the module up / down · tap the switch = HOLD · double-tap = 0</div>
+<div class="readout" id="readout">drag up = more chops · PATTERN = next pattern</div>
 
 <div class="z" style="display:flex;flex-direction:column;gap:7px">
   <div class="row"><label>LOOP</label><select id="loopSel"></select></div>
@@ -63,15 +63,15 @@ select{ flex:1; min-width:0; width:100%; text-overflow:ellipsis; height:36px; bo
 <div class="note">LAB build <b id="ver"></b> · same sound code as the app</div>
 
 <script>
-const LAB_VERSION = 'lab-2';
+const LAB_VERSION = 'lab-3';
 document.getElementById('ver').textContent = LAB_VERSION;
 const $ = id=>document.getElementById(id);
 const ACC = '#e0a060', COLS = ['#e8dcc4','#e0a060','#c84a28','#8a5a30','#f2ede2','#b07840','#d8b880','#a03a20'];
 /* same hash as the worklet → the face shows exactly what you hear */
 function quipuHash(a, b, seed){ let h = Math.imul(a|0, 374761393) ^ Math.imul(b|0, 668265263) ^ Math.imul(seed|0, 2246822519); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
 
-const st = { amount:0.5, hold:false, slices:8, reroll:1, seed:1, wet:true, playing:false, bar:-1, slice:-1, heldKey:-1 };
-try{ const s = JSON.parse(localStorage.getItem('lab_quipu') || '{}'); Object.assign(st, s, { playing:false, bar:-1, slice:-1, heldKey:-1, slices:8, reroll:1 }); }catch(e){}   /* lab-2: kept simple — 8 slices, new set every bar */
+const st = { amount:0.5, hold:false, slices:8, reroll:0, seed:1, wet:true, playing:false, bar:-1, slice:-1, heldKey:-1 };
+try{ const s = JSON.parse(localStorage.getItem('lab_quipu') || '{}'); Object.assign(st, s, { playing:false, bar:-1, slice:-1, heldKey:-1, slices:8, reroll:0, hold:false }); }catch(e){}   /* lab-3: one fixed pattern, PATTERN button = next one — 8 slices, new set every bar */
 function save(){ try{ localStorage.setItem('lab_quipu', JSON.stringify({ amount:st.amount, hold:st.hold, slices:st.slices, reroll:st.reroll, seed:st.seed, wet:st.wet, loop:st.loop })); }catch(e){} }
 
 /* ---------- AUDIO ---------- */
@@ -115,8 +115,8 @@ function stopSrc(){ if(src){ try{ src.stop(); }catch(e){} try{ src.disconnect();
 function stop(){ stopSrc(); st.playing = false; st.bar = -1; st.slice = -1; $('play').classList.remove('on'); $('play').textContent = '▶'; $('barLcd').innerHTML = '—<i>BAR</i>'; draw(); }
 
 /* ---------- THE FACE (look v1: woven plate + hanging cords; knot on cord i = the slice that plays there) ---------- */
-function mapping(){ const S = st.slices, key = st.hold && st.heldKey >= 0 ? st.heldKey : Math.floor(Math.max(0, st.bar)/st.reroll); const m = [];
-  for(let i=0;i<S;i++){ const swap = st.bar >= 0 ? quipuHash(key*64 + i, 1, st.seed) < st.amount : quipuHash(i, 1, st.seed) < st.amount; const kk = st.bar >= 0 ? key*64 + i : i; m.push(swap ? Math.floor(quipuHash(kk, 2, st.seed)*S) : i); } return m; }
+function mapping(){ const S = st.slices, key = 0; const m = [];
+  for(let i=0;i<S;i++){ const swap = quipuHash(key*64 + i, 1, st.seed) < st.amount; const kk = key*64 + i; m.push(swap ? Math.floor(quipuHash(kk, 2, st.seed)*S) : i); } return m; }
 function draw(){ const S = st.slices, m = mapping(), W = 230, H = 300, top = 14, gap = (W - 20)/(S - 1);
   let svg = `<line x1="4" y1="${top}" x2="${W-4}" y2="${top}" stroke="${st.hold ? ACC : '#e8dcc4'}" stroke-width="${st.hold ? 5 : 3.5}" ${st.hold ? `style="filter:drop-shadow(0 0 6px ${ACC})"` : ''}/>`;
   for(let i=0;i<S;i++){ const x = 10 + i*gap, play = i === st.slice && st.playing; svg += `<path d="M${x} ${top} Q${x + (i%2 ? 2 : -2)} ${H*0.55} ${x} ${H-6}" fill="none" stroke="${play ? '#fff' : COLS[i%8]}" stroke-width="${play ? 3 : (S > 8 ? 1.6 : 2.2)}" opacity="${play ? 1 : .8}" ${play ? 'style="filter:drop-shadow(0 0 5px #fff)"' : ''}/>`; }
@@ -128,9 +128,9 @@ function draw(){ const S = st.slices, m = mapping(), W = 230, H = 300, top = 14,
     <div class="qplate">QUIPU</div>
     <div class="qzone"><div class="qscr"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg></div>
     <div class="qrail"><div class="qbead" style="bottom:calc(${st.amount*100}% - 4px)"></div></div></div>
-    <div class="qseat ${st.hold ? 'on' : ''}" id="seat"><i></i></div><div class="qsl ${st.hold ? 'on' : ''}">HOLD</div></div>`;
+    <div class="qpat" id="seat"><b>${st.seed}</b><span>PATTERN</span></div></div>`;
   if(st.bar >= 0) $('barLcd').innerHTML = (st.bar + 1) + '<i>BAR</i>'; }
-function renderReadout(){ $('readout').innerHTML = `QUIPU <b>${Math.round(st.amount*100)}%</b>${st.hold ? ' · <b>HOLD</b>' : ''}${st.wet ? '' : ' · <b>A = DRY</b>'}`; }
+function renderReadout(){ $('readout').innerHTML = `QUIPU <b>${Math.round(st.amount*100)}%</b> · pattern <b>${st.seed}</b>${st.wet ? '' : ' · <b>A = DRY</b>'}`; }
 
 /* card: drag = amount · tap the switch = HOLD · double-tap = 0 */
 let drag = null, lastTap = 0;
@@ -138,7 +138,7 @@ $('card').addEventListener('pointerdown', e=>{ e.preventDefault(); try{ $('card'
 $('card').addEventListener('pointermove', e=>{ if(!drag) return; const dy = e.clientY - drag.y0; if(!drag.moved && Math.abs(dy) < 4) return; drag.moved = true;
   st.amount = Math.min(1, Math.max(0, drag.v0 - dy/260)); applyParams(); draw(); renderReadout(); });
 const end = ()=>{ if(!drag) return; const d = drag; drag = null;
-  if(!d.moved){ if(d.seat){ st.hold = !st.hold; applyParams(); }
+  if(!d.moved){ if(d.seat){ st.seed = st.seed >= 99 ? 1 : st.seed + 1; applyParams(); }
     else { const t = performance.now(); if(t - lastTap < 320){ st.amount = 0; applyParams(); lastTap = 0; } else lastTap = t; } draw(); renderReadout(); }
   save(); };
 $('card').addEventListener('pointerup', end); $('card').addEventListener('pointercancel', end);
@@ -154,7 +154,7 @@ loadLib(); draw(); renderReadout();
 </script>
 <style>
 /* QUIPU face — look v1 (MOCKS/QUIPU_look_v1.png) */
-.qmod{ position:relative; width:250px; height:380px; border-radius:12px; border:1px solid #000; overflow:hidden; display:flex; flex-direction:column; align-items:center; padding:24px 0 12px;
+.qmod{ position:relative; width:250px; height:400px; border-radius:12px; border:1px solid #000; overflow:hidden; display:flex; flex-direction:column; align-items:center; padding:24px 0 12px;
   box-shadow:0 8px 18px #000,inset 0 1px 0 rgba(255,255,255,.1);
   background:repeating-linear-gradient(90deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px),linear-gradient(#2a1810 0 9%,#7a2a18 9% 11%,#2a1810 11% 86%,#7a2a18 86% 88%,#2a1810 88%); }
 .qmod::before,.qmod::after{ content:''; position:absolute; left:0; right:0; height:14px; background:conic-gradient(from 45deg at 50% 50%,#e0a060 0 25%,transparent 0 50%,#c84a28 0 75%,transparent 0) 0 0/14px 14px; opacity:.55; }
@@ -169,6 +169,10 @@ loadLib(); draw(); renderReadout();
 .qseat{ width:34px; height:34px; border-radius:50%; margin-top:9px; z-index:5; border:1px solid #3a2a18; background:#120a06; display:flex; align-items:center; justify-content:center; cursor:pointer; }
 .qseat i{ width:40%; height:40%; border-radius:50%; background:#2a1a10; }
 .qseat.on i{ background:var(--acc); box-shadow:0 0 12px var(--acc); }
+.qpat{ margin-top:8px; z-index:5; width:118px; height:46px; border-radius:9px; border:2px solid var(--acc); background:linear-gradient(#2a1a10,#140a06); box-shadow:0 0 12px #e0a06055,inset 0 1px 0 rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }
+.qpat b{ font:700 20px var(--mono); color:var(--acc); text-shadow:0 0 8px #e0a06088; min-width:26px; text-align:right; }
+.qpat span{ font:700 10px var(--mono); letter-spacing:.16em; color:#f2ede2; }
+.qpat:active{ transform:scale(.96); background:var(--acc); } .qpat:active b,.qpat:active span{ color:#1a0e06; }
 .qsl{ font:700 8px var(--mono); color:var(--acc); letter-spacing:.14em; margin-top:3px; z-index:5; opacity:.5; } .qsl.on{ opacity:1; }
 </style>
 </body></html>

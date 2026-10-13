@@ -12,7 +12,8 @@
 :root{ --void:#0a0804; --panel:#1a1612; --panel2:#2a2218; --red:#d32f2f; --green:#4fd1a5; --text:#f2ede2; --mute:#8a8176; --faint:#4a443d; --acc:#e0a060;
   --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --ui:'Jura','Arial Narrow',system-ui,sans-serif; color-scheme:dark; }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html,body{ margin:0; height:100%; background:var(--void); color:var(--text); font-family:var(--ui); overscroll-behavior:none; }
+html,body{ margin:0; height:100%; background:var(--void); color:var(--text); font-family:var(--ui); overscroll-behavior:none; touch-action:manipulation; overflow:hidden; }
+body{ position:fixed; inset:0; }   /* lab-4: the page never scrolls or zooms — sliding only moves the module */
 body{ display:flex; flex-direction:column; padding:calc(env(safe-area-inset-top,0px) + 10px) 16px calc(env(safe-area-inset-bottom,0px) + 12px); gap:10px; max-width:520px; margin:0 auto; user-select:none; -webkit-user-select:none; }
 .z{ position:relative; background:linear-gradient(#1c1a17,#0e0d0b); border-radius:10px; box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 10px #000; padding:10px 12px; }
 .top{ display:flex; align-items:center; gap:10px; }
@@ -21,7 +22,9 @@ body{ display:flex; flex-direction:column; padding:calc(env(safe-area-inset-top,
 .top h1 small{ display:block; font:300 9px var(--ui); letter-spacing:.5em; color:var(--mute); margin-top:2px; }
 .lcd{ background:#040605; border:2px solid #1a1a1a; border-radius:6px; padding:5px 8px; font:700 15px var(--mono); color:var(--green); text-shadow:0 0 6px #4fd1a588; min-width:60px; text-align:center; }
 .lcd i{ display:block; font:700 7px var(--mono); color:#2f7a60; letter-spacing:.2em; font-style:normal; text-shadow:none; }
-.stage{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:12px; }
+.stage{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:12px; touch-action:none; cursor:ns-resize; }
+#card{ width:calc(250px*var(--k,1)); height:calc(400px*var(--k,1)); flex:none; }
+#card .qmod{ transform:scale(var(--k,1)); transform-origin:top left; }
 #card{ touch-action:none; cursor:ns-resize; }
 .readout{ font:700 11px var(--mono); color:var(--mute); text-align:center; letter-spacing:.06em; min-height:14px; }
 .readout b{ color:var(--acc); }
@@ -49,7 +52,7 @@ select{ flex:1; min-width:0; width:100%; text-overflow:ellipsis; height:36px; bo
   <div class="lcd" id="barLcd">—<i>BAR</i></div>
 </div>
 
-<div class="z stage"><div id="card"></div></div>
+<div class="z stage" id="stage"><div id="card"></div></div>
 <div class="readout" id="readout">drag up = more chops · PATTERN = next pattern</div>
 
 <div class="z" style="display:flex;flex-direction:column;gap:7px">
@@ -63,7 +66,7 @@ select{ flex:1; min-width:0; width:100%; text-overflow:ellipsis; height:36px; bo
 <div class="note">LAB build <b id="ver"></b> · same sound code as the app</div>
 
 <script>
-const LAB_VERSION = 'lab-3';
+const LAB_VERSION = 'lab-4';
 document.getElementById('ver').textContent = LAB_VERSION;
 const $ = id=>document.getElementById(id);
 const ACC = '#e0a060', COLS = ['#e8dcc4','#e0a060','#c84a28','#8a5a30','#f2ede2','#b07840','#d8b880','#a03a20'];
@@ -128,20 +131,24 @@ function draw(){ const S = st.slices, m = mapping(), W = 230, H = 300, top = 14,
     <div class="qplate">QUIPU</div>
     <div class="qzone"><div class="qscr"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg></div>
     <div class="qrail"><div class="qbead" style="bottom:calc(${st.amount*100}% - 4px)"></div></div></div>
-    <div class="qpat" id="seat"><b>${st.seed}</b><span>PATTERN</span></div></div>`;
+    <div class="qpat" id="seat"><span>🎲 PATTERN</span></div></div>`;
   if(st.bar >= 0) $('barLcd').innerHTML = (st.bar + 1) + '<i>BAR</i>'; }
-function renderReadout(){ $('readout').innerHTML = `QUIPU <b>${Math.round(st.amount*100)}%</b> · pattern <b>${st.seed}</b>${st.wet ? '' : ' · <b>A = DRY</b>'}`; }
+function renderReadout(){ $('readout').innerHTML = `QUIPU <b>${Math.round(st.amount*100)}%</b>${st.wet ? '' : ' · <b>A = DRY</b>'}`; }
 
 /* card: drag = amount · tap the switch = HOLD · double-tap = 0 */
 let drag = null, lastTap = 0;
-$('card').addEventListener('pointerdown', e=>{ e.preventDefault(); try{ $('card').setPointerCapture(e.pointerId); }catch(_){} const onSeat = !!e.target.closest('#seat'); drag = { y0:e.clientY, v0:st.amount, moved:false, seat:onSeat }; });
-$('card').addEventListener('pointermove', e=>{ if(!drag) return; const dy = e.clientY - drag.y0; if(!drag.moved && Math.abs(dy) < 4) return; drag.moved = true;
+$('stage').addEventListener('pointerdown', e=>{ e.preventDefault(); try{ $('stage').setPointerCapture(e.pointerId); }catch(_){} const onSeat = !!e.target.closest('#seat'); drag = { y0:e.clientY, v0:st.amount, moved:false, seat:onSeat }; });
+$('stage').addEventListener('pointermove', e=>{ if(!drag) return; const dy = e.clientY - drag.y0; if(!drag.moved && Math.abs(dy) < 4) return; drag.moved = true;
   st.amount = Math.min(1, Math.max(0, drag.v0 - dy/260)); applyParams(); draw(); renderReadout(); });
 const end = ()=>{ if(!drag) return; const d = drag; drag = null;
-  if(!d.moved){ if(d.seat){ st.seed = st.seed >= 99 ? 1 : st.seed + 1; applyParams(); }
+  if(!d.moved){ if(d.seat){ let n; do{ n = 1 + Math.floor(Math.random()*100000); }while(n === st.seed); st.seed = n; applyParams(); }
     else { const t = performance.now(); if(t - lastTap < 320){ st.amount = 0; applyParams(); lastTap = 0; } else lastTap = t; } draw(); renderReadout(); }
   save(); };
-$('card').addEventListener('pointerup', end); $('card').addEventListener('pointercancel', end);
+$('stage').addEventListener('pointerup', end); $('stage').addEventListener('pointercancel', end);
+document.addEventListener('touchmove', e=>{ if(!e.target.closest('select')) e.preventDefault(); }, { passive:false });
+/* fit the module to the space so nothing hangs off the screen */
+function fit(){ const z = $('stage'), h = z.clientHeight - 24, w = z.clientWidth - 24; $('card').style.setProperty('--k', Math.min(1, h/400, w/250).toFixed(3)); }
+addEventListener('resize', fit); setTimeout(fit, 0);
 
 document.querySelectorAll('.seg[data-p]').forEach(g=>{ const p = g.dataset.p; g.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on', +b.dataset.v === st[p]);
   b.addEventListener('click', ()=>{ st[p] = +b.dataset.v; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x === b)); applyParams(); draw(); renderReadout(); save(); }); }); });
@@ -171,7 +178,7 @@ loadLib(); draw(); renderReadout();
 .qseat.on i{ background:var(--acc); box-shadow:0 0 12px var(--acc); }
 .qpat{ margin-top:8px; z-index:5; width:118px; height:46px; border-radius:9px; border:2px solid var(--acc); background:linear-gradient(#2a1a10,#140a06); box-shadow:0 0 12px #e0a06055,inset 0 1px 0 rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }
 .qpat b{ font:700 20px var(--mono); color:var(--acc); text-shadow:0 0 8px #e0a06088; min-width:26px; text-align:right; }
-.qpat span{ font:700 10px var(--mono); letter-spacing:.16em; color:#f2ede2; }
+.qpat span{ font:700 13px var(--mono); letter-spacing:.16em; color:#f2ede2; }
 .qpat:active{ transform:scale(.96); background:var(--acc); } .qpat:active b,.qpat:active span{ color:#1a0e06; }
 .qsl{ font:700 8px var(--mono); color:var(--acc); letter-spacing:.14em; margin-top:3px; z-index:5; opacity:.5; } .qsl.on{ opacity:1; }
 </style>

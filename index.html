@@ -242,7 +242,7 @@
   .lrow{ position:relative; height:46px; border-radius:8px; overflow:hidden; background:#0d0b09; border:1px solid var(--panel-2); display:flex; align-items:center; margin-bottom:5px; cursor:pointer; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:pan-y; }
   .lrow canvas{ position:absolute; left:0; top:0; width:calc(100% - 46px); height:100%; display:block; }
   .lrow .txt{ position:relative; flex:1; min-width:0; padding:0 10px; pointer-events:none; }
-  .lrow .nm{ font:700 11px var(--ui); letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 3px #000,0 0 6px #000; }
+  .lrow .nm{ font:700 8px var(--mono); letter-spacing:.06em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 3px #000,0 0 6px #000; }
   .lrow .meta{ font:500 8px var(--mono); color:var(--dim); margin-top:1px; text-shadow:0 1px 3px #000; white-space:nowrap; }
   .lrow .add{ position:relative; flex:none; width:46px; height:100%; border:none; border-left:1px solid var(--panel-2); background:linear-gradient(#272320,#121010); color:var(--text); font-size:22px; line-height:1; cursor:pointer; padding:0; }
   .lrow .add:active{ background:var(--red); color:var(--void); }
@@ -468,7 +468,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.24';
+const APP_VERSION = 'v10.25';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1088,7 +1088,7 @@ function renderLibrary(){
 function libRow(smp){
   const row = el('div','lrow' + (previewId===smp.id?' playing':'') + (libEdit===smp.id?' editing':'')); row.dataset.id = smp.id; row.dataset.k = 'LIB ROW';
   const cv = document.createElement('canvas');
-  const tx = el('div','txt'); const nm = el('div','nm'); nm.textContent = smp.displayName; const meta = el('div','meta'); meta.textContent = [(smp.bpm||'?') + ' BPM', smp.key, smp.buffer ? fmtLen(smp.buffer.duration) : null].filter(Boolean).join(' · '); tx.append(nm, meta);
+  const tx = el('div','txt'); const nm = el('div','nm'); nm.textContent = smp.displayName; const meta = el('div','meta'); const NU = (smp.displayName||'').toUpperCase(); meta.textContent = [ (smp.bpm && !NU.includes(String(smp.bpm))) ? smp.bpm + ' BPM' : null, (smp.key && !NU.includes(smp.key.replace(/min|maj/i,'').toUpperCase())) ? smp.key : null, smp.buffer ? fmtLen(smp.buffer.duration) : null].filter(Boolean).join(' · ');   /* v10.25: no repeats — BPM/key only when the name doesn't already say it */ tx.append(nm, meta);
   const add = el('button','add'); add.dataset.k = libShowHidden ? 'UNHIDE' : 'LIB +'; add.textContent = libShowHidden ? '↺' : '+'; add.title = libShowHidden ? 'back in the library' : 'add to track';
   add.addEventListener('click', e=>{ e.stopPropagation(); if(libShowHidden){ smp.hidden = false; saveSampleMeta(smp); setStatus(smp.displayName + ' is back'); renderLibrary(); return; } addChannelFromSample(smp); setStatus(smp.displayName + ' → track'); });
   add.addEventListener('pointerdown', e=>e.stopPropagation());

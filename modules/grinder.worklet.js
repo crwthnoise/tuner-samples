@@ -1,29 +1,48 @@
-/* GRINDER — pattern chopper + grit (THREAT TUNER module, CHOP) — LAB lab-16, sound first, look later.
+/* GRINDER — pattern chopper → RAGE → rhythm GATE (THREAT TUNER module, CHOP) — LAB lab-17, sound first, look later.
+   lab-17 (Alex 14 Oct): grit was too quiet → the moved pieces' grit is gone from here; the whole chop now goes through a real
+   RAGE inside GRINDER, then a beat GATE (hand-made 16-step patterns with fades) cuts it into a brand-new rhythm.
+   This file runs twice: mode 'chop' (before RAGE) and mode 'gate' (after RAGE).
+   --- lab-16 notes below ---
    Alex 14 Oct (option C): no dice. Hand-made chop patterns on 1/4 (or 1/8) pieces, like chopping on an MPC.
    Fader steps from the lightest pattern to the wildest — same every time. Every piece that MOVES also gets grit,
    and the grit gets dirtier as the fader goes up (starts from his RAGE taste: light drive, HARD clip, asym).
    Switch = FLIP: moved pieces play backwards.
    Timing comes from the loop itself (loop length in samples), so the chops can never drift off the audio. */
 const PAT4 = [ [0,1,2,2], [0,1,0,1], [0,0,2,3], [0,1,3,3], [0,0,2,2], [0,1,0,0], [0,0,0,3], [3,2,1,0] ];
+/* GATE patterns: 16 steps per bar, x = open, . = closed. Paired with the chop pattern (fader picks both). */
+const GATE = [ 'xxxxxxxxxxxxxxx.', 'xxx.xxx.xxx.xxxx', 'xx.xxx.xxx.xx.x.', 'x.xx.xx.x.xx.xx.',
+               'xx..xx..xx..x.x.', 'x..x..x.x..x..x.', 'x.x.x.x.xxxx.x.x', 'x...x.x..x..xx..' ].map(g=>g.split('').map(c=>c === 'x' ? 1 : 0));
 const PAT8 = [ [0,1,2,3,4,5,6,6], [0,1,2,3,4,5,4,5], [0,1,2,3,0,1,6,7], [0,0,2,3,4,4,6,7],
                [0,1,0,1,4,5,4,5], [0,0,2,2,4,4,6,6], [0,0,0,0,4,5,6,6], [6,7,6,7,0,0,0,0] ];
 class GrinderProcessor extends AudioWorkletProcessor {
   constructor(opt){ super(); this.b0 = null; this.b1 = null; this.len = 0; this.loopBeats = 4;
     this.t0 = 0; this.bs = 0.5; this.run = true; this.v = 0; this.sw = false;
     this.P = { sliceI:0, when:0, drv:6, clip:1, asym:.31, trim:1, fade:4 };
-    this.mix = 0; this.tick = 0;
-    const po = (opt && opt.processorOptions) || {}; this.msg(po);
+    this.mix = 0; this.tick = 0; this.mode = 'chop'; this.gEnv = 1;
+    this.G = { depth:1, att:3, rel:40 };
+    const po = (opt && opt.processorOptions) || {}; if(po.mode) this.mode = po.mode; this.msg(po);
     this.port.onmessage = e=>this.msg(e.data || {}); }
   msg(d){ ['t0','bs','v','loopBeats'].forEach(k=>{ if(d[k] != null) this[k] = +d[k]; }); if(d.sw != null) this.sw = !!d.sw;
     if(d.P) Object.assign(this.P, d.P); if(d.run != null) this.run = !!d.run;
-    if(d.ch0){ this.b0 = d.ch0; this.b1 = d.ch1 || d.ch0; this.len = this.b0.length; } }
+    if(d.G) Object.assign(this.G, d.G);
+    if(d.ch0){ this.b0 = d.ch0; this.b1 = d.ch1 || d.ch0; this.len = this.b0.length; } if(d.len) this.len = +d.len; }
+  /* GATE mode: open/close on the 16-step pattern, with attack/release fades = the rhythm + "fade" texture */
+  gate(ins, outs){ const out = outs[0], n = out[0].length, inp = ins[0] || [], i0 = inp[0], i1 = inp[1] || i0, sr = sampleRate, G = this.G;
+    const pi = this.run && this.len ? this.patIdx() : -1, g = pi >= 0 ? GATE[pi] : null, barLen = this.len*4/Math.max(1, this.loopBeats), stepN = barLen/16;
+    const aC = 1 - Math.exp(-1/(Math.max(.3, G.att)*.001*sr)), rC = 1 - Math.exp(-1/(Math.max(1, G.rel)*.001*sr));
+    for(let k=0;k<n;k++){ const tt = (currentFrame + k) - this.t0*sr; let tgt = 1;
+      if(g && tt >= 0){ const st = Math.floor((tt % barLen)/stepN) % 16; tgt = g[st] ? 1 : 1 - G.depth; }
+      this.gEnv += (tgt - this.gEnv)*(tgt > this.gEnv ? aC : rC);
+      out[0][k] = (i0 ? i0[k] : 0)*this.gEnv; if(out[1]) out[1][k] = (i1 ? i1[k] : 0)*this.gEnv; }
+    if(++this.tick % 24 === 0) this.port.postMessage({ gate:pi, gmap:g ? g.join('') : '' });
+    return true; }
   pats(){ return Math.round(this.P.sliceI) ? PAT8 : PAT4; }
   patIdx(){ return this.v > .04 ? Math.min(7, Math.floor((this.v - .04)/.96*8)) : -1; }
   /* grit: drive → clip (SOFT tanh / HARD) with a little asymmetry, DC removed, level pulled back so louder ≠ better */
   grit(x, d){ const P = this.P, b = P.asym*.5, c = Math.round(P.clip);
     const f = c ? (z=>z > 1 ? 1 : (z < -1 ? -1 : z)) : Math.tanh;
     return (f(x*d + b) - f(b))/Math.pow(d, .4)*P.trim; }
-  process(ins, outs){
+  process(ins, outs){ if(this.mode === 'gate') return this.gate(ins, outs);
     const out = outs[0], n = out[0].length, inp = ins[0] || [], i0 = inp[0], i1 = inp[1] || i0, sr = sampleRate, P = this.P;
     const pi = this.run && this.b0 ? this.patIdx() : -1, pats = this.pats(), pat = pi >= 0 ? pats[pi] : null, steps = pats[0].length;
     const beatsPerBar = 4, barLen = this.len*beatsPerBar/Math.max(1, this.loopBeats), sliceN = barLen/steps;
@@ -43,7 +62,7 @@ class GrinderProcessor extends AudioWorkletProcessor {
           const src = bar*barLen + j*sliceN + (this.sw ? sliceN - 1 - inS : inS), ip = Math.floor(src), fr = src - ip;
           const a = ((ip % this.len) + this.len) % this.len, b = (a + 1) % this.len;
           let r0 = this.b0[a] + (this.b0[b] - this.b0[a])*fr, r1 = this.b1[a] + (this.b1[b] - this.b1[a])*fr;
-          r0 = this.grit(r0, d); r1 = this.grit(r1, d);
+          
           const env = Math.min(1, inS/fadeN, (sliceN - inS)/fadeN)*this.mix;   /* fades at both edges = no clicks */
           y0 = x0*(1 - env) + r0*env; y1 = x1*(1 - env) + r1*env;
         }

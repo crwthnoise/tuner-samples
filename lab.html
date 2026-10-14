@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-/* MODULE LAB lab-13 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
+/* MODULE LAB lab-14 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
 :root{ --void:#0a0804; --red:#d32f2f; --green:#4fd1a5; --text:#f2ede2; --mute:#8a8176; --faint:#4a443d;
   --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --ui:'Jura','Arial Narrow',system-ui,sans-serif; color-scheme:dark; }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -43,7 +43,7 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 #play{ flex:none; width:88px; height:88px; border-radius:50%; border:3px solid var(--red); background:radial-gradient(circle,#2a2622,#0e0c0a 70%); box-shadow:0 0 18px #d32f2f55,inset 0 0 0 6px #0a0908; color:var(--text); font-size:30px; cursor:pointer; }
 .lb{ flex:none; width:44px; height:38px; font-size:15px; padding:0; }
 .note{ font:500 10px var(--mono); color:var(--faint); text-align:center; }
-/* CHAIN panel (lab-13) — for designing the sound: every unit + its live settings + meters. LAB only, never in the app. */
+/* CHAIN panel (lab-14) — for designing the sound: every unit + its live settings + meters. LAB only, never in the app. */
 #chain{ padding:6px 10px; font:500 10px var(--mono); }
 #chain h3{ margin:0; display:flex; align-items:center; gap:8px; font:700 10px var(--mono); letter-spacing:.2em; color:var(--mute); cursor:pointer; }
 #chain h3 span{ flex:1; }
@@ -70,6 +70,8 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 #favs:empty{ display:none; }
 #favs button{ height:28px; min-width:40px; padding:0 8px; border-radius:6px; border:1px solid #5a4a1a; background:#141210; color:#ffd34d; font:700 10px var(--mono); cursor:pointer; }
 #favs button.on{ background:#ffd34d; color:#000; border-color:#ffd34d; }
+#favs button.love{ border-color:#ff5a1f; color:#ff7a3d; }
+#favs button.love.on{ background:#ff5a1f; color:#000; }
 #favs button.x{ min-width:28px; border-color:#2a2724; color:var(--mute); }
 .un.chg b::after{ content:' •'; color:#ffb347; }
 .kn{ grid-column:2 / 4; display:none; flex-direction:column; gap:4px; padding:4px 0 6px; }
@@ -94,9 +96,9 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 .scr{ position:absolute; inset:0 10%; background:#040605; border:2px solid #1a1a1a; border-radius:3px; box-shadow:inset 0 0 14px #000; overflow:hidden; }
 svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 </style>
-<script src="modules/sky.js?v=lab-13"></script>
-<script src="modules/rage.js?v=lab-13"></script>
-<script src="modules/grinder.js?v=lab-13"></script>
+<script src="modules/sky.js?v=lab-14"></script>
+<script src="modules/rage.js?v=lab-14"></script>
+<script src="modules/grinder.js?v=lab-14"></script>
 </head><body>
 <div class="z top">
   <h1><b>THREAT</b> TUNER<small>MODULE LAB</small></h1>
@@ -105,14 +107,14 @@ svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 <div class="chips" id="chips"></div>
 <div class="z" id="band"><div class="ghost"></div><div class="ghost"></div><div id="slot"></div><div class="ghost"></div><div class="ghost"></div></div>
 <div class="readout" id="readout">drag up / down anywhere in the rack</div>
-<div class="z" id="chain"><h3 id="chainH"><span>🔧 CHAIN</span><em id="chainT">▾</em></h3><div id="meters"></div><div class="tools"><button id="pDice">🎲 ALL</button><button id="pReset">↺ RESET</button><button id="pSave">⭐ SAVE</button><button id="pCopy">📋 COPY</button></div><div id="favs"></div><div id="units"></div></div>
+<div class="z" id="chain"><h3 id="chainH"><span>🔧 CHAIN</span><em id="chainT">▾</em></h3><div id="meters"></div><div class="tools"><button id="pDice">🎲 ALL</button><button id="pReset">↺ RESET</button><button id="pSave">⭐ SAVE</button><button id="pCopy">📋 COPY ALL</button></div><div id="favs"></div><div id="units"></div></div>
 <div class="row"><label>LOOP</label><select id="loopSel"></select><button class="btn lb" id="lHide" aria-label="hide this loop">🚫</button><button class="btn lb" id="lNext" aria-label="next loop">⏭</button></div>
 <div class="dock">
   <button class="btn" id="ab">A/B</button>
   <button class="btn" id="sw">SWITCH</button>
   <button id="play" aria-label="play">▶</button>
 </div>
-<div class="note">lab-13 · module at real app size</div>
+<div class="note">lab-14 · module at real app size</div>
 <script>
 const $ = id=>document.getElementById(id);
 const clamp = (v,a,b)=>Math.min(b, Math.max(a, v));
@@ -157,7 +159,7 @@ function wake(){ /* called right inside the tap, before any await — phones onl
 async function boot(){ if(ready) return ready; ready = (async()=>{
   wake();
   const files = new Set(); ORDER.forEach(k=>(MODS[k].worklets||[]).forEach(f=>files.add(f)));
-  for(const f of files){ try{ await ctx.audioWorklet.addModule(f + '?v=lab-13'); }catch(e){ console.warn('worklet failed', f, e); } }   /* one bad file never kills PLAY */
+  for(const f of files){ try{ await ctx.audioWorklet.addModule(f + '?v=lab-14'); }catch(e){ console.warn('worklet failed', f, e); } }   /* one bad file never kills PLAY */
   dry = ctx.createGain(); wetBus = ctx.createGain(); const out = ctx.createGain(); out.gain.value = 0.85;
   dry.connect(out); wetBus.connect(out); out.connect(ctx.destination); an = ctx.createAnalyser(); an.fftSize = 512; wetBus.connect(an);
   ORDER.forEach(k=>{ try{ chain[k] = MODS[k].build(ctx, st); }catch(e){ console.warn('module failed', k, e); const g = ctx.createGain(); chain[k] = { in:g, out:g, set(){}, transport(){} }; } });
@@ -186,7 +188,7 @@ async function loadLib(){ try{ const r = await fetch('samples/index.json', { cac
   Object.keys(folders).sort().forEach(f=>{ const g = document.createElement('optgroup'); g.label = f; folders[f].forEach(k=>{ const o = document.createElement('option'); o.value = LIB[k].id; o.textContent = LIB[k].name + ' · ' + LIB[k].bpm; g.appendChild(o); }); sel.appendChild(g); });
   const pick = LIB.find(s=>s.id === st.loop) || LIB.find(s=>/drum/i.test(s.folder || '')) || LIB[0]; if(pick){ sel.value = pick.id; st.loop = pick.id; } }
 async function getBuffer(s){ if(s._buf) return s._buf; const r = await fetch('samples/' + s.file.split('/').map(encodeURIComponent).join('/')); const ab = await ctx.decodeAudioData(await r.arrayBuffer()); s._buf = trimLoop(s, ab); return s._buf; }
-/* lab-13 fix: every tap gets a ticket — if you tap again (or change loop) while one is still loading, the old one is cancelled.
+/* lab-14 fix: every tap gets a ticket — if you tap again (or change loop) while one is still loading, the old one is cancelled.
    Before, a second tap during loading started a 2nd copy that never stopped = the "tail" playing over the next loop. */
 let gen = 0, srcGain = null;
 async function start(){ const my = ++gen; $('play').textContent = '…';
@@ -273,25 +275,33 @@ $('units').addEventListener('input', e=>{ const k = e.target.dataset && e.target
 $('units').addEventListener('change', ()=>{ knobDrag = false; lastUnits = ''; });
 $('pDice').addEventListener('click', ()=>dice(null));
 $('pReset').addEventListener('click', ()=>resetP(null));
-/* ⭐ SAVE (lab-13): every roll you like goes in a list — tap ⭐1, ⭐2… to hear it again. Saved on this phone; 📋 COPY sends them all to chat. */
+/* ⭐ SAVE (lab-14): every roll you like goes in a list — tap ⭐1, ⭐2… to hear it again. Saved on this phone; 📋 COPY sends them all to chat. */
 let favOn = -1;
 const favKey = ()=>'labFav_' + st.mod;
 function getFavs(){ try{ return JSON.parse(localStorage.getItem(favKey()) || '[]'); }catch(e){ return []; } }
 function putFavs(a){ try{ localStorage.setItem(favKey(), JSON.stringify(a)); }catch(e){} }
-function drawFavs(){ const a = getFavs(); $('favs').innerHTML = a.map((f, i)=>`<button data-fav="${i}" class="${i === favOn ? 'on' : ''}">⭐${i + 1}</button>`).join('') + (favOn >= 0 && favOn < a.length ? `<button class="x" data-del="${favOn}">✕</button>` : ''); }
+function drawFavs(){ const a = getFavs(); $('favs').innerHTML = a.map((f, i)=>`<button data-fav="${i}" class="${(i === favOn ? 'on ' : '') + (f.love ? 'love' : '')}">${f.love ? '🔥' : '⭐'}${i + 1}</button>`).join('') + (favOn >= 0 && favOn < a.length ? `<button class="x" data-love="${favOn}">${a[favOn].love ? '⭐' : '🔥'}</button><button class="x" data-del="${favOn}">✕</button>` : ''); }
 $('pSave').addEventListener('click', ()=>{ const n = chain[st.mod] && chain[st.mod]._n; if(!n){ $('readout').textContent = 'press ▶ first'; return; }
   const a = getFavs(); a.push({ P:saveP(st.mod, n.P, M().params || []), v:+st.v[st.mod].toFixed(2), sw:!!st.sw[st.mod], t:Date.now() }); putFavs(a); favOn = a.length - 1; drawFavs();
   $('pSave').textContent = '⭐ ' + a.length + ' SAVED'; setTimeout(()=>{ $('pSave').textContent = '⭐ SAVE'; }, 1200); });
 $('favs').addEventListener('click', e=>{ const b = e.target.closest('button'); if(!b) return; const a = getFavs();
+  if(b.dataset.love != null){ const f = a[+b.dataset.love]; f.love = !f.love; putFavs(a); drawFavs(); return; }   /* 🔥 = the ones he likes most */
   if(b.dataset.del != null){ a.splice(+b.dataset.del, 1); putFavs(a); favOn = -1; drawFavs(); return; }
   const i = +b.dataset.fav, f = a[i], n = chain[st.mod] && chain[st.mod]._n; if(!f) return; if(!n){ $('readout').textContent = 'press ▶ first'; return; }
   (M().params || []).forEach(p=>{ n.P[p.k] = f.P[p.k] != null ? f.P[p.k] : p.def; }); st.v[st.mod] = f.v; st.sw[st.mod] = f.sw;
   pChanged(); favOn = i; draw(); readout(); save(); drawFavs(); });
-$('pCopy').addEventListener('click', async ()=>{ const n = chain[st.mod] && chain[st.mod]._n; const ch = n ? saveP(st.mod, n.P, M().params || []) : loadP(st.mod);
-  const favs = getFavs(), line = (P, v, sw)=>(Object.keys(P).length ? JSON.stringify(P) : 'all default') + ' · fader ' + Math.round(v*100) + '%' + (sw ? ' · ' + M().sw + ' on' : '');
-  const txt = st.mod + ' NOW (lab-13): ' + line(ch, st.v[st.mod], st.sw[st.mod]) + favs.map((f, i)=>'\n⭐' + (i + 1) + ': ' + line(f.P, f.v, f.sw)).join('');
-  try{ await navigator.clipboard.writeText(txt); $('pCopy').textContent = '✅ COPIED'; }catch(e){ prompt('copy this', txt); }
-  setTimeout(()=>{ $('pCopy').textContent = '📋 COPY'; }, 1500); });
+/* 📋 COPY ALL (lab-14): ONE paste = every module's knobs + every ⭐/🔥 save. Do it once at the end, not per preset. */
+$('pCopy').addEventListener('click', async ()=>{ const n = chain[st.mod] && chain[st.mod]._n; if(n) saveP(st.mod, n.P, M().params || []);
+  const rd = k=>{ try{ return JSON.parse(localStorage.getItem(k) || 'null'); }catch(e){ return null; } };
+  const out = ['TUNER LAB ALL (lab-14)'];
+  Object.keys(MODS).forEach(m=>{ const P = rd('labP_' + m) || {}, favs = rd('labFav_' + m) || [], sw = MODS[m].sw || 'switch';
+    if(!Object.keys(P).length && !favs.length) return;
+    const line = (P, v, s2)=>(Object.keys(P).length ? JSON.stringify(P) : 'default') + (v != null ? ' · fader ' + Math.round(v*100) + '%' : '') + (s2 ? ' · ' + sw + ' on' : '');
+    out.push(m + ' NOW: ' + line(P, st.v[m], st.sw[m]));
+    favs.forEach((f, i)=>out.push('  ' + (f.love ? '🔥' : '⭐') + (i + 1) + ': ' + line(f.P, f.v, f.sw))); });
+  const txt = out.length > 1 ? out.join('\n') : 'TUNER LAB ALL: nothing saved yet';
+  try{ await navigator.clipboard.writeText(txt); $('pCopy').textContent = '✅ COPIED ALL'; }catch(e){ prompt('copy this', txt); }
+  setTimeout(()=>{ $('pCopy').textContent = '📋 COPY ALL'; }, 1500); });
 let openNotes = {}; try{ openNotes = JSON.parse(localStorage.getItem('labNotes') || '{}'); }catch(e){}
 $('units').addEventListener('click', e=>{ const b = e.target.closest('button'); if(b){ if(b.dataset.dice) dice(b.dataset.dice); if(b.dataset.reset) resetP(b.dataset.reset); return; }
   if(e.target.closest('.kn')) return; const r = e.target.closest('.un'); if(!r || !r.dataset.u) return; openNotes[r.dataset.u] = !openNotes[r.dataset.u]; r.classList.toggle('open'); lastUnits = ''; try{ localStorage.setItem('labNotes', JSON.stringify(openNotes)); }catch(_){} });

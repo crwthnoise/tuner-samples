@@ -15,6 +15,8 @@
     name:'FLAME', acc:'#ff7a1a', screws:false, cat:'DRIVE',
     desc:'warmth and heat on anything', sw:'WIDE', swd:'spreads the hot top end (lows stay centred)',
     face:'linear-gradient(#2a1608,#120804)',
+    hero:[ { k:'warmG', l:'WARM' }, { k:'drvMax', l:'DRIVE' }, { k:'sizMix', l:'SIZZLE' }, { k:'gRat', l:'GLUE' } ],   /* the pop-up's big knobs; the rest sit under ▾ ALL */
+    look:'flame',
     worklets:['modules/rage.worklet.js'],   /* uses RAGE's level matcher */
     params:[
       { k:'warmF',  u:'WARM',   l:'low shelf',   min:60,  max:300,   def:140,  unit:'Hz', log:1 },
@@ -62,14 +64,16 @@
       n.apply = ()=>{ const P = n.P; n.warm.frequency.value = P.warmF; n.tape.frequency.value = P.tapeF; n.shape.curve = tapeCurve(P.asym);
         n.glue.threshold.value = P.gThr; n.glue.ratio.value = P.gRat; n.sHp.frequency.value = P.sizF; [n.wHp, n.wHp2].forEach(f=>f.frequency.value = P.wideF); };
       n.apply();
+      /* PLUGIN MODE: n._mode 'RISE' (default = fader brings everything up to the knobs) or 'MIX' (knobs at full, fader fades dry → wet) */
       n.set = (v, sw, now)=>{ const P = n.P, s = (p, x)=>{ if(now == null) p.value = x; else p.setTargetAtTime(x, now, 0.03); };
-        const x = Math.min(1, v/P.full), d = 1 + Math.pow(v, 1.3)*(P.drvMax - 1);
-        s(n.warm.gain, P.warmG*Math.min(1, v*1.5)); s(n.tape.gain, P.tapeG*v);
+        const mix = n._mode === 'MIX', u = mix ? 1 : v;   /* u = how hard the sound params go; v still sets the blend */
+        const x = mix ? v : Math.min(1, v/P.full), d = 1 + Math.pow(u, 1.3)*(P.drvMax - 1);
+        s(n.warm.gain, P.warmG*Math.min(1, u*1.5)); s(n.tape.gain, P.tapeG*u);
         s(n.drive.gain, d); s(n.trim.gain, 1/Math.sqrt(d));
-        s(n.sG.gain, P.sizMix*v); s(n.sDrv.gain, 2 + v*4);
+        s(n.sG.gain, P.sizMix*u); s(n.sDrv.gain, 2 + u*4);
         s(n.dry.gain, Math.cos(x*Math.PI/2)); s(n.wet.gain, Math.sin(x*Math.PI/2));
-        if(n.match) s(n.match.parameters.get('boost'), Math.pow(10, P.boost*v/20));
-        s(n.wG.gain, sw ? P.wide*(.4 + .6*v) : 0);
+        if(n.match) s(n.match.parameters.get('boost'), Math.pow(10, P.boost*u/20));
+        s(n.wG.gain, sw ? P.wide*(.4 + .6*u) : 0);
         n._v = v; n._sw = !!sw; };
       n.taps = { WARMED:n.glue, SIZZLE:n.sG, FLAME:n.wet, WIDE:n.wG, OUT:n.out };
       n.info = ()=>{ const P = n.P, v = n._v || 0, x = Math.min(1, v/P.full), d = 1 + Math.pow(v, 1.3)*(P.drvMax - 1), hz = f=>f >= 1000 ? (f/1000).toFixed(1) + 'k' : Math.round(f) + '';

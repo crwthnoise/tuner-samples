@@ -95,6 +95,28 @@
   :root[data-season="storm"] .info.loop{ color:var(--red-hi); text-shadow:0 0 6px var(--red-hi), 0 0 14px rgba(var(--red-hi-rgb),.45); }
   #thickTip{ position:fixed; z-index:29; max-width:min(240px,70vw); display:flex; align-items:flex-start; gap:8px; padding:7px 8px 7px 10px; background:#0a0908; border:1px solid var(--a,#888); border-radius:6px; box-shadow:0 6px 16px #000, 0 0 10px color-mix(in srgb, var(--a,#888) 35%, transparent); font:500 11px/1.35 var(--mono); color:#d8d2c6; opacity:0; transform:translateY(4px); pointer-events:none; transition:opacity .15s, transform .15s; }
   #thickTip.on{ opacity:1; transform:none; pointer-events:auto; }
+
+  /* v10.34 PLUGIN MODE pop-up: tap a module → a small panel flips up on top of it, styled like that module */
+  #plug{ position:fixed; z-index:30; width:214px; padding:26px 8px 10px; border-radius:6px; background:linear-gradient(#2a1608,#120804); border:1px solid #000; box-shadow:0 0 0 1.5px var(--a), 0 10px 24px #000, 0 0 22px color-mix(in srgb, var(--a) 40%, transparent); opacity:0; transform:translateY(8px) scale(.96); transform-origin:50% 100%; pointer-events:none; transition:opacity .16s, transform .16s; font-family:var(--mono); color:#c9a27a; user-select:none; -webkit-user-select:none; touch-action:none; }
+  #plug.on{ opacity:1; transform:none; pointer-events:auto; }
+  #plug .pt{ position:absolute; left:12px; top:7px; font:700 9px var(--mono); letter-spacing:1px; padding:2px 6px; border-radius:2px; background:var(--a); color:#111; }
+  #plug .px{ position:absolute; right:8px; top:4px; border:0; background:none; color:#8a847a; font:700 14px var(--mono); padding:2px 4px; }
+  #plug .tail{ position:absolute; bottom:-6px; width:10px; height:10px; background:var(--a); transform:rotate(45deg); }
+  #plug .pdsc{ font:700 8px var(--mono); color:var(--a); background:#0a0503; border-radius:2px; padding:3px 5px; margin-bottom:8px; box-shadow:inset 0 0 0 1px #3a2412; min-height:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #plug .kr{ display:flex; justify-content:space-between; padding:0 2px; }
+  #plug .kn{ width:38px; text-align:center; font:700 7px var(--mono); letter-spacing:.5px; touch-action:none; cursor:ns-resize; }
+  #plug .kn b{ display:block; width:38px; height:38px; margin:0 0 3px; border-radius:50%; background:radial-gradient(circle at 38% 32%,#e8e2d8,#8a847a 55%,#3a3630); box-shadow:0 3px 5px #000,0 0 0 2px #050403; position:relative; transform:rotate(var(--r,0deg)); }
+  #plug .kn b:after{ content:""; position:absolute; left:50%; top:3px; width:2px; height:12px; background:var(--a); margin-left:-1px; }
+  #plug .kn.you b{ box-shadow:0 3px 5px #000,0 0 0 2px var(--a); }
+  #plug .br{ display:flex; align-items:center; justify-content:space-between; margin-top:9px; }
+  #plug .tog{ display:flex; border-radius:11px; background:#0c0b0a; box-shadow:inset 0 2px 3px #000,0 0 0 1px #3a3630; font:700 8px var(--mono); overflow:hidden; }
+  #plug .tog span{ padding:7px 8px; color:#6a645c; } #plug .tog .on{ background:var(--a); color:#111; }
+  #plug .bt{ white-space:nowrap; font:700 8px var(--mono); letter-spacing:.5px; color:var(--a); padding:8px 4px; } #plug .bt.dim{ color:#8a847a; }
+  #plug .all{ display:none; margin-top:6px; max-height:24vh; overflow:auto; touch-action:pan-y; border-top:1px solid #3a2412; padding-top:6px; }
+  #plug.open .all{ display:block; }
+  #plug .all .g{ font:700 7px var(--mono); letter-spacing:1px; color:var(--a); margin:6px 0 2px; }
+  #plug .all .r{ display:flex; align-items:center; gap:6px; font:700 7px var(--mono); } #plug .all .r span{ width:62px; flex:none; } #plug .all .r em{ width:44px; text-align:right; font-style:normal; color:#8a847a; }
+  #plug .all input{ flex:1; min-width:0; height:26px; accent-color:var(--a); }
   #thickTip b{ color:var(--a); font-weight:700; }
   #thickTip button{ flex:none; border:0; background:none; color:#8a847a; font:700 13px var(--mono); padding:0 2px; line-height:1; cursor:pointer; }
   .info.mq{ text-overflow:clip; color:var(--text); text-align:left; }
@@ -488,6 +510,7 @@
 </div>
 
 <div class="ask" id="ask"><div class="ask-card"><p id="askTxt"></p><div><button class="btn-ghost" id="askNo">NO</button><button class="btn-primary" id="askYes">YES</button></div></div></div>
+<div id="plug"></div>
 <div id="thickTip"><span id="thickTipT"></span><button id="thickTipX" aria-label="close">✕</button></div>
 <div class="bubble" id="bubble"><span id="bubbleTxt"></span><button id="bubbleUndo">↶ UNDO</button><button id="bubbleRedo">↷ REDO</button></div>
 <audio id="unlockAudio" playsinline style="display:none"></audio>
@@ -496,14 +519,14 @@ window.__tunerEarly = []; window.__tunerBar = function(m){ try{ var b = document
 window.addEventListener('error', function(e){ var m = (e.message || 'error') + (e.lineno ? ' @' + e.lineno : ''); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' + (e.reason && e.reason.message || e.reason); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 </script>
-<script src="modules/sky.js?v=10.33"></script>
-<script src="modules/rage.js?v=10.33"></script>
-<script src="modules/grinder.js?v=10.33"></script>
-<script src="modules/flame.js?v=10.33"></script>
+<script src="modules/sky.js?v=10.34"></script>
+<script src="modules/rage.js?v=10.34"></script>
+<script src="modules/grinder.js?v=10.34"></script>
+<script src="modules/flame.js?v=10.34"></script>
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.33';
+const APP_VERSION = 'v10.34';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -573,7 +596,7 @@ function scheduleAutosave(){ if(!currentProjectId && !channels.length) return; i
 async function saveSampleAudio(sample, arrayBuf, mime){ const payload = { name:sample.name, mime:mime||'audio/wav', bpm:sample.bpm, key:sample.key }; if(Store.mode === 'idb') payload.buf = arrayBuf; else payload.base64 = abToB64(arrayBuf); await Store.set('sample:'+sample.id, payload); }
 function clearChannels(){ stopSources(); channels.forEach(ch=>{ try{ ch.gainNode.disconnect(); if(ch.tuneNodes) ch.tuneNodes.out.disconnect(); }catch(e){} }); channels = []; sidechainTrigger = null; closeOptions(); }
 async function getProjectIndex(){ if(Store.mode==='none') return []; const idx = await Store.get('projects'); return Array.isArray(idx) ? idx : []; }
-function channelMeta(){ return channels.map(ch=>({ id:ch.id, sampleId:ch.sample.id, clips:ch.clips.map(c=>({start:c.start,len:c.len,off:c.off,mute:!!c.mute})), volume:ch.volume, filterVal:ch.filterVal, pitchSemitones:ch.pitchSemitones, scTrigger:ch.scTrigger, scDuck:ch.scDuck, mute:!!ch.mute, fx:ch.fx.slice(), sw:Object.assign({}, ch.sw), rack:ch.rack.slice(), qSeed:ch.qSeed, keyLock:!!ch.keyLock })); }
+function channelMeta(){ return channels.map(ch=>({ id:ch.id, sampleId:ch.sample.id, clips:ch.clips.map(c=>({start:c.start,len:c.len,off:c.off,mute:!!c.mute})), volume:ch.volume, filterVal:ch.filterVal, pitchSemitones:ch.pitchSemitones, scTrigger:ch.scTrigger, scDuck:ch.scDuck, mute:!!ch.mute, fx:ch.fx.slice(), sw:Object.assign({}, ch.sw), rack:ch.rack.slice(), qSeed:ch.qSeed, keyLock:!!ch.keyLock, mp:JSON.parse(JSON.stringify(ch.mp||{})), mm:Object.assign({}, ch.mm) })); }
 function settingsMeta(){ return { songKey:songKeyState, bpm, zoomX, zoomY, master:masterGain.gain.value, limiterOn, sc:{ depth:scDepth, thr:scThreshold, rel:scRelease, curve:scCurve } }; }
 function buildProjectPayload(name, forceB64){
   const usedIds = [...new Set(channels.map(c=>c.sample.id))], sampleList = [];
@@ -1298,9 +1321,14 @@ function tuneParams(v, sw){ // one place for every number → live and export ma
     thDry:1 - th*0.5, thWet:th, thDrive:1 + th*14*push, thThr:-th*26*(push > 1 ? 1.25 : 1), thRatio:1 + th*5, thTrim:1 - th*0.2,
   };
 }
+/* v10.34 PLUGIN MODE: a module's own knobs. ch.mp[MOD] = knobs you touched (rest stay magic) · ch.mm[MOD] = 'RISE' | 'MIX'. Untouched modules are never changed. */
+function plugApply(m, k, mp, mm){ const o = mp && mp[k], mode = (mm && mm[k]) || 'RISE', T = window.TUNER_MODS && TUNER_MODS[k]; if(!T || !T.params || !m.P) return;
+  const touched = !!(o && Object.keys(o).length) || mode !== 'RISE'; if(!touched && m._pk === undefined) return;
+  const key = mode + '|' + JSON.stringify(o || {}); if(m._pk === key) return; m._pk = key;
+  T.params.forEach(p=>{ m.P[p.k] = (o && o[p.k] != null) ? o[p.k] : p.def; }); m._mode = mode; if(m.apply) m.apply(); }
 function setTune(n, v, ac, now, sw){ const p = tuneParams(v, sw); n.half = p.half; const set = (param, val)=>{ if(now == null) param.value = val; else param.setTargetAtTime(val, now, 0.03); };
   if(n.sky) n.sky.set((v && v[FX_SLOTS.indexOf('SKY')]) || 0, !!(sw && sw.SKY), now);
-  if(n.lab) LAB_MODS.forEach(k=>{ const m = n.lab[k]; if(m && !m._fake) m.set((v && v[FX_SLOTS.indexOf(k)]) || 0, !!(sw && sw[k]), now); });
+  if(n.lab) LAB_MODS.forEach(k=>{ const m = n.lab[k]; if(m && !m._fake){ plugApply(m, k, n._mp, n._mm); m.set((v && v[FX_SLOTS.indexOf(k)]) || 0, !!(sw && sw[k]), now); } });
   if(n.quipu && n.quipu.parameters){ const qa = n.quipu.parameters.get('amount'); if(qa) set(qa, (v && v[FX_SLOTS.indexOf('QUIPU')]) || 0); }
   set(n.wDirect.gain, p.wDirect); set(n.wHi.gain, p.wHi); set(n.mlG.gain, p.mlG); set(n.sub.frequency, p.subF); set(n.unAir.gain, p.unAir); set(n.flHp.frequency, p.flHp); set(n.neCrOn.gain, p.crush ? 1 : 0); set(n.neCrOff.gain, p.crush ? 0 : 1);
   set(n.gLL.gain, p.gLL); set(n.gRL.gain, p.gRL); set(n.gLR.gain, p.gLR); set(n.gRR.gain, p.gRR); set(n.haasL.gain, p.haasL); set(n.haasR.gain, p.haasR);
@@ -1311,7 +1339,7 @@ function setTune(n, v, ac, now, sw){ const p = tuneParams(v, sw); n.half = p.hal
   set(n.flMud.gain, p.flMud); set(n.flLow.gain, p.flLow);
   set(n.neDry.gain, p.neDry); set(n.neWet.gain, p.neWet); set(n.neLp.frequency, p.neLp); set(n.neHp.frequency, p.neHp);
   set(n.thDry.gain, p.thDry); set(n.thWet.gain, p.thWet); set(n.thDrive.gain, p.thDrive); set(n.thComp.threshold, p.thThr); set(n.thComp.ratio, p.thRatio); set(n.thTrim.gain, p.thTrim); }
-function applyTune(ch){ if(ch.tuneNodes) setTune(ch.tuneNodes, ch.fx, ctx, ctx.currentTime, ch.sw); }
+function applyTune(ch){ if(ch.tuneNodes){ ch.tuneNodes._mp = ch.mp; ch.tuneNodes._mm = ch.mm; } if(ch.tuneNodes) setTune(ch.tuneNodes, ch.fx, ctx, ctx.currentTime, ch.sw); }
 async function addChannelFromSample(sample, opts={}){
   if(!sample.buffer){ setStatus('loading ' + sample.displayName + '…'); await ensureLoaded(sample); if(!sample.buffer) return; }
   const gainNode = ctx.createGain(); gainNode.gain.value = 0;
@@ -1320,11 +1348,11 @@ async function addChannelFromSample(sample, opts={}){
   const rack0 = migrateRack(opts.rack, sample, opts.fx); const tuneNodes = buildTune(ctx, rack0);
   gainNode.connect(lp); lp.connect(hp); hp.connect(tuneNodes.in); tuneNodes.out.connect(masterGain);
   const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; gainNode.connect(analyser);
-  const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, fx:migrateFx(opts.fx), sw:migrateSw(opts.sw), rack:rack0, qSeed:opts.qSeed || newQuipuSeed(), keyLock:!!opts.keyLock, tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
+  const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, fx:migrateFx(opts.fx), sw:migrateSw(opts.sw), rack:rack0, qSeed:opts.qSeed || newQuipuSeed(), keyLock:!!opts.keyLock, mp:(opts.mp && typeof opts.mp === 'object') ? JSON.parse(JSON.stringify(opts.mp)) : {}, mm:Object.assign({}, opts.mm), tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
   if(!channels.length && !restoring && !opts.quiet && sample.bpm && sample.bpm !== bpm){ bpm = sample.bpm; $('bpmInput').value = bpm; renderBpm(); }   /* first loop sets the song BPM */
   rebuildBuffer(ch);
   if(ch.scTrigger){ channels.forEach(c=>c.scTrigger=false); sidechainTrigger = ch; }
-  channels.push(ch); applyFilter(ch); setTune(tuneNodes, ch.fx, ctx, null, ch.sw); syncQuipu(ch, quipuT0()); refreshTimeline(); if(!restoring) maybeTapHint();
+  channels.push(ch); applyFilter(ch); tuneNodes._mp = ch.mp; tuneNodes._mm = ch.mm; setTune(tuneNodes, ch.fx, ctx, null, ch.sw); syncQuipu(ch, quipuT0()); refreshTimeline(); if(!restoring) maybeTapHint();
   if(!opts.quiet){ markDirty(); commit(); }
   if(isRunning && !restoring) reschedule();
   if(!restoring){ scrollToRow(channels.length-1); if(!opts.quiet){ selectChannel(ch.id); zoomToFit(); } }
@@ -1664,7 +1692,7 @@ async function renderArrangementOffline(sampleRate){
     if(isSilent(ch) || !ch.clips.length) return;
     const g = offline.createGain(); const lp = offline.createBiquadFilter(); lp.type='lowpass'; lp.Q.value=0.7; const hp = offline.createBiquadFilter(); hp.type='highpass'; hp.Q.value=0.7;
     if(ch.filterVal<0){ lp.Q.value = filterQ(ch); lp.frequency.value=20000-(Math.abs(ch.filterVal)/100)*19700; hp.frequency.value=20; } else { hp.frequency.value=20+(ch.filterVal/100)*3000; lp.frequency.value=20000; if(ch.filterVal>0) hp.Q.value = filterQ(ch); }
-    const oTune = buildTune(offline, ch.rack, quipuOpts(ch, 0)); setTune(oTune, ch.fx, offline, null, ch.sw); { const gr = oTune.lab && oTune.lab.GRINDER; if(gr && !gr._fake) gr.transport({ t0:0, bs, loopBeats: loopBeats(ch.sample), reset:true }, ch.buffer); } g.connect(lp); lp.connect(hp); hp.connect(oTune.in); oTune.out.connect(oMaster);
+    const oTune = buildTune(offline, ch.rack, quipuOpts(ch, 0)); oTune._mp = ch.mp; oTune._mm = ch.mm; setTune(oTune, ch.fx, offline, null, ch.sw); { const gr = oTune.lab && oTune.lab.GRINDER; if(gr && !gr._fake) gr.transport({ t0:0, bs, loopBeats: loopBeats(ch.sample), reset:true }, ch.buffer); } g.connect(lp); lp.connect(hp); hp.connect(oTune.in); oTune.out.connect(oMaster);
     const rate = playRate(ch), dur = ch.buffer.duration;
     ch.clips.forEach(c=>{ if(c.mute) return; const src = offline.createBufferSource(); src.buffer = ch.buffer; src.loop = true; src.detune.value = chPitch(ch)*100; src.connect(g); src.start(c.start*bs, (c.off*bs*rate) % dur); src.stop((c.start+c.len)*bs); });
     const ducks = ch.scDuck && sidechainTrigger && ch !== sidechainTrigger;
@@ -1799,14 +1827,46 @@ function layoutRack(){ const box = $('rack'); const W = box.clientWidth; if(!W) 
 /* TAP (no drag) = card · TAP the little switch = ON/OFF · DRAG = tune · DOUBLE-TAP = default */
 let thickIdx = -1, cardTimer = 0;
 function thickDesc(){ const m = RACK[thickIdx], ch = selCh(); if(!m) return ''; const info = MOD_INFO[m.n]; return m.n + ' — ' + info.d + (info.s ? ' · ' + info.s + (swGet(m, ch) ? ' ON' : ' OFF') : ''); }
-function showTip(){ const t = $('thickTip'); if(thickIdx < 0){ t.classList.remove('on'); return; } const m = RACK[thickIdx], ch = selCh(), info = MOD_INFO[m.n]; t.style.setProperty('--a', m.acc);
+function showTip(){ const t = $('thickTip'); if(thickIdx < 0){ t.classList.remove('on'); $('plug').classList.remove('on'); return; } const m = RACK[thickIdx], ch = selCh(), info = MOD_INFO[m.n]; if(window.TUNER_MODS && TUNER_MODS[m.n] && TUNER_MODS[m.n].hero && ch && ch.tuneNodes && ch.tuneNodes.lab && ch.tuneNodes.lab[m.n] && !ch.tuneNodes.lab[m.n]._fake){ t.classList.remove('on'); showPlug(m, ch); return; } $('plug').classList.remove('on'); t.style.setProperty('--a', m.acc);
   $('thickTipT').innerHTML = `<b>${m.n}</b> ${info.d}` + (info.s ? `<br><b>${info.s}</b> ${info.sd}` : '');
   setTimeout(()=>{ if(thickIdx < 0) return; const r = rackEls[thickIdx].getBoundingClientRect(), tw = t.offsetWidth, th = t.offsetHeight; t.style.left = clamp(r.left + r.width/2 - tw/2, 8, innerWidth - tw - 8) + 'px'; t.style.top = Math.max(8, r.top - th - 8) + 'px'; t.classList.add('on'); }, 210); }
 $('thickTipX').addEventListener('click', e=>{ e.stopPropagation(); $('thickTip').classList.remove('on'); });
+
+/* ---- v10.34 PLUGIN pop-up ---- */
+let plugAll = false; try{ plugAll = localStorage.getItem('tuner_plugAll') === '1'; }catch(e){}
+function plugDef(T, k){ return T.params.find(p=>p.k === k); }
+function plugVal(ch, mn, T, k){ const o = ch.mp && ch.mp[mn]; return (o && o[k] != null) ? o[k] : plugDef(T, k).def; }
+function plugNorm(p, v){ return p.log ? Math.log(v/p.min)/Math.log(p.max/p.min) : (v - p.min)/(p.max - p.min); }
+function plugDen(p, t){ t = clamp(t, 0, 1); let v = p.log ? p.min*Math.pow(p.max/p.min, t) : p.min + t*(p.max - p.min); if(p.step) v = Math.round(v/p.step)*p.step; return v; }
+function plugFmt(p, v){ if(p.names) return p.names[Math.round(v)]; const a = Math.abs(v); return (a >= 1000 ? (v/1000).toFixed(1) + 'k' : a >= 100 ? Math.round(v) : a >= 10 ? v.toFixed(1) : v.toFixed(2)) + (p.unit ? ' ' + p.unit : ''); }
+function plugSet(ch, mn, k, v){ ch.mp = ch.mp || {}; (ch.mp[mn] = ch.mp[mn] || {})[k] = v; applyTune(ch); markDirty(); commit(); }
+function showPlug(m, ch){ const T = TUNER_MODS[m.n], box = $('plug'), n = m.n; box.style.setProperty('--a', m.acc); box.className = (plugAll ? 'open ' : '') + (T.look || '');
+  const mode = () => (ch.mm && ch.mm[n]) || 'RISE', yours = () => !!(ch.mp && ch.mp[n] && Object.keys(ch.mp[n]).length);
+  const lcd = () => '<div class="pdsc" id="plcd">' + MOD_INFO[n].d + '</div>';
+  const knobs = () => T.hero.map(h=>{ const p = plugDef(T, h.k), t = plugNorm(p, plugVal(ch, n, T, h.k)); const you = ch.mp && ch.mp[n] && ch.mp[n][h.k] != null; return `<div class="kn${you ? ' you' : ''}" data-pk="${h.k}" data-k="plug-${n}-${h.k}"><b style="--r:${(-135 + 270*clamp(t,0,1)).toFixed(0)}deg"></b>${h.l}</div>`; }).join('');
+  const rows = () => { const g = {}; T.params.forEach(p=>{ (g[p.u] = g[p.u] || []).push(p); }); return Object.keys(g).map(u=>`<div class="g">${u}</div>` + g[u].map(p=>`<div class="r"><span>${p.l}</span><input type="range" min="0" max="1000" value="${Math.round(1000*clamp(plugNorm(p, plugVal(ch, n, T, p.k)),0,1))}" data-rk="${p.k}" data-k="plug-${n}-all-${p.k}"><em>${plugFmt(p, plugVal(ch, n, T, p.k))}</em></div>`).join('')).join(''); };
+  box.innerHTML = '<span class="pt">' + n + '</span><button class="px" id="plugX" aria-label="close">✕</button>' + lcd() + '<div class="kr">' + knobs() + '</div><div class="br"><div class="tog" id="ptog" data-k="plug-' + n + '-mode"><span class="' + (mode() === 'RISE' ? 'on' : '') + '">RISE</span><span class="' + (mode() === 'MIX' ? 'on' : '') + '">MIX</span></div><span class="bt" id="pall" data-k="plug-' + n + '-all">▾ ALL ' + T.params.length + '</span><span class="bt dim" id="pback" data-k="plug-' + n + '-reset">↺ MAGIC</span></div><div class="all" id="pallbox">' + rows() + '</div><i class="tail"></i>';
+  const place = () => { const r = rackEls[thickIdx] && rackEls[thickIdx].getBoundingClientRect(); if(!r) return; const w = box.offsetWidth, h = box.offsetHeight; const l = clamp(r.left + r.width/2 - w/2, 6, innerWidth - w - 6); box.style.left = l + 'px'; box.style.top = Math.max(6, r.top - h - 12) + 'px'; box.querySelector('.tail').style.left = clamp(r.left + r.width/2 - l - 5, 8, w - 18) + 'px'; };
+  const redraw = () => { box.querySelector('.kr').innerHTML = knobs(); box.querySelectorAll('.tog span').forEach((s,i)=>s.classList.toggle('on', (i === 0) === (mode() === 'RISE'))); box.querySelector('#pallbox').innerHTML = rows(); };
+  const lcdSay = t => { const e = $('plcd'); if(e) e.textContent = t; };
+  /* knob = drag up/down (no shortcuts) · double-tap = back to magic for that knob */
+  let kd = null, lastK = 0, lastKt = 0;
+  box.querySelector('.kr').onpointerdown = e => { const kn = e.target.closest('.kn'); if(!kn) return; e.preventDefault(); const k = kn.dataset.pk, p = plugDef(T, k); const now = Date.now();
+    if(lastK === k && now - lastKt < 350){ if(ch.mp[n]){ delete ch.mp[n][k]; } applyTune(ch); markDirty(); commit(); redraw(); lcdSay(p.l + ' back to magic'); lastKt = 0; return; } lastK = k; lastKt = now;
+    try{ kn.setPointerCapture(e.pointerId); }catch(_){} kd = { k, p, y0:e.clientY, t0:plugNorm(p, plugVal(ch, n, T, k)), kn }; };
+  box.querySelector('.kr').onpointermove = e => { if(!kd) return; const t = clamp(kd.t0 - (e.clientY - kd.y0)/140, 0, 1), v = plugDen(kd.p, t); plugSet(ch, n, kd.k, v); kd.kn.classList.add('you'); kd.kn.querySelector('b').style.setProperty('--r', (-135 + 270*t).toFixed(0) + 'deg'); lcdSay(kd.p.l + ' ' + plugFmt(kd.p, v)); };
+  box.querySelector('.kr').onpointerup = box.querySelector('.kr').onpointercancel = () => { if(kd){ const k = kd.k; kd = null; redraw(); } };
+  box.querySelector('#ptog').onclick = e => { const s = e.target.closest('span'); if(!s) return; ch.mm = ch.mm || {}; ch.mm[n] = s.textContent; applyTune(ch); markDirty(); commit(); redraw(); lcdSay(n + ' · ' + s.textContent + (s.textContent === 'RISE' ? ': fader brings it all up' : ': your sound, fader fades dry → wet')); };
+  box.querySelector('#pall').onclick = () => { plugAll = !plugAll; try{ localStorage.setItem('tuner_plugAll', plugAll ? '1' : '0'); }catch(_){} box.classList.toggle('open', plugAll); place(); };
+  box.querySelector('#pback').onclick = () => { if(ch.mp) delete ch.mp[n]; if(ch.mm) delete ch.mm[n]; applyTune(ch); markDirty(); commit(); redraw(); lcdSay(n + ' back to magic'); };
+  box.querySelector('#plugX').onclick = () => closeThick();
+  box.querySelector('#pallbox').oninput = e => { const r = e.target.closest('input'); if(!r) return; const p = plugDef(T, r.dataset.rk), v = plugDen(p, r.value/1000); plugSet(ch, n, p.k, v); r.nextElementSibling.textContent = plugFmt(p, v); lcdSay(p.l + ' ' + plugFmt(p, v)); };
+  box.querySelector('#pallbox').onchange = () => { box.querySelector('.kr').innerHTML = knobs(); };
+  setTimeout(()=>{ if(thickIdx < 0) return; place(); box.classList.add('on'); }, 210); }
 function openThick(i){ const prev = thickIdx; thickIdx = i; if(prev >= 0) drawModule(prev); drawModule(i); layoutRack(); renderInfo(); showTip(); }
-function closeThick(){ clearTimeout(cardTimer); $('thickTip').classList.remove('on'); if(thickIdx < 0) return; const i = thickIdx; thickIdx = -1; drawModule(i); layoutRack(); renderInfo(); }
+function closeThick(){ clearTimeout(cardTimer); $('thickTip').classList.remove('on'); $('plug').classList.remove('on'); if(thickIdx < 0) return; const i = thickIdx; thickIdx = -1; drawModule(i); layoutRack(); renderInfo(); }
 document.addEventListener('pointerdown', e=>{
-  if(thickIdx >= 0 && !(rackEls[thickIdx] && rackEls[thickIdx].contains(e.target)) && !e.target.closest('.rk-m') && !e.target.closest('#thickTip')) closeThick();
+  if(thickIdx >= 0 && !(rackEls[thickIdx] && rackEls[thickIdx].contains(e.target)) && !e.target.closest('.rk-m') && !e.target.closest('#thickTip') && !e.target.closest('#plug')) closeThick();
   if(vzBig && !e.target.closest('#vizZone')) setVizBig(false);
   if($('addSheet').classList.contains('open') && !e.target.closest('#addSheet') && !e.target.closest('.rk-add') && !e.target.closest('.rk-m')) closeAdd();
 }, true);

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-/* MODULE LAB lab-19 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
+/* MODULE LAB lab-20 — the module at its REAL app size, one loop, A/B. Sound code = modules/*.js (same files the app uses). */
 :root{ --void:#0a0804; --red:#d32f2f; --green:#4fd1a5; --text:#f2ede2; --mute:#8a8176; --faint:#4a443d;
   --mono:'JetBrains Mono',ui-monospace,Menlo,monospace; --ui:'Jura','Arial Narrow',system-ui,sans-serif; color-scheme:dark; }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -43,7 +43,22 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 #play{ flex:none; width:88px; height:88px; border-radius:50%; border:3px solid var(--red); background:radial-gradient(circle,#2a2622,#0e0c0a 70%); box-shadow:0 0 18px #d32f2f55,inset 0 0 0 6px #0a0908; color:var(--text); font-size:30px; cursor:pointer; }
 .lb{ flex:none; width:44px; height:38px; font-size:15px; padding:0; }
 .note{ font:500 10px var(--mono); color:var(--faint); text-align:center; }
-/* CHAIN panel (lab-19) — for designing the sound: every unit + its live settings + meters. LAB only, never in the app. */
+/* 🎛 PLUGIN (lab-20) — what USERS will see when they tap a module: 3 big knobs + RISE/MIX. Drag a knob up/down. */
+#plug{ padding:8px 10px; display:none; }
+#plug.has{ display:block; }
+#plug .ph{ display:flex; align-items:center; gap:6px; font:700 10px var(--mono); letter-spacing:.2em; color:var(--mute); }
+#plug .ph span{ flex:1; }
+#plug .ph b{ color:#000; background:var(--a); border-radius:4px; padding:2px 6px; letter-spacing:.1em; font-size:9px; }
+#plug .ph button{ height:26px; padding:0 9px; border-radius:6px; border:1px solid #2a2724; background:#141210; color:var(--mute); font:700 10px var(--mono); letter-spacing:.08em; cursor:pointer; }
+#plug .ph button.on{ color:#000; background:var(--a); border-color:var(--a); }
+#knobs{ display:flex; justify-content:space-around; margin-top:8px; }
+.knob{ display:flex; flex-direction:column; align-items:center; gap:4px; touch-action:none; cursor:ns-resize; user-select:none; -webkit-user-select:none; }
+.knob .dial{ width:62px; height:62px; border-radius:50%; background:conic-gradient(from 225deg, var(--a) calc(var(--p)*270deg), #2a2622 0 270deg, transparent 0); display:grid; place-items:center; }
+.knob .dial i{ width:48px; height:48px; border-radius:50%; background:radial-gradient(circle at 40% 35%,#2e2a26,#0e0c0a); box-shadow:inset 0 0 0 2px #000; position:relative; transform:rotate(calc(-135deg + var(--p)*270deg)); }
+.knob .dial i:after{ content:''; position:absolute; left:50%; top:5px; width:3px; height:12px; margin-left:-1.5px; border-radius:2px; background:var(--text); }
+.knob label{ font:700 10px var(--mono); letter-spacing:.14em; color:var(--text); }
+.knob em{ font:500 9px var(--mono); color:var(--mute); font-style:normal; }
+/* CHAIN panel (lab-20) — for designing the sound: every unit + its live settings + meters. LAB only, never in the app. */
 #chain{ padding:6px 10px; font:500 10px var(--mono); }
 #chain h3{ margin:0; display:flex; align-items:center; gap:8px; font:700 10px var(--mono); letter-spacing:.2em; color:var(--mute); cursor:pointer; }
 #chain h3 span{ flex:1; }
@@ -96,11 +111,11 @@ select{ flex:1; min-width:0; width:100%; height:38px; border-radius:7px; border:
 .scr{ position:absolute; inset:0 10%; background:#040605; border:2px solid #1a1a1a; border-radius:3px; box-shadow:inset 0 0 14px #000; overflow:hidden; }
 svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 </style>
-<script src="modules/sky.js?v=lab-19"></script>
-<script src="modules/rage.js?v=lab-19"></script>
-<script src="modules/grinder.js?v=lab-19"></script>
-<script src="modules/flame.js?v=lab-19"></script>
-<script src="modules/brick.js?v=lab-19"></script>
+<script src="modules/sky.js?v=lab-20"></script>
+<script src="modules/rage.js?v=lab-20"></script>
+<script src="modules/grinder.js?v=lab-20"></script>
+<script src="modules/flame.js?v=lab-20"></script>
+<script src="modules/brick.js?v=lab-20"></script>
 </head><body>
 <div class="z top">
   <h1><b>THREAT</b> TUNER<small>MODULE LAB</small></h1>
@@ -109,6 +124,7 @@ svg.f{ position:absolute; inset:0; width:100%; height:100%; }
 <div class="chips" id="chips"></div>
 <div class="z" id="band"><div class="ghost"></div><div class="ghost"></div><div id="slot"></div><div class="ghost"></div><div class="ghost"></div></div>
 <div class="readout" id="readout">drag up / down anywhere in the rack</div>
+<div class="z" id="plug"><div class="ph"><span>🎛 PLUGIN</span><b id="yours">YOURS</b><button id="mRise">RISE</button><button id="mMix">MIX</button><button id="mBack">↺</button></div><div id="knobs"></div></div>
 <div class="z" id="chain"><h3 id="chainH"><span>🔧 CHAIN</span><em id="chainT">▾</em></h3><div id="meters"></div><div class="tools"><button id="pDice">🎲 ALL</button><button id="pReset">↺ RESET</button><button id="pSave">⭐ SAVE</button><button id="pCopy">📋 COPY ALL</button></div><div id="favs"></div><div id="units"></div></div>
 <div class="row"><label>LOOP</label><select id="loopSel"></select><button class="btn lb" id="lHide" aria-label="hide this loop">🚫</button><button class="btn lb" id="lNext" aria-label="next loop">⏭</button></div>
 <div class="dock">
@@ -116,7 +132,7 @@ svg.f{ position:absolute; inset:0; width:100%; height:100%; }
   <button class="btn" id="sw">SWITCH</button>
   <button id="play" aria-label="play">▶</button>
 </div>
-<div class="note">lab-19 · module at real app size</div>
+<div class="note">lab-20 · module at real app size</div>
 <script>
 const $ = id=>document.getElementById(id);
 const clamp = (v,a,b)=>Math.min(b, Math.max(a, v));
@@ -142,7 +158,11 @@ const MODS = {
   SKY: Object.assign({}, window.TUNER_MODS.SKY, { build(ac){ const n = window.TUNER_MODS.SKY.build(ac); return { in:n.in, out:n.out, set(v, sw){ n.set(v, sw, ac.currentTime); } }; } }),
   RAGE: Object.assign({}, window.TUNER_MODS.RAGE, { build(ac){ const n = window.TUNER_MODS.RAGE.build(ac, loadP('RAGE')); return { _n:n, in:n.in, out:n.out, set(v, sw){ n.set(v, sw, ac.currentTime); } }; } }),
   FLAME: Object.assign({}, window.TUNER_MODS.FLAME, { build(ac){ const n = window.TUNER_MODS.FLAME.build(ac, loadP('FLAME')); return { _n:n, in:n.in, out:n.out, set(v, sw){ n.set(v, sw, ac.currentTime); } }; } }),
-  BRICK: Object.assign({}, window.TUNER_MODS.BRICK, { build(ac){ const n = window.TUNER_MODS.BRICK.build(ac, loadP('BRICK')); return { _n:n, in:n.in, out:n.out, set(v, sw){ n.set(v, sw, ac.currentTime); } }; } }),
+  BRICK: Object.assign({}, window.TUNER_MODS.BRICK, { build(ac){ const n = window.TUNER_MODS.BRICK.build(ac, loadP('BRICK')), G = v=>{ const g = ac.createGain(); g.gain.value = v; return g; }, w = { in:G(1), out:G(1), d:G(0), e:G(1) };
+    w.in.connect(n.in); n.out.connect(w.e); w.e.connect(w.out); w.in.connect(w.d); w.d.connect(w.out);
+    /* RISE (or untouched) = the fader drives everything up to the knobs · MIX = their sound at full, fader just fades dry → wet */
+    return { _n:n, in:w.in, out:w.out, set(v, sw){ const t = ac.currentTime, mix = plugMode('BRICK') === 'MIX';
+      n.set(mix ? 1 : v, sw, t); w.d.gain.setTargetAtTime(mix ? Math.cos(v*Math.PI/2) : 0, t, 0.02); w.e.gain.setTargetAtTime(mix ? Math.sin(v*Math.PI/2) : 1, t, 0.02); } }; } }),
   GRINDER: Object.assign({}, window.TUNER_MODS.GRINDER, { build(ac){ const n = window.TUNER_MODS.GRINDER.build(ac, loadP('GRINDER')); return { _n:n, in:n.in, out:n.out, set(v, sw){ n.set(v, sw); }, transport:n.transport }; } }),
 };
 const ORDER = ['QUIPU','SKY','RAGE','GRINDER','FLAME','BRICK'];
@@ -163,7 +183,7 @@ function wake(){ /* called right inside the tap, before any await — phones onl
 async function boot(){ if(ready) return ready; ready = (async()=>{
   wake();
   const files = new Set(); ORDER.forEach(k=>(MODS[k].worklets||[]).forEach(f=>files.add(f)));
-  for(const f of files){ try{ await ctx.audioWorklet.addModule(f + '?v=lab-19'); }catch(e){ console.warn('worklet failed', f, e); } }   /* one bad file never kills PLAY */
+  for(const f of files){ try{ await ctx.audioWorklet.addModule(f + '?v=lab-20'); }catch(e){ console.warn('worklet failed', f, e); } }   /* one bad file never kills PLAY */
   dry = ctx.createGain(); wetBus = ctx.createGain(); const out = ctx.createGain(); out.gain.value = 0.85;
   dry.connect(out); wetBus.connect(out); out.connect(ctx.destination); an = ctx.createAnalyser(); an.fftSize = 512; wetBus.connect(an);
   ORDER.forEach(k=>{ try{ chain[k] = MODS[k].build(ctx, st); }catch(e){ console.warn('module failed', k, e); const g = ctx.createGain(); chain[k] = { in:g, out:g, set(){}, transport(){} }; } });
@@ -192,7 +212,7 @@ async function loadLib(){ try{ const r = await fetch('samples/index.json', { cac
   Object.keys(folders).sort().forEach(f=>{ const g = document.createElement('optgroup'); g.label = f; folders[f].forEach(k=>{ const o = document.createElement('option'); o.value = LIB[k].id; o.textContent = LIB[k].name + ' · ' + LIB[k].bpm; g.appendChild(o); }); sel.appendChild(g); });
   const pick = LIB.find(s=>s.id === st.loop) || LIB.find(s=>/drum/i.test(s.folder || '')) || LIB[0]; if(pick){ sel.value = pick.id; st.loop = pick.id; } }
 async function getBuffer(s){ if(s._buf) return s._buf; const r = await fetch('samples/' + s.file.split('/').map(encodeURIComponent).join('/')); const ab = await ctx.decodeAudioData(await r.arrayBuffer()); s._buf = trimLoop(s, ab); return s._buf; }
-/* lab-19 fix: every tap gets a ticket — if you tap again (or change loop) while one is still loading, the old one is cancelled.
+/* lab-20 fix: every tap gets a ticket — if you tap again (or change loop) while one is still loading, the old one is cancelled.
    Before, a second tap during loading started a 2nd copy that never stopped = the "tail" playing over the next loop. */
 let gen = 0, srcGain = null;
 async function start(){ const my = ++gen; $('play').textContent = '…';
@@ -219,7 +239,7 @@ function draw(){ const m = M(), v = st.v[st.mod], on = !!st.sw[st.mod];
   $('slot').innerHTML = `<div class="mod slot" style="background:${m.face}">${m.screws ? SCREWS : ''}<div class="plate" style="background:${m.acc};color:#000">${m.name}</div><div class="zone">${m.g(clamp(v,0,1), st, chain[st.mod] && chain[st.mod]._n)}</div><div class="sw2${on ? ' on' : ''}" style="--a:${m.acc}"><i></i></div></div>`;
   $('sw').textContent = m.sw || 'SWITCH'; $('sw').classList.toggle('on', !m.oneShot && on); }
 function readout(){ const m = M(); $('readout').innerHTML = `${m.name} <b>${Math.round(st.v[st.mod]*100)}%</b>` + (!m.oneShot && st.sw[st.mod] ? ` · <b>${m.sw}</b>` : '') + (st.wet ? '' : ' · A = DRY'); }
-function chips(){ $('chips').innerHTML = ''; ORDER.forEach(k=>{ const b = document.createElement('button'); b.textContent = k; b.style.setProperty('--a', MODS[k].acc); b.className = st.mod === k ? 'on' : ''; b.addEventListener('click', ()=>{ st.mod = k; favOn = -1; chips(); route(); draw(); readout(); save(); chainShow(); drawFavs(); }); $('chips').appendChild(b); }); }
+function chips(){ $('chips').innerHTML = ''; ORDER.forEach(k=>{ const b = document.createElement('button'); b.textContent = k; b.style.setProperty('--a', MODS[k].acc); b.className = st.mod === k ? 'on' : ''; b.addEventListener('click', ()=>{ st.mod = k; favOn = -1; chips(); route(); draw(); readout(); save(); chainShow(); drawFavs(); drawPlug(); }); $('chips').appendChild(b); }); }
 
 /* drag anywhere in the rack band = the fader (no scrolling, no zoom) */
 let drag = null;
@@ -270,16 +290,16 @@ let lastUnits = '', knobDrag = false;
 const toPos = (p, v)=>p.log ? Math.log(v/p.min)/Math.log(p.max/p.min) : (v - p.min)/(p.max - p.min);
 const fromPos = (p, x)=>{ let v = p.log ? p.min*Math.pow(p.max/p.min, x) : p.min + x*(p.max - p.min); if(p.step) v = Math.round(v/p.step)*p.step; return v; };
 function fmtP(p, v){ if(p.names) return p.names[Math.round(v)]; if(p.unit === '%') return Math.round(v*100) + '%'; if(p.unit === 'Hz') return v >= 1000 ? (v/1000).toFixed(2) + 'k' : Math.round(v) + ''; return (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(2)) + (p.unit && p.unit !== 'Hz' ? ' ' + p.unit : ''); }
-function pChanged(){ favOn = -1; drawFavs && drawFavs(); const n = chain[st.mod] && chain[st.mod]._n; if(!n) return; n.apply && n.apply(); apply(); saveP(st.mod, n.P, M().params || []); lastUnits = ''; }
+function pChanged(){ favOn = -1; drawFavs && drawFavs(); typeof drawPlug === 'function' && setTimeout(drawPlug); const n = chain[st.mod] && chain[st.mod]._n; if(!n) return; n.apply && n.apply(); apply(); saveP(st.mod, n.P, M().params || []); lastUnits = ''; }
 function dice(unit){ const n = chain[st.mod] && chain[st.mod]._n; if(!n){ $('readout').textContent = 'press ▶ first'; return; }
   (M().params || []).filter(p=>!unit || p.u === unit).forEach(p=>{ n.P[p.k] = fromPos(p, Math.random()); }); pChanged(); }
 function resetP(unit){ const n = chain[st.mod] && chain[st.mod]._n; if(!n) return; (M().params || []).filter(p=>!unit || p.u === unit).forEach(p=>{ n.P[p.k] = p.def; }); pChanged(); }
 $('units').addEventListener('input', e=>{ const k = e.target.dataset && e.target.dataset.k; if(!k) return; const n = chain[st.mod]._n, p = M().params.find(q=>q.k === k);
-  knobDrag = true; if(favOn >= 0){ favOn = -1; drawFavs(); } n.P[k] = fromPos(p, e.target.value/1000); $('kv_' + k).textContent = fmtP(p, n.P[k]); n.apply && n.apply(); apply(); saveP(st.mod, n.P, M().params); });
+  knobDrag = true; if(favOn >= 0){ favOn = -1; drawFavs(); } n.P[k] = fromPos(p, e.target.value/1000); $('kv_' + k).textContent = fmtP(p, n.P[k]); n.apply && n.apply(); apply(); saveP(st.mod, n.P, M().params); drawPlug(); });
 $('units').addEventListener('change', ()=>{ knobDrag = false; lastUnits = ''; });
 $('pDice').addEventListener('click', ()=>dice(null));
 $('pReset').addEventListener('click', ()=>resetP(null));
-/* ⭐ SAVE (lab-19): every roll you like goes in a list — tap ⭐1, ⭐2… to hear it again. Saved on this phone; 📋 COPY sends them all to chat. */
+/* ⭐ SAVE (lab-20): every roll you like goes in a list — tap ⭐1, ⭐2… to hear it again. Saved on this phone; 📋 COPY sends them all to chat. */
 let favOn = -1;
 const favKey = ()=>'labFav_' + st.mod;
 function getFavs(){ try{ return JSON.parse(localStorage.getItem(favKey()) || '[]'); }catch(e){ return []; } }
@@ -294,10 +314,10 @@ $('favs').addEventListener('click', e=>{ const b = e.target.closest('button'); i
   const i = +b.dataset.fav, f = a[i], n = chain[st.mod] && chain[st.mod]._n; if(!f) return; if(!n){ $('readout').textContent = 'press ▶ first'; return; }
   (M().params || []).forEach(p=>{ n.P[p.k] = f.P[p.k] != null ? f.P[p.k] : p.def; }); st.v[st.mod] = f.v; st.sw[st.mod] = f.sw;
   pChanged(); favOn = i; draw(); readout(); save(); drawFavs(); });
-/* 📋 COPY ALL (lab-19): ONE paste = every module's knobs + every ⭐/🔥 save. Do it once at the end, not per preset. */
+/* 📋 COPY ALL (lab-20): ONE paste = every module's knobs + every ⭐/🔥 save. Do it once at the end, not per preset. */
 $('pCopy').addEventListener('click', async ()=>{ const n = chain[st.mod] && chain[st.mod]._n; if(n) saveP(st.mod, n.P, M().params || []);
   const rd = k=>{ try{ return JSON.parse(localStorage.getItem(k) || 'null'); }catch(e){ return null; } };
-  const out = ['TUNER LAB ALL (lab-19)'];
+  const out = ['TUNER LAB ALL (lab-20)'];
   Object.keys(MODS).forEach(m=>{ const P = rd('labP_' + m) || {}, favs = rd('labFav_' + m) || [], sw = MODS[m].sw || 'switch';
     if(!Object.keys(P).length && !favs.length) return;
     const line = (P, v, s2)=>(Object.keys(P).length ? JSON.stringify(P) : 'default') + (v != null ? ' · fader ' + Math.round(v*100) + '%' : '') + (s2 ? ' · ' + sw + ' on' : '');
@@ -319,6 +339,27 @@ const mBuf = new Float32Array(1024); let lastInfo = 0;
 /* quiet click counter (build rule): what gets tapped most → goes front in the redesign */
 document.addEventListener('click', e=>{ const b = e.target.closest('button,select,.un'); if(!b) return; const k = b.id || (b.dataset && (b.dataset.u || (b.dataset.fav != null ? 'fav' : b.dataset.dice ? 'dice:' + b.dataset.dice : ''))) || b.textContent.trim().slice(0, 12);
   try{ const c = JSON.parse(localStorage.getItem('labClicks') || '{}'); c[k] = (c[k] || 0) + 1; localStorage.setItem('labClicks', JSON.stringify(c)); }catch(_){} }, true);
-layout(); chips(); draw(); readout(); loadLib(); chainShow(); drawFavs();
+/* ---------- 🎛 PLUGIN (lab-20): the user view. Untouched = fader does the magic. Touch a knob = YOURS: the fader now RISES to your knobs (or MIX: dry → your sound). ---------- */
+function plugMode(k){ try{ return localStorage.getItem('labMode_' + k) || 'RISE'; }catch(e){ return 'RISE'; } }
+function setMode(k, m){ try{ localStorage.setItem('labMode_' + k, m); }catch(e){} }
+function curP(){ const n = chain[st.mod] && chain[st.mod]._n; if(n) return n.P; const P = {}; (M().params || []).forEach(p=>P[p.k] = p.def); return Object.assign(P, loadP(st.mod)); }
+function isYours(){ const P = curP(); return (M().hero || []).some(k=>{ const p = M().params.find(q=>q.k === k); return Math.abs(P[k] - p.def) > 1e-9; }); }
+function drawPlug(){ const m = M(), el = $('plug'); el.classList.toggle('has', !!m.hero); if(!m.hero) return; el.style.setProperty('--a', m.acc);
+  const P = curP(), mode = plugMode(st.mod), y = isYours();
+  $('yours').style.display = y ? '' : 'none'; $('mRise').className = mode === 'RISE' ? 'on' : ''; $('mMix').className = mode === 'MIX' ? 'on' : '';
+  $('knobs').innerHTML = m.hero.map(k=>{ const p = m.params.find(q=>q.k === k); return `<div class="knob" data-k="${k}" style="--p:${toPos(p, P[k]).toFixed(3)}"><div class="dial"><i></i></div><label>${p.hl || p.u}</label><em>${fmtP(p, P[k])}</em></div>`; }).join(''); }
+function setHero(k, x){ const p = M().params.find(q=>q.k === k), n = chain[st.mod] && chain[st.mod]._n, v = fromPos(p, clamp(x, 0, 1));
+  if(n){ n.P[k] = v; n.apply && n.apply(); apply(); saveP(st.mod, n.P, M().params); } else { const P = curP(); P[k] = v; saveP(st.mod, P, M().params); }
+  favOn = -1; drawFavs(); lastUnits = ''; drawPlug(); }
+let kDrag = null;
+$('knobs').addEventListener('pointerdown', e=>{ const kb = e.target.closest('.knob'); if(!kb) return; e.preventDefault(); const k = kb.dataset.k, p = M().params.find(q=>q.k === k);
+  kDrag = { k, y:e.clientY, x0:toPos(p, curP()[k]) }; try{ kb.setPointerCapture(e.pointerId); }catch(er){} });
+$('knobs').addEventListener('pointermove', e=>{ if(!kDrag) return; setHero(kDrag.k, kDrag.x0 + (kDrag.y - e.clientY)/220); });
+['pointerup','pointercancel'].forEach(t=>$('knobs').addEventListener(t, ()=>{ kDrag = null; }));
+$('mRise').addEventListener('click', ()=>{ setMode(st.mod, 'RISE'); apply(); drawPlug(); });
+$('mMix').addEventListener('click', ()=>{ setMode(st.mod, 'MIX'); apply(); drawPlug(); });
+$('mBack').addEventListener('click', ()=>{ const n = chain[st.mod] && chain[st.mod]._n, P = curP(); (M().hero || []).forEach(k=>{ P[k] = M().params.find(q=>q.k === k).def; });
+  if(n){ n.apply && n.apply(); apply(); } saveP(st.mod, P, M().params); lastUnits = ''; drawPlug(); });
+layout(); chips(); draw(); readout(); loadLib(); chainShow(); drawFavs(); drawPlug();
 </script>
 </body></html>

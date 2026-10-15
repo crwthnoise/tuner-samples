@@ -1,6 +1,6 @@
-/* BRICK — CRUDE (THREAT TUNER module, DRIVE). LAB lab-19: SOUND FIRST — look gets redone after.
+/* BRICK — CRUDE (THREAT TUNER module, DRIVE). LAB lab-20: SOUND FIRST — look gets redone after.
    Alex 14 Oct: "crude = brick" → one brutal hard clip. No level match, no polish: louder + flatter, like slamming a channel into the red.
-   Fader = how hard you slam it. Hero knobs (PLUGIN MODE): CLIP · TONE · MIX. Switch = TWICE: a second clipper right after the first = even flatter, more crunch.
+   Fader = how hard you slam it. Hero knobs (PLUGIN MODE): CLIP · TONE · EDGE — the fader RISES to them (or MIX mode = dry → their sound). Switch = TWICE: a second clipper right after the first = even flatter, more crunch.
    Chain: TONE tilt (pre, 0 = untouched) → DRIVE 1→30x → HARD CLIP (flat top, tiny knee) → [TWICE: +6 dB → clip again] → CEILING → MIX */
 (function(){
   const curves = new Map();
@@ -13,14 +13,13 @@
     name:'BRICK', acc:'#d63a2a', screws:true, cat:'DRIVE',
     desc:'slam it into the red', sw:'TWICE', swd:'clips it a second time — flatter, harder',
     face:'linear-gradient(#2a0d0a,#120504)',
-    hero:['drvMax','tone','mix'],   /* PLUGIN MODE: the 3 knobs users see (CLIP · TONE · MIX) */
+    hero:['drvMax','tone','knee'],   /* PLUGIN MODE: the 3 knobs users see (CLIP · TONE · EDGE) */
     params:[
-      { k:'drvMax', u:'CLIP',  l:'max slam',     min:2,   max:60,  def:30,  unit:'x', log:1 },
-      { k:'knee',   u:'CLIP',  l:'corner',       min:0,   max:.4,  def:.03 },
-      { k:'tone',   u:'TONE',  l:'dark ← → bright', min:-9, max:9, def:0,   unit:'dB' },
+      { k:'drvMax', u:'CLIP', hl:'CLIP', l:'max slam',     min:2,   max:60,  def:30,  unit:'x', log:1 },
+      { k:'knee',   u:'CLIP', hl:'EDGE', l:'corner (0 = brick)',       min:0,   max:.4,  def:.03 },
+      { k:'tone',   u:'TONE', hl:'TONE', l:'dark ← → bright', min:-9, max:9, def:0,   unit:'dB' },
       { k:'ceil',   u:'CEILING', l:'output',     min:-6,  max:0,   def:-.5, unit:'dB' },
       { k:'full',   u:'MIX',   l:'full brick at', min:.05, max:1,  def:.2,  unit:'%' },
-      { k:'mix',    u:'MIX',   l:'wet',          min:0,   max:1,   def:1,   unit:'%' },
     ],
     /* placeholder face: a red wall that gets flatter-topped as you slam it */
     g(v, st){ const w = st && st.sw && st.sw.BRICK, top = 150 - v*120, rows = [];
@@ -42,17 +41,17 @@
       n.apply = ()=>{ const P = n.P, c = clipCurve(P.knee); n.clip.curve = c; n.clip2.curve = c; n._toneSet = null; if(n._v != null) n.set(n._v, n._sw); };
       n.apply();
       n.set = (v, sw, now)=>{ const P = n.P, s = (p, x)=>{ if(now == null) p.value = x; else p.setTargetAtTime(x, now, 0.02); };
-        const d = 1 + Math.pow(v, 1.2)*(P.drvMax - 1), x = Math.min(1, v/P.full)*P.mix;
-        s(n.lo.gain, -P.tone/2); s(n.hi.gain, P.tone/2);
+        const d = 1 + Math.pow(v, 1.2)*(P.drvMax - 1), x = Math.min(1, v/P.full);
+        s(n.lo.gain, -P.tone*v/2); s(n.hi.gain, P.tone*v/2);   /* tone rises with the fader too */
         s(n.drive.gain, d/4);   /* curve spans ±4 → /4 maps ±1 in to ±1 on the curve's input */
         s(n.one.gain, sw ? 0 : 1); s(n.two.gain, sw ? 1 : 0);
         s(n.ceil.gain, Math.pow(10, P.ceil/20));
         s(n.dry.gain, Math.cos(x*Math.PI/2)); s(n.wet.gain, Math.sin(x*Math.PI/2));
         n._v = v; n._sw = !!sw; };
       n.taps = { CLIPPED:n.one, TWICE:n.two, BRICK:n.wet, OUT:n.out };
-      n.info = ()=>{ const P = n.P, v = n._v || 0, d = 1 + Math.pow(v, 1.2)*(P.drvMax - 1), x = Math.min(1, v/P.full)*P.mix;
+      n.info = ()=>{ const P = n.P, v = n._v || 0, d = 1 + Math.pow(v, 1.2)*(P.drvMax - 1), x = Math.min(1, v/P.full);
         return [
-          { u:'TONE',    s:P.tone === 0 ? 'flat' : (P.tone > 0 ? '+' : '') + P.tone.toFixed(1) + ' dB tilt', off:P.tone === 0, note:'before the clip' },
+          { u:'TONE',    s:P.tone === 0 ? 'flat' : (P.tone > 0 ? '+' : '') + (P.tone*v).toFixed(1) + ' dB tilt', off:P.tone === 0, note:'before the clip' },
           { u:'CLIP',    s:d.toFixed(1) + 'x into a brick wall · corner ' + P.knee.toFixed(2), note:'the fader = how hard' },
           { u:'TWICE',   s:n._sw ? '+6 dB → clipped again' : 'off', off:!n._sw, note:'the switch' },
           { u:'CEILING', s:P.ceil.toFixed(1) + ' dB', note:'no level match — it gets LOUD' },

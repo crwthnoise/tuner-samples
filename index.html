@@ -496,14 +496,14 @@ window.__tunerEarly = []; window.__tunerBar = function(m){ try{ var b = document
 window.addEventListener('error', function(e){ var m = (e.message || 'error') + (e.lineno ? ' @' + e.lineno : ''); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' + (e.reason && e.reason.message || e.reason); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 </script>
-<script src="modules/sky.js?v=10.32"></script>
-<script src="modules/rage.js?v=10.32"></script>
-<script src="modules/grinder.js?v=10.32"></script>
-<script src="modules/flame.js?v=10.32"></script>
+<script src="modules/sky.js?v=10.33"></script>
+<script src="modules/rage.js?v=10.33"></script>
+<script src="modules/grinder.js?v=10.33"></script>
+<script src="modules/flame.js?v=10.33"></script>
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.32';
+const APP_VERSION = 'v10.33';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1183,8 +1183,8 @@ function quipuOpts(ch, t0){ return { t0: t0 || 0, bs: beatSec(), loopBeats: ch ?
 function upgradeQuipu(ch){ const n = ch.tuneNodes; if(n && n.lab && LAB_MODS.some(k=>n.lab[k] && n.lab[k]._fake)){ LAB_MODS.forEach(k=>{ if(n.lab[k] && n.lab[k]._fake){ const m = makeLab(ctx, k); if(!m._fake){ n.lab[k] = m; n.blk[k] = [m.in, m.out]; } } }); wireTune(n, n.order); applyTune(ch); syncQuipu(ch, quipuT0()); } if(n && n.sky && !n.sky.shift && window.TUNER_MODS){ n.sky = TUNER_MODS.SKY.build(ctx); n.blk.SKY = [n.sky.in, n.sky.out]; wireTune(n, n.order); applyTune(ch); }
   if(!n || !n.quipu || !n.quipu._fake) return; const q = makeQuipu(ctx, quipuOpts(ch, quipuT0())); if(q._fake) return; n.quipu = q; n.blk.QUIPU = [q, q]; wireTune(n, n.order); applyTune(ch); }
 function quipuT0(){ return isRunning ? songStartTime - startBeat*beatSec() : 0; }
-function syncQuipu(ch, t0, fresh){ const n = ch.tuneNodes; const gr = n && n.lab && n.lab.GRINDER; if(gr && !gr._fake && gr.transport && ch.buffer) gr.transport({ t0, bs: beatSec(), loopBeats: loopBeats(ch.sample), reset:true }, ch.buffer); if(n && n.quipu && n.quipu.port) n.quipu.port.postMessage(Object.assign({ t0, bs: beatSec(), loopBeats: loopBeats(ch.sample), seed: ch.qSeed }, fresh ? { reset:true, run:true } : {})); }
-function quietQuipu(){ channels.forEach(ch=>{ const n = ch.tuneNodes; if(n && n.quipu && n.quipu.port) n.quipu.port.postMessage({ run:false }); }); }
+function syncQuipu(ch, t0, fresh){ const n = ch.tuneNodes; const gr = n && n.lab && n.lab.GRINDER; if(gr && !gr._fake && gr.transport && ch.buffer){ const run = !!fresh || isRunning; gr.transport({ t0, bs: beatSec(), loopBeats: loopBeats(ch.sample), reset:true, run }, ch.buffer); if(gr.gate) gr.gate.port.postMessage({ run }); } if(n && n.quipu && n.quipu.port) n.quipu.port.postMessage(Object.assign({ t0, bs: beatSec(), loopBeats: loopBeats(ch.sample), seed: ch.qSeed }, fresh ? { reset:true, run:true } : {})); }
+function quietQuipu(){ channels.forEach(ch=>{ const n = ch.tuneNodes; const gr = n && n.lab && n.lab.GRINDER; if(gr && !gr._fake){ gr.node.port.postMessage({ run:false }); gr.gate.port.postMessage({ run:false }); } if(n && n.quipu && n.quipu.port) n.quipu.port.postMessage({ run:false }); }); }
 function migrateSw(o){ const out = {}; if(o && typeof o === 'object') SW_KEYS.forEach(k=>{ if(o[k]) out[k] = true; }); return out; }
 function migrateFx(v){ return Array.isArray(v) ? FX_SLOTS.map((_,i)=>clamp(+v[i]||0, 0, 1)) : fxDefaults(); }
 const _curveCache = {};
@@ -1237,17 +1237,17 @@ function buildTune(ac, order, qo){
   /* v10.26: every module is a block [in, out]; the loop's rack order = the signal order, LEFT → RIGHT */
   n.quipu = (ac === ctx && !quipuOK) ? (()=>{ const g = ac.createGain(); g._fake = true; return g; })() : makeQuipu(ac, qo || { t0:0, bs:beatSec(), loopBeats:4, seed:1 });
   n.sky = (window.TUNER_MODS && TUNER_MODS.SKY) ? TUNER_MODS.SKY.build(ac) : null;   /* SKY = modules/sky.js, the same file the LAB uses */
-  n.lab = {}; LAB_MODS.forEach(k=>{ n.lab[k] = makeLab(ac, k); });
-  n.blk = { 'QUIPU':[n.quipu, n.quipu], ...Object.fromEntries(LAB_MODS.map(k=>[k, [n.lab[k].in, n.lab[k].out]])), ...(n.sky ? { 'SKY':[n.sky.in, n.sky.out] } : {}), 'FLOOR':[n.flHp, n.flLow], 'SUB':[n.sub, n.subComp], 'UNTIRE':[n.unComp, n.unMake], 'NEW ERA':[n.neIn, n.neSum], 'THREAT':[n.thIn, n.thTrim], 'LOADED':[n.ldIn, n.ldSum], 'WIDE':[n.wIn, n.wOut], 'PUMP':[n.pump, n.pump] };
+  n.ac = ac; n.lab = {};   /* v10.33: LAB modules are heavy → built only when they're in this loop's rack (see wireTune) */
+  n.blk = { 'QUIPU':[n.quipu, n.quipu], ...(n.sky ? { 'SKY':[n.sky.in, n.sky.out] } : {}), 'FLOOR':[n.flHp, n.flLow], 'SUB':[n.sub, n.subComp], 'UNTIRE':[n.unComp, n.unMake], 'NEW ERA':[n.neIn, n.neSum], 'THREAT':[n.thIn, n.thTrim], 'LOADED':[n.ldIn, n.ldSum], 'WIDE':[n.wIn, n.wOut], 'PUMP':[n.pump, n.pump] };
   wireTune(n, order);
   startPump(n, ac, 0);
   return n;
 }
-function wireTune(n, order){ order = order || FX_SLOTS; try{ n.in.disconnect(); }catch(e){} Object.values(n.blk).forEach(b=>{ try{ b[1].disconnect(); }catch(e){} });
+function wireTune(n, order){ order = order || FX_SLOTS; if(n.lab) order.forEach(k=>{ if(LAB_MODS.includes(k) && !n.lab[k]){ const m = makeLab(n.ac, k); n.lab[k] = m; n.blk[k] = [m.in, m.out]; n._fresh = true; } }); try{ n.in.disconnect(); }catch(e){} Object.values(n.blk).forEach(b=>{ try{ b[1].disconnect(); }catch(e){} });
   let prev = n.in; order.forEach(k=>{ const b = n.blk[k]; if(!b) return; prev.connect(b[0]); prev = b[1]; }); prev.connect(n.out); n.order = order.slice(); }
 /* live re-wire without a click: dip the loop's output for a moment, swap the cables, bring it back */
 function rewireLive(ch){ const n = ch.tuneNodes; if(!n) return; const t = ctx.currentTime; n.out.gain.cancelScheduledValues(t); n.out.gain.setTargetAtTime(0, t, 0.004);
-  setTimeout(()=>{ wireTune(n, ch.rack); const t2 = ctx.currentTime; n.out.gain.cancelScheduledValues(t2); n.out.gain.setTargetAtTime(1, t2, 0.01); }, 30); }
+  setTimeout(()=>{ wireTune(n, ch.rack); if(n._fresh){ n._fresh = false; applyTune(ch); syncQuipu(ch, quipuT0()); } const t2 = ctx.currentTime; n.out.gain.cancelScheduledValues(t2); n.out.gain.setTargetAtTime(1, t2, 0.01); }, 30); }
 /* v10.27 ＋ MODULES page — 5 categories × 4 new (+ the 8 already built). SOON = drawn + voted, sound not built yet. */
 const MOD_CATS = ['DRIVE','CHOP','SPACE','MOTION','TONE'];
 const MOD_CAT = { 'QUIPU':'CHOP', 'SKY':'SPACE', 'RAGE':'DRIVE', 'GRINDER':'CHOP', 'FLAME':'DRIVE', 'THREAT':'DRIVE','NEW ERA':'DRIVE','UNTIRE':'DRIVE', 'LOADED':'CHOP', 'WIDE':'SPACE', 'PUMP':'MOTION', 'SUB':'TONE','FLOOR':'TONE' };

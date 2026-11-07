@@ -539,14 +539,14 @@ window.__tunerEarly = []; window.__tunerBar = function(m){ try{ var b = document
 window.addEventListener('error', function(e){ var m = (e.message || 'error') + (e.lineno ? ' @' + e.lineno : ''); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' + (e.reason && e.reason.message || e.reason); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 </script>
-<script src="modules/sky.js?v=10.36"></script>
-<script src="modules/rage.js?v=10.36"></script>
-<script src="modules/grinder.js?v=10.36"></script>
-<script src="modules/flame.js?v=10.36"></script>
+<script src="modules/sky.js?v=10.37"></script>
+<script src="modules/rage.js?v=10.37"></script>
+<script src="modules/grinder.js?v=10.37"></script>
+<script src="modules/flame.js?v=10.37"></script>
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.36';
+const APP_VERSION = 'v10.37';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1960,7 +1960,7 @@ TUNER.addMade = async function(s){
   let sent = 0, loaded = false;
   const pin = ()=>{ try{ return localStorage.getItem('tuner_makerPin') || ''; }catch(e){ return ''; } };
   const showPin = on => $('makePin').classList.toggle('on', on);
-  const init = ()=>{ try{ fr.contentWindow.postMessage({ type:'tuner:init', bpm, key: songKeyState ? songKeyState.root : null, minor: songKeyState ? !!songKeyState.minor : null, pin: pin() }, MAKER); }catch(e){} };
+  const init = ()=>{ try{ const cs = getComputedStyle(document.documentElement); fr.contentWindow.postMessage({ type:'tuner:init', skin:{ green:cs.getPropertyValue('--green').trim()||'#4fd1a5', red:cs.getPropertyValue('--red').trim()||'#d32f2f', season:($('seasonLine')||{}).textContent||'' }, bpm, key: songKeyState ? songKeyState.root : null, minor: songKeyState ? !!songKeyState.minor : null, pin: pin() }, MAKER); }catch(e){} };
   function open(){
     zone.classList.add('on'); try{ if(isRunning) stopAll(); }catch(e){}
     if(!pin()){ showPin(true); info.textContent = 'enter your maker PIN once'; }

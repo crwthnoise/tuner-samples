@@ -45,10 +45,10 @@
   /* v10.35 MAKE (TNR-4729.19): the SAMPLE MAKER walkie inside TUNER — same screen, way back at the bottom */
   .lcd.mk b{ font-size:0; } .lcd.mk svg{ width:22px; height:16px; stroke:#4fd1a5; fill:none; stroke-width:1.6; stroke-linecap:round; filter:drop-shadow(0 0 4px #4fd1a5); }
   @media (max-width:420px){ .tbtns{ gap:5px; } .tbtns .lcd{ width:48px; } .logo{ font-size:15px !important; letter-spacing:2px !important; } .season{ letter-spacing:2px !important; } }
-  #makeZone{ position:fixed; inset:0; z-index:900; background:#060504; display:none; flex-direction:column; }
+  #makeZone{ position:fixed; inset:0; z-index:900; background:#060504; display:none; flex-direction:column; padding-top:env(safe-area-inset-top); box-sizing:border-box; height:100dvh; }
   #makeZone.on{ display:flex; }
   #makeZone iframe{ flex:1; width:100%; border:0; background:#060504; }
-  #makeBar{ flex:none; height:calc(46px + env(safe-area-inset-bottom)); padding:0 10px env(safe-area-inset-bottom); display:flex; align-items:center; gap:10px; background:#0b0907; border-top:1px solid #2e231a; font:11px var(--mono); color:#8a8276; letter-spacing:.08em; }
+  #makeBar{ box-sizing:border-box; flex:none; height:calc(46px + env(safe-area-inset-bottom)); padding:0 10px env(safe-area-inset-bottom); display:flex; align-items:center; gap:10px; background:#0b0907; border-top:1px solid #2e231a; font:11px var(--mono); color:#8a8276; letter-spacing:.08em; }
   #makeBack{ height:32px; padding:0 14px; border-radius:8px; background:#0b0907; color:#f2ede2; border:1px solid #c8302c; font:700 11px var(--ui); letter-spacing:.14em; cursor:pointer; }
   #makeInfo{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #makeInfo b{ color:#4fd1a5; font-weight:400; }
@@ -539,14 +539,14 @@ window.__tunerEarly = []; window.__tunerBar = function(m){ try{ var b = document
 window.addEventListener('error', function(e){ var m = (e.message || 'error') + (e.lineno ? ' @' + e.lineno : ''); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' + (e.reason && e.reason.message || e.reason); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 </script>
-<script src="modules/sky.js?v=10.37"></script>
-<script src="modules/rage.js?v=10.37"></script>
-<script src="modules/grinder.js?v=10.37"></script>
-<script src="modules/flame.js?v=10.37"></script>
+<script src="modules/sky.js?v=10.38"></script>
+<script src="modules/rage.js?v=10.38"></script>
+<script src="modules/grinder.js?v=10.38"></script>
+<script src="modules/flame.js?v=10.38"></script>
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.37';
+const APP_VERSION = 'v10.38';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1950,9 +1950,12 @@ TUNER.addMade = async function(s){
   const wav = s.wav instanceof Blob ? await s.wav.arrayBuffer() : s.wav; if(!wav) return null;
   const nm = String(s.name || 'made').replace(/\.wav$/i,'').replace(/[^\w .+#-]+/g,' ').trim().slice(0,60) || 'made';
   const tags = ['made'].concat(s.kind ? [String(s.kind).toLowerCase()] : []);
+  const dupe = samples.find(x=>x.folder==='MADE' && x.name===nm + '.wav');
+  if(dupe){ if(s.track){ await addChannelFromSample(dupe); setStatus((dupe.displayName||'sound') + ' → track'); } return dupe; }
   const sample = await addSample(new File([wav], nm + '.wav', { type:'audio/wav' }), { folder:'MADE', bpm:s.bpm||null, key:s.key||null, displayName:s.title || nm, tags, arrayBuf:wav, quiet:true });
   if(sample && s.midi){ try{ const m = s.midi instanceof Blob ? await s.midi.arrayBuffer() : s.midi; await Store.set('smidi:' + sample.id, m); sample.midi = true; }catch(e){} }
-  if(sample){ setStatus((sample.displayName || 'sound') + ' → MADE'); try{ renderLibrary(); }catch(e){} }
+  if(sample && s.track){ try{ await addChannelFromSample(sample); }catch(e){} }
+  if(sample){ setStatus((sample.displayName || 'sound') + (s.track ? ' → track' : ' → MADE')); try{ renderLibrary(); }catch(e){} }
   return sample;
 };
 (()=>{
@@ -1974,7 +1977,7 @@ TUNER.addMade = async function(s){
     if(e.origin !== MAKER || e.source !== fr.contentWindow) return; const d = e.data || {};
     if(d.type === 'tuner:ready'){ init(); return; }
     if(d.type === 'tuner:badpin'){ const had = pin(); try{ localStorage.removeItem('tuner_makerPin'); }catch(_){} showPin(true); info.textContent = had ? 'PIN didn’t work — try again' : 'enter your maker PIN once'; return; }
-    if(d.type === 'tuner:sound'){ try{ const smp = await TUNER.addMade(d); if(smp){ sent++; info.innerHTML = '<b>' + sent + ' SENT</b> · ' + (smp.displayName || '') + ' → MADE'; fr.contentWindow.postMessage({ type:'tuner:got', id:d.id }, MAKER); } }catch(err){ info.textContent = 'couldn’t add that one: ' + (err && err.message || err); } }
+    if(d.type === 'tuner:sound'){ try{ const smp = await TUNER.addMade(d); if(smp){ sent++; info.innerHTML = '<b>' + sent + ' SENT</b> · ' + (smp.displayName || '') + (d.track ? ' → TRACK' : ' → MY SAMPLES'); fr.contentWindow.postMessage({ type:'tuner:got', id:d.id, track:!!d.track }, MAKER); } }catch(err){ info.textContent = 'couldn’t add that one: ' + (err && err.message || err); } }
   });
 })();
 /* ================= BOOT ================= */

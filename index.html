@@ -557,7 +557,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.39';
+const APP_VERSION = 'v10.40';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1991,16 +1991,20 @@ TUNER.addMade = async function(s){
     if(d.type === 'tuner:sound'){ try{ const smp = await TUNER.addMade(d); if(smp){ sent++; info.innerHTML = '<b>' + sent + ' SENT</b> · ' + (smp.displayName || '') + (d.track ? ' → TRACK' : ' → MY SAMPLES'); fr.contentWindow.postMessage({ type:'tuner:got', id:d.id, track:!!d.track }, MAKER); } }catch(err){ info.textContent = 'couldn’t add that one: ' + (err && err.message || err); } }
   });
 })();
-/* ================= SING (v10.39, VOX-3726) =================
+/* ================= SING (v10.39–10.40, VOX-3726) =================
    VOICE → MIDI page (voice/) in #singFrame, same site. Its → TUNER button sends the take as a whole-bar WAV + the MIDI through TUNER.addMade. */
 (()=>{
   const zone = $('singZone'), fr = $('singFrame'), info = $('singInfo'); let sent = 0, loaded = false;
-  const init = ()=>{ try{ fr.contentWindow.postMessage({ type:'tuner:init', bpm }, location.origin); }catch(e){} };
+  const soundList = ()=> samples.filter(x=>!x.failed).sort((a,b)=>(b.folder==='MADE')-(a.folder==='MADE')).slice(0,400).map(x=>({ id:x.id, name:x.displayName || x.name, folder:x.folder || '' }));
+  const init = ()=>{ try{ fr.contentWindow.postMessage({ type:'tuner:init', bpm, key: songKeyState ? songKeyState.root : null, minor: songKeyState ? !!songKeyState.minor : false, hasBeat: channels.length > 0, sounds: soundList() }, location.origin); }catch(e){} };
   $('singBtn').addEventListener('click', ()=>{ zone.classList.add('on'); try{ if(isRunning) stopAll(); }catch(e){} if(!loaded){ loaded = true; fr.src = 'voice/?tuner=1'; } else init(); });
   $('singBack').addEventListener('click', ()=>{ try{ fr.contentWindow.postMessage({ type:'tuner:close' }, location.origin); }catch(e){} zone.classList.remove('on'); try{ renderLibrary(); }catch(e){} });
   window.addEventListener('message', async e=>{
     if(e.origin !== location.origin || e.source !== fr.contentWindow) return; const d = e.data || {};
     if(d.type === 'tuner:ready'){ init(); return; }
+    /* v10.40: SING plays your sounds (sampler) and records over your beat */
+    if(d.type === 'tuner:getSound'){ const smp = samples.find(x=>x.id === d.id); if(!smp) return; try{ await ensureLoaded(smp); const b = smp.buffer; if(!b) return; const n = Math.min(b.length, Math.round(b.sampleRate*4)); const pcm = new Float32Array(n); pcm.set(b.getChannelData(0).subarray(0, n)); fr.contentWindow.postMessage({ type:'tuner:soundData', id:d.id, name:smp.displayName || smp.name, sr:b.sampleRate, pcm:pcm.buffer }, location.origin, [pcm.buffer]); }catch(e){} return; }
+    if(d.type === 'tuner:transport'){ try{ if(d.play){ playBeat = 0; await ensureRunning(0); info.innerHTML = '<b>REC</b> · over your beat'; } else if(isRunning){ stopAll(); } }catch(e){} return; }
     if(d.type === 'tuner:sound'){ try{ const smp = await TUNER.addMade(d); if(smp){ sent++; info.innerHTML = '<b>' + sent + ' SENT</b> · ' + (smp.displayName || '') + ' → TRACK'; fr.contentWindow.postMessage({ type:'tuner:got', id:d.id }, location.origin); } }catch(err){ info.textContent = 'couldn’t add that one: ' + (err && err.message || err); } }
   });
 })();

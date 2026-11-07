@@ -42,6 +42,20 @@
   .logo span{ color:var(--red); }
   .season{ font-weight:300; font-size:7px; letter-spacing:4px; color:var(--mute); margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tbtns{ display:flex; gap:8px; flex:none; }
+  /* v10.35 MAKE (TNR-4729.19): the SAMPLE MAKER walkie inside TUNER — same screen, way back at the bottom */
+  .lcd.mk b{ font-size:0; } .lcd.mk svg{ width:22px; height:16px; stroke:#4fd1a5; fill:none; stroke-width:1.6; stroke-linecap:round; filter:drop-shadow(0 0 4px #4fd1a5); }
+  @media (max-width:420px){ .tbtns{ gap:5px; } .tbtns .lcd{ width:48px; } .logo{ font-size:15px !important; letter-spacing:2px !important; } .season{ letter-spacing:2px !important; } }
+  #makeZone{ position:fixed; inset:0; z-index:900; background:#060504; display:none; flex-direction:column; }
+  #makeZone.on{ display:flex; }
+  #makeZone iframe{ flex:1; width:100%; border:0; background:#060504; }
+  #makeBar{ flex:none; height:calc(46px + env(safe-area-inset-bottom)); padding:0 10px env(safe-area-inset-bottom); display:flex; align-items:center; gap:10px; background:#0b0907; border-top:1px solid #2e231a; font:11px var(--mono); color:#8a8276; letter-spacing:.08em; }
+  #makeBack{ height:32px; padding:0 14px; border-radius:8px; background:#0b0907; color:#f2ede2; border:1px solid #c8302c; font:700 11px var(--ui); letter-spacing:.14em; cursor:pointer; }
+  #makeInfo{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #makeInfo b{ color:#4fd1a5; font-weight:400; }
+  #makePin{ display:none; gap:6px; align-items:center; } #makePin.on{ display:flex; }
+  #makePin input{ width:70px; height:30px; background:#050605; color:#f2ede2; border:1px solid #2e231a; border-radius:6px; font:16px var(--mono); text-align:center; }
+  #makePin button{ height:30px; padding:0 10px; border-radius:6px; background:#0b0907; color:#4fd1a5; border:1px solid #2e5e4e; font:700 10px var(--ui); letter-spacing:.12em; }
+
   .btn{ width:56px; height:52px; border-radius:8px; background:var(--lane); border:1px solid var(--rail); color:var(--text); display:flex; flex-direction:column; align-items:center; justify-content:center; font:700 10px var(--mono); letter-spacing:.06em; cursor:pointer; padding:0; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
   .btn small{ font:500 8px var(--mono); color:var(--mute); letter-spacing:1px; margin-bottom:2px; }
   .btn b{ font-size:15px; font-weight:700; }
@@ -407,7 +421,7 @@
 <div class="z top" id="topZone" data-screws="4">
   <div class="brand"><div class="logo"><span>THREAT</span> TUNER</div><div class="season" id="seasonLine">WARBLOOM SEASON</div></div>
   <div class="tbtns">
-    <button class="lcd" id="keyBtn" data-k="KEY"><small>KEY</small><b id="keyVal">—</b></button>
+    <button class="lcd mk" id="makeBtn" data-k="MAKE" aria-label="make sounds"><small>MAKE</small><b><svg viewBox="0 0 22 16"><path d="M1 8h3l2-6 3 12 3-9 2 5 2-2h5"/></svg></b></button><button class="lcd" id="keyBtn" data-k="KEY"><small>KEY</small><b id="keyVal">—</b></button>
     <button class="lcd" id="bpmBtn" data-k="BPM"><small>BPM</small><b id="bpmVal">133</b></button>
   </div>
   <div class="key-pop" id="keyPop"><div class="key-grid" id="keyGrid"></div><div class="key-mode"><button id="keyMin">MINOR</button><button id="keyMaj">MAJOR</button><button id="keyOff">OFF</button></div><div class="key-note">ON = every loop with a key moves to it · drums stay put</div></div>
@@ -445,6 +459,12 @@
   <button class="play" id="transportBtn" data-k="PLAY" aria-label="play"></button>
 </div>
 
+
+<!-- MAKE (v10.35): SAMPLE MAKER inside TUNER. Loads only when you press MAKE. ★ in the maker = send to TUNER (MADE folder) -->
+<div id="makeZone"><iframe id="makeFrame" title="SAMPLE MAKER" allow="autoplay"></iframe>
+  <div id="makeBar"><button id="makeBack" data-k="MAKE BACK">◂ TUNER</button><div id="makeInfo">★ a sound = send it to TUNER</div>
+  <div id="makePin"><input id="makePinIn" type="password" inputmode="numeric" maxlength="8" placeholder="PIN"><button id="makePinOk">LINK</button></div></div>
+</div>
 <input type="file" id="fileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.aif,.aiff,.caf,.flac,.ogg,.wma" multiple>
 
 <!-- PACKS (library) -->
@@ -519,14 +539,14 @@ window.__tunerEarly = []; window.__tunerBar = function(m){ try{ var b = document
 window.addEventListener('error', function(e){ var m = (e.message || 'error') + (e.lineno ? ' @' + e.lineno : ''); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' + (e.reason && e.reason.message || e.reason); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 </script>
-<script src="modules/sky.js?v=10.34"></script>
-<script src="modules/rage.js?v=10.34"></script>
-<script src="modules/grinder.js?v=10.34"></script>
-<script src="modules/flame.js?v=10.34"></script>
+<script src="modules/sky.js?v=10.35"></script>
+<script src="modules/rage.js?v=10.35"></script>
+<script src="modules/grinder.js?v=10.35"></script>
+<script src="modules/flame.js?v=10.35"></script>
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.34';
+const APP_VERSION = 'v10.35';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1921,6 +1941,42 @@ $('saveBtn').addEventListener('click', async ()=>{ if(!channels.length){ setStat
 $('tlStart').addEventListener('click', ()=>{ playBeat = 0; scrollX = 0; if(isRunning) scheduleFrom(0); clampScroll(); drawTL(); });
 $('tlZoomIn').addEventListener('click', ()=> setZoom(zoomX*1.4, tl.clientWidth/2));
 $('tlZoomOut').addEventListener('click', ()=> setZoom(zoomX/1.4, tl.clientWidth/2));
+
+/* ================= MAKE (v10.35, TNR-4729.19) =================
+   TUNER.addMade() = THE one door for made sounds into TUNER. Today the SAMPLE MAKER walkie (cloud page in #makeFrame) calls it
+   through postMessage; when the machines move into TUNER itself they call the same function. Sounds land in the MADE folder, saved like your own loops. */
+window.TUNER = window.TUNER || {};
+TUNER.addMade = async function(s){
+  const wav = s.wav instanceof Blob ? await s.wav.arrayBuffer() : s.wav; if(!wav) return null;
+  const nm = String(s.name || 'made').replace(/\.wav$/i,'').replace(/[^\w .+#-]+/g,' ').trim().slice(0,60) || 'made';
+  const tags = ['made'].concat(s.kind ? [String(s.kind).toLowerCase()] : []);
+  const sample = await addSample(new File([wav], nm + '.wav', { type:'audio/wav' }), { folder:'MADE', bpm:s.bpm||null, key:s.key||null, displayName:s.title || nm, tags, arrayBuf:wav, quiet:true });
+  if(sample && s.midi){ try{ const m = s.midi instanceof Blob ? await s.midi.arrayBuffer() : s.midi; await Store.set('smidi:' + sample.id, m); sample.midi = true; }catch(e){} }
+  if(sample){ setStatus((sample.displayName || 'sound') + ' → MADE'); try{ renderLibrary(); }catch(e){} }
+  return sample;
+};
+(()=>{
+  const MAKER = 'https://space.crwth.workers.dev', zone = $('makeZone'), fr = $('makeFrame'), info = $('makeInfo');
+  let sent = 0, loaded = false;
+  const pin = ()=>{ try{ return localStorage.getItem('tuner_makerPin') || ''; }catch(e){ return ''; } };
+  const showPin = on => $('makePin').classList.toggle('on', on);
+  const init = ()=>{ try{ fr.contentWindow.postMessage({ type:'tuner:init', bpm, key: songKeyState ? songKeyState.root : null, minor: songKeyState ? !!songKeyState.minor : null, pin: pin() }, MAKER); }catch(e){} };
+  function open(){
+    zone.classList.add('on'); try{ if(isRunning) stopAll(); }catch(e){}
+    if(!pin()){ showPin(true); info.textContent = 'enter your maker PIN once'; }
+    if(!loaded){ loaded = true; fr.src = MAKER + '/samplemaker-phone?tuner=1'; } else init();
+  }
+  function close(){ zone.classList.remove('on'); try{ renderLibrary(); }catch(e){} }
+  $('makeBtn').addEventListener('click', open);
+  $('makeBack').addEventListener('click', close);
+  $('makePinOk').addEventListener('click', ()=>{ const v = $('makePinIn').value.trim(); if(!v) return; try{ localStorage.setItem('tuner_makerPin', v); }catch(e){} $('makePinIn').value = ''; showPin(false); info.innerHTML = 'linked · ★ a sound = send it to TUNER'; init(); });
+  window.addEventListener('message', async e=>{
+    if(e.origin !== MAKER || e.source !== fr.contentWindow) return; const d = e.data || {};
+    if(d.type === 'tuner:ready'){ init(); return; }
+    if(d.type === 'tuner:badpin'){ try{ localStorage.removeItem('tuner_makerPin'); }catch(_){} showPin(true); info.textContent = 'PIN didn’t work — try again'; return; }
+    if(d.type === 'tuner:sound'){ try{ const smp = await TUNER.addMade(d); if(smp){ sent++; info.innerHTML = '<b>' + sent + ' SENT</b> · ' + (smp.displayName || '') + ' → MADE'; fr.contentWindow.postMessage({ type:'tuner:got', id:d.id }, MAKER); } }catch(err){ info.textContent = 'couldn’t add that one: ' + (err && err.message || err); } }
+  });
+})();
 /* ================= BOOT ================= */
 /* v10.23: always on the newest version — if the site has a newer one than this page, reload once onto it */
 async function checkVersion(){ try{ const r = await fetch('version.txt?t=' + Date.now(), { cache:'no-store' }); if(!r.ok) return; const v = (await r.text()).trim(); if(!v || v === APP_VERSION) return; let tried = ''; try{ tried = sessionStorage.getItem('tuner_upd') || ''; }catch(e){} if(tried === v) return; try{ sessionStorage.setItem('tuner_upd', v); }catch(e){} if(isRunning || channels.length && dirty) return; location.replace(location.pathname + '?v=' + encodeURIComponent(v)); }catch(e){} }

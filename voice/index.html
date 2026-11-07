@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>VOICE → MIDI</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root{--fg:#eaeaea;--dim:#666;--line:#262626;--on:#7CE0A0;--rec:#ff3b3b;}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;background:#000;color:var(--fg);font-family:'Share Tech Mono',ui-monospace,monospace;font-size:12px;overflow:hidden;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+  .app{height:100dvh;display:grid;grid-template-rows:auto auto 1fr auto;gap:8px;
+       padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 8px) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 8px)}
+  .card{border:1px solid var(--line);border-radius:10px;box-shadow:0 0 10px rgba(255,255,255,.04)}
+  .top{padding:6px 10px;color:var(--dim);letter-spacing:.05em;line-height:1.4}
+  .top b{color:var(--fg);font-weight:normal}
+  .readout{display:flex;align-items:center;gap:12px;padding:8px 12px}
+  #note{font-size:52px;line-height:1;min-width:120px}
+  .sub{display:flex;flex-direction:column;gap:3px;color:var(--dim)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#333;display:inline-block;flex:none}
+  .dot.on{background:var(--on);box-shadow:0 0 8px var(--on)}
+  .dot.rec{background:var(--rec);box-shadow:0 0 8px var(--rec)}
+  .main{display:grid;grid-template-columns:1fr 104px;gap:8px;min-height:0}
+  .roll{min-height:0;overflow:hidden}
+  canvas{width:100%;height:100%;display:block}
+  .side{display:flex;flex-direction:column;gap:6px;min-height:0}
+  button,select,input{font-family:inherit;font-size:16px;background:#0a0a0a;color:var(--fg);border:1px solid #3a3a3a;border-radius:8px}
+  button{width:100%;padding:9px 4px;display:flex;align-items:center;justify-content:center;gap:6px;letter-spacing:.06em}
+  button:disabled{opacity:.35}
+  button.active{border-color:var(--fg);background:#151515}
+  .k{font-size:13px}
+  .lbl{color:var(--dim);font-size:10px;letter-spacing:.1em;margin:4px 0 2px 2px}
+  .row{display:flex;gap:4px}
+  .row>*{flex:1;min-width:0}
+  .row button{padding:7px 0}
+  select,input[type=number]{width:100%;padding:6px 4px;text-align:center;-webkit-appearance:none;appearance:none}
+  input[type=range]{width:100%;accent-color:#bbb}
+  #oct{text-align:center;font-size:14px;align-self:center}
+  .spacer{flex:1}
+  #status{color:var(--dim);font-size:11px;line-height:1.4;padding:6px 10px;min-height:2.8em}
+  .bottom{display:flex;align-items:center;gap:8px}
+  .hub{width:auto;display:flex;align-items:center;gap:8px;border:1px solid #5a1a1a;background:#1a0505;color:#ff8a8a;border-radius:6px;padding:6px 10px;font-size:12px;letter-spacing:.1em}
+  .bars{display:flex;gap:2px}.bars i{width:4px;height:10px;display:block}
+  #live{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="card top"><b>SING → NOTES.</b> REC, then SEND → AirDrop the .mid to your Mac → drop in the piano roll.</div>
+
+  <div class="card readout">
+    <span class="dot" id="micDot"></span>
+    <div id="note">—</div>
+    <div class="sub"><span id="cents">&nbsp;</span><span id="hz">MIC OFF</span></div>
+  </div>
+
+  <div class="main">
+    <div class="card roll"><canvas id="roll"></canvas></div>
+    <div class="side">
+      <button id="micBtn" class="k">MIC</button>
+      <button id="recBtn" class="k" disabled><span class="dot" id="recDot"></span><span id="recTxt">REC</span></button>
+      <button id="playBtn" class="k" disabled>PLAY</button>
+      <button id="sendBtn" class="k" disabled>SEND</button>
+
+      <div class="lbl">OCTAVE</div>
+      <div class="row"><button id="octDn">-</button><span id="oct">0</span><button id="octUp">+</button></div>
+
+      <div class="lbl">SNAP</div>
+      <select id="snap"><option value="0">off</option><option value="4" selected>1/16</option><option value="2">1/8</option><option value="1">1/4</option></select>
+
+      <div class="lbl">BPM</div>
+      <input id="bpm" type="number" inputmode="numeric" value="140" min="40" max="300">
+
+      <div class="lbl">GATE</div>
+      <input id="gate" type="range" min="1" max="40" value="10">
+
+      <div id="live">
+        <div class="lbl">LIVE MIDI</div>
+        <select id="outSel"><option value="">off</option></select>
+      </div>
+      <div class="spacer"></div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <button class="hub" id="hubBtn"><span class="bars"><i style="background:#ff3b3b"></i><i style="background:#ffb03b"></i><i style="background:#7CE0A0"></i><i style="background:#3bb0ff"></i></span>HUB</button>
+    <div class="card" id="status" style="flex:1">tap MIC</div>
+  </div>
+</div>
+
+<script>
+const NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const $=id=>document.getElementById(id);
+const say=t=>$('status').textContent=t;
+let ctx,analyser,buf,midiOut=null,midiAccess=null,stream;
+let octave=0,current=null,candidate=null,candCount=0,silentCount=0;
+let recording=false,recStart=0,events=[],playing=false;
+const trail=[];const STABLE=3,SILENT=4;
+const noteName=m=>NAMES[((m%12)+12)%12]+(Math.floor(m/12)-1);
+
+// ---- pitch (YIN) ----
+function yin(b,sr){
+  const half=b.length>>1,d=new Float32Array(half);
+  const tmin=Math.floor(sr/1100),tmax=Math.min(half-1,Math.floor(sr/60));
+  for(let t=1;t<=tmax;t++){let s=0;for(let i=0;i<half;i++){const x=b[i]-b[i+t];s+=x*x;}d[t]=s;}
+  let run=0;d[0]=1;
+  for(let t=1;t<=tmax;t++){run+=d[t];d[t]=d[t]*t/(run||1);}
+  let tau=-1;
+  for(let t=tmin;t<=tmax;t++){if(d[t]<0.15){while(t+1<=tmax&&d[t+1]<d[t])t++;tau=t;break;}}
+  if(tau<0)return null;
+  const x0=d[tau-1]??d[tau],x2=d[tau+1]??d[tau];
+  return sr/(tau+(x2-x0)/(2*(2*d[tau]-x2-x0)||1));
+}
+
+// ---- live MIDI (Mac Chrome only; iPhone has no Web MIDI) ----
+async function initMidi(){
+  if(!navigator.requestMIDIAccess)return;
+  try{midiAccess=await navigator.requestMIDIAccess();$('live').style.display='block';fillOuts();midiAccess.onstatechange=fillOuts;}catch(e){}
+}
+function fillOuts(){
+  const sel=$('outSel'),keep=sel.value;sel.innerHTML='<option value="">off</option>';let iac=null;
+  for(const o of midiAccess.outputs.values()){const op=document.createElement('option');op.value=o.id;op.textContent=o.name;sel.appendChild(op);if(/IAC/i.test(o.name)&&!iac)iac=o.id;}
+  sel.value=keep||iac||'';pickOut();
+}
+function pickOut(){midiOut=midiAccess&&$('outSel').value?midiAccess.outputs.get($('outSel').value):null;}
+$('outSel').onchange=pickOut;
+
+function noteOn(m,vel){current={midi:m};midiOut&&midiOut.send([0x90,m,vel]);if(recording)events.push({type:'on',midi:m,vel,t:performance.now()-recStart});}
+function noteOff(){if(!current)return;midiOut&&midiOut.send([0x80,current.midi,0]);if(recording)events.push({type:'off',midi:current.midi,t:performance.now()-recStart});current=null;}
+
+// ---- loop ----
+function tick(){
+  if(!playing){
+    analyser.getFloatTimeDomainData(buf);
+    let rms=0;for(let i=0;i<buf.length;i++)rms+=buf[i]*buf[i];rms=Math.sqrt(rms/buf.length);
+    let midi=null;
+    if(rms>$('gate').value/1000){const f=yin(buf,ctx.sampleRate);
+      if(f){const ex=69+12*Math.log2(f/440);midi=Math.round(ex)+12*octave;
+        $('note').textContent=noteName(midi);const c=Math.round((ex-Math.round(ex))*100);
+        $('cents').textContent=(c>=0?'+':'')+c+'¢';$('hz').textContent=f.toFixed(1)+' Hz';}}
+    if(midi===null){silentCount++;candidate=null;candCount=0;
+      if(silentCount>=SILENT){noteOff();$('note').textContent='—';$('cents').innerHTML='&nbsp;';$('hz').textContent='…';}}
+    else{silentCount=0;
+      if(current&&current.midi===midi){candidate=null;candCount=0;}
+      else{if(candidate===midi)candCount++;else{candidate=midi;candCount=1;}
+        if(candCount>=STABLE){noteOff();noteOn(midi,Math.max(40,Math.min(127,Math.round(rms*900))));candidate=null;candCount=0;}}}
+    trail.push({t:performance.now(),midi:current?current.midi:null,rec:recording});
+  }
+  while(trail.length&&performance.now()-trail[0].t>8000)trail.shift();
+  draw();requestAnimationFrame(tick);
+}
+
+function draw(){
+  const c=$('roll'),r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;
+  if(c.width!==Math.round(r.width*dpr)||c.height!==Math.round(r.height*dpr)){c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);}
+  const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  const W=r.width,H=r.height;g.clearRect(0,0,W,H);
+  let mid=60;for(let i=trail.length-1;i>=0;i--)if(trail[i].midi!==null){mid=trail[i].midi;break;}
+  const lo=mid-12,hi=mid+12,rowH=H/(hi-lo+1);
+  g.font='10px Share Tech Mono, monospace';
+  for(let m=lo;m<=hi;m++){const y=H-(m-lo+1)*rowH;
+    if([1,3,6,8,10].includes(((m%12)+12)%12)){g.fillStyle='#080808';g.fillRect(0,y,W,rowH);}
+    if(((m%12)+12)%12===0){g.fillStyle='#444';g.fillText(noteName(m),4,y+rowH-2);}}
+  const now=performance.now();
+  for(const h of trail){if(h.midi===null)continue;
+    const x=W-(now-h.t)/8000*W,y=H-(h.midi-lo+1)*rowH;
+    g.fillStyle=h.rec?'#ff6b6b':'#eaeaea';g.fillRect(x,y+1,W/400+1,rowH-2);}
+}
+
+// ---- take → notes ----
+function takeNotes(){
+  const bpm=+$('bpm').value||140,ppq=480,snap=+$('snap').value;
+  const toTick=ms=>Math.round(ms/1000*bpm/60*ppq),grid=snap?ppq/snap:0,q=t=>grid?Math.round(t/grid)*grid:t;
+  const raw=[];let open=null;
+  for(const e of events){if(e.type==='on')open=e;else if(open&&e.midi===open.midi){raw.push({midi:open.midi,vel:open.vel,s:toTick(open.t),e:toTick(e.t)});open=null;}}
+  if(!raw.length)return null;
+  const first=raw[0].s;
+  return{bpm,ppq,notes:raw.map(n=>{const s=q(n.s-first);let e=q(n.e-first);if(e<=s)e=s+(grid||60);return{midi:n.midi,vel:n.vel,s,e};})};
+}
+
+// ---- MIDI file ----
+function vlq(n){const o=[n&0x7f];while((n>>=7))o.unshift((n&0x7f)|0x80);return o;}
+function buildMidi(){
+  const tk=takeNotes();if(!tk)return null;
+  const ev=[];for(const n of tk.notes)ev.push({t:n.s,d:[0x90,n.midi,n.vel]},{t:n.e,d:[0x80,n.midi,0]});
+  ev.sort((a,b)=>a.t-b.t||(a.d[0]===0x80?-1:1));
+  const tempo=Math.round(60000000/tk.bpm),name=[...'VOICE'].map(c=>c.charCodeAt(0));
+  const trk=[0,0xFF,0x51,3,(tempo>>16)&255,(tempo>>8)&255,tempo&255,0,0xFF,0x03,name.length,...name];
+  let last=0;for(const e of ev){trk.push(...vlq(e.t-last),...e.d);last=e.t;}
+  trk.push(0,0xFF,0x2F,0);const L=trk.length;
+  return new Uint8Array([0x4D,0x54,0x68,0x64,0,0,0,6,0,0,0,1,(tk.ppq>>8)&255,tk.ppq&255,0x4D,0x54,0x72,0x6B,(L>>>24)&255,(L>>16)&255,(L>>8)&255,L&255,...trk]);
+}
+
+// ---- buttons ----
+$('micBtn').onclick=async()=>{
+  if(ctx)return;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+    analyser=ctx.createAnalyser();analyser.fftSize=2048;buf=new Float32Array(analyser.fftSize);
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    $('micDot').classList.add('on');$('micBtn').classList.add('active');$('micBtn').textContent='MIC ON';
+    $('recBtn').disabled=false;say('sing. notes run across the roll.');
+    initMidi();tick();
+  }catch(e){say('mic blocked. allow the mic for this page and tap MIC again.');}
+};
+$('recBtn').onclick=()=>{
+  if(!recording){recording=true;events=[];recStart=performance.now();$('recDot').classList.add('rec');$('recTxt').textContent='STOP';
+    $('playBtn').disabled=$('sendBtn').disabled=true;say('recording take…');}
+  else{noteOff();recording=false;$('recDot').classList.remove('rec');$('recTxt').textContent='REC';
+    const n=events.filter(e=>e.type==='on').length;$('playBtn').disabled=$('sendBtn').disabled=!n;say(n?n+' notes. PLAY to check, SEND to your Mac.':'no notes caught. try louder or lower the GATE.');}
+};
+$('playBtn').onclick=()=>{
+  const tk=takeNotes();if(!tk||playing)return;
+  playing=true;ctx.resume();const t0=ctx.currentTime+0.05,sec=tk.ppq*tk.bpm/60;let end=0;
+  for(const n of tk.notes){const o=ctx.createOscillator(),gn=ctx.createGain();o.type='triangle';
+    o.frequency.value=440*Math.pow(2,(n.midi-69)/12);const a=t0+n.s/sec,b=t0+n.e/sec;end=Math.max(end,b);
+    gn.gain.setValueAtTime(0,a);gn.gain.linearRampToValueAtTime(0.25*n.vel/127,a+0.01);gn.gain.setValueAtTime(0.25*n.vel/127,b-0.02);gn.gain.linearRampToValueAtTime(0,b);
+    o.connect(gn).connect(ctx.destination);o.start(a);o.stop(b+0.05);}
+  say('playing take…');setTimeout(()=>{playing=false;say('PLAY again or SEND.');},(end-ctx.currentTime)*1000+200);
+};
+$('sendBtn').onclick=async()=>{
+  const data=buildMidi();if(!data)return;
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  const name=`VOICE ${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}${p(d.getMinutes())}.mid`;
+  const file=new File([data],name,{type:'audio/midi'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file]});say('sent: '+name);return;}catch(e){if(e.name==='AbortError'){say('send cancelled');return;}}
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;a.click();say('saved: '+name);
+};
+const setOct=v=>{octave=Math.max(-2,Math.min(2,v));$('oct').textContent=(octave>0?'+':'')+octave;noteOff();};
+$('octDn').onclick=()=>setOct(octave-1);$('octUp').onclick=()=>setOct(octave+1);
+$('hubBtn').onclick=()=>{history.length>1?history.back():say('no page behind this one');};
+</script>
+</body>
+</html>

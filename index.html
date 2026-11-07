@@ -44,9 +44,16 @@
   .tbtns{ display:flex; gap:8px; flex:none; }
   /* v10.35 MAKE (TNR-4729.19): the SAMPLE MAKER walkie inside TUNER — same screen, way back at the bottom */
   .lcd.mk b{ font-size:0; } .lcd.mk svg{ width:22px; height:16px; stroke:#4fd1a5; fill:none; stroke-width:1.6; stroke-linecap:round; filter:drop-shadow(0 0 4px #4fd1a5); }
-  @media (max-width:420px){ .tbtns{ gap:5px; } .tbtns .lcd{ width:48px; } .logo{ font-size:15px !important; letter-spacing:2px !important; } .season{ letter-spacing:2px !important; } }
+  @media (max-width:460px){ .tbtns{ gap:5px; } .tbtns .lcd{ width:46px; } .logo{ font-size:15px !important; letter-spacing:2px !important; } .season{ letter-spacing:2px !important; } }
+  @media (max-width:400px){ .tbtns .lcd{ width:42px; } .logo{ font-size:13px !important; letter-spacing:1px !important; } }
   #makeZone{ position:fixed; inset:0; z-index:900; background:#060504; display:none; flex-direction:column; padding-top:env(safe-area-inset-top); box-sizing:border-box; height:100dvh; }
   #makeZone.on{ display:flex; }
+  /* v10.39 SING (VOX-3726): VOICE → MIDI inside TUNER — hum a melody, it lands on a track */
+  #singZone{ position:fixed; inset:0; z-index:900; background:#000; display:none; flex-direction:column; padding-top:env(safe-area-inset-top); box-sizing:border-box; height:100dvh; }
+  #singZone.on{ display:flex; } #singZone iframe{ flex:1; width:100%; border:0; background:#000; }
+  #singBar{ box-sizing:border-box; flex:none; height:calc(46px + env(safe-area-inset-bottom)); padding:0 10px env(safe-area-inset-bottom); display:flex; align-items:center; gap:10px; background:#0b0907; border-top:1px solid #2e231a; font:11px var(--mono); color:#8a8276; letter-spacing:.08em; }
+  #singBack{ height:32px; padding:0 14px; border-radius:8px; background:#0b0907; color:#f2ede2; border:1px solid #c8302c; font:700 11px var(--ui); letter-spacing:.14em; cursor:pointer; }
+  #singInfo{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } #singInfo b{ color:#4fd1a5; font-weight:400; }
   #makeZone iframe{ flex:1; width:100%; border:0; background:#060504; }
   #makeBar{ box-sizing:border-box; flex:none; height:calc(46px + env(safe-area-inset-bottom)); padding:0 10px env(safe-area-inset-bottom); display:flex; align-items:center; gap:10px; background:#0b0907; border-top:1px solid #2e231a; font:11px var(--mono); color:#8a8276; letter-spacing:.08em; }
   #makeBack{ height:32px; padding:0 14px; border-radius:8px; background:#0b0907; color:#f2ede2; border:1px solid #c8302c; font:700 11px var(--ui); letter-spacing:.14em; cursor:pointer; }
@@ -421,7 +428,7 @@
 <div class="z top" id="topZone" data-screws="4">
   <div class="brand"><div class="logo"><span>THREAT</span> TUNER</div><div class="season" id="seasonLine">WARBLOOM SEASON</div></div>
   <div class="tbtns">
-    <button class="lcd mk" id="makeBtn" data-k="MAKE" aria-label="make sounds"><small>MAKE</small><b><svg viewBox="0 0 22 16"><path d="M1 8h3l2-6 3 12 3-9 2 5 2-2h5"/></svg></b></button><button class="lcd" id="keyBtn" data-k="KEY"><small>KEY</small><b id="keyVal">—</b></button>
+    <button class="lcd mk" id="makeBtn" data-k="MAKE" aria-label="make sounds"><small>MAKE</small><b><svg viewBox="0 0 22 16"><path d="M1 8h3l2-6 3 12 3-9 2 5 2-2h5"/></svg></b></button><button class="lcd mk" id="singBtn" data-k="SING" aria-label="sing a melody"><small>SING</small><b><svg viewBox="0 0 22 16"><path d="M9 3a2 2 0 0 1 4 0v5a2 2 0 0 1-4 0zM6 7a5 5 0 0 0 10 0M11 12v3"/></svg></b></button><button class="lcd" id="keyBtn" data-k="KEY"><small>KEY</small><b id="keyVal">—</b></button>
     <button class="lcd" id="bpmBtn" data-k="BPM"><small>BPM</small><b id="bpmVal">133</b></button>
   </div>
   <div class="key-pop" id="keyPop"><div class="key-grid" id="keyGrid"></div><div class="key-mode"><button id="keyMin">MINOR</button><button id="keyMaj">MAJOR</button><button id="keyOff">OFF</button></div><div class="key-note">ON = every loop with a key moves to it · drums stay put</div></div>
@@ -464,6 +471,10 @@
 <div id="makeZone"><iframe id="makeFrame" title="SAMPLE MAKER" allow="autoplay"></iframe>
   <div id="makeBar"><button id="makeBack" data-k="MAKE BACK">◂ TUNER</button><div id="makeInfo">★ a sound = send it to TUNER</div>
   <div id="makePin"><input id="makePinIn" type="password" inputmode="numeric" maxlength="8" placeholder="PIN"><button id="makePinOk">LINK</button></div></div>
+</div>
+<!-- SING (v10.39, VOX-3726): VOICE → MIDI inside TUNER. Loads only when you press SING. → TUNER = the take lands on a track (MADE folder, MIDI kept) -->
+<div id="singZone"><iframe id="singFrame" title="VOICE MIDI" allow="microphone; autoplay"></iframe>
+  <div id="singBar"><button id="singBack" data-k="SING BACK">◂ TUNER</button><div id="singInfo">sing · REC · → TUNER</div></div>
 </div>
 <input type="file" id="fileInput" accept="audio/*,.wav,.mp3,.m4a,.aac,.aif,.aiff,.caf,.flac,.ogg,.wma" multiple>
 
@@ -546,7 +557,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.38';
+const APP_VERSION = 'v10.39';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1978,6 +1989,19 @@ TUNER.addMade = async function(s){
     if(d.type === 'tuner:ready'){ init(); return; }
     if(d.type === 'tuner:badpin'){ const had = pin(); try{ localStorage.removeItem('tuner_makerPin'); }catch(_){} showPin(true); info.textContent = had ? 'PIN didn’t work — try again' : 'enter your maker PIN once'; return; }
     if(d.type === 'tuner:sound'){ try{ const smp = await TUNER.addMade(d); if(smp){ sent++; info.innerHTML = '<b>' + sent + ' SENT</b> · ' + (smp.displayName || '') + (d.track ? ' → TRACK' : ' → MY SAMPLES'); fr.contentWindow.postMessage({ type:'tuner:got', id:d.id, track:!!d.track }, MAKER); } }catch(err){ info.textContent = 'couldn’t add that one: ' + (err && err.message || err); } }
+  });
+})();
+/* ================= SING (v10.39, VOX-3726) =================
+   VOICE → MIDI page (voice/) in #singFrame, same site. Its → TUNER button sends the take as a whole-bar WAV + the MIDI through TUNER.addMade. */
+(()=>{
+  const zone = $('singZone'), fr = $('singFrame'), info = $('singInfo'); let sent = 0, loaded = false;
+  const init = ()=>{ try{ fr.contentWindow.postMessage({ type:'tuner:init', bpm }, location.origin); }catch(e){} };
+  $('singBtn').addEventListener('click', ()=>{ zone.classList.add('on'); try{ if(isRunning) stopAll(); }catch(e){} if(!loaded){ loaded = true; fr.src = 'voice/?tuner=1'; } else init(); });
+  $('singBack').addEventListener('click', ()=>{ try{ fr.contentWindow.postMessage({ type:'tuner:close' }, location.origin); }catch(e){} zone.classList.remove('on'); try{ renderLibrary(); }catch(e){} });
+  window.addEventListener('message', async e=>{
+    if(e.origin !== location.origin || e.source !== fr.contentWindow) return; const d = e.data || {};
+    if(d.type === 'tuner:ready'){ init(); return; }
+    if(d.type === 'tuner:sound'){ try{ const smp = await TUNER.addMade(d); if(smp){ sent++; info.innerHTML = '<b>' + sent + ' SENT</b> · ' + (smp.displayName || '') + ' → TRACK'; fr.contentWindow.postMessage({ type:'tuner:got', id:d.id }, location.origin); } }catch(err){ info.textContent = 'couldn’t add that one: ' + (err && err.message || err); } }
   });
 })();
 /* ================= BOOT ================= */

@@ -133,12 +133,12 @@ function hitsOf(s){
   const sr = buf.sampleRate, hop = Math.max(64, Math.round(sr*0.005)), n = Math.floor(buf.length/hop), e = new Float32Array(n), chs = [];
   for(let c=0;c<buf.numberOfChannels;c++) chs.push(buf.getChannelData(c));
   for(let i=0;i<n;i++){ let a = 0; for(const d of chs) for(let j=i*hop, z=j+hop; j<z; j++) a += d[j]*d[j]; e[i] = Math.sqrt(a/(hop*chs.length)); }
-  let mx = 0; const fl = new Float32Array(n); for(let i=1;i<n;i++){ fl[i] = Math.max(0, e[i] - e[i-1]); if(fl[i] > mx) mx = fl[i]; }
+  let mx = 0; const fl = new Float32Array(n); fl[0] = e[0]; mx = fl[0]; for(let i=1;i<n;i++){ fl[i] = Math.max(0, e[i] - e[i-1]); if(fl[i] > mx) mx = fl[i]; }
   const out = []; let last = -1e9; const gap = Math.round(0.04*sr/hop);
-  for(let i=1;i<n-1;i++){ if(fl[i] < 0.08*mx || fl[i] < fl[i-1] || fl[i] < fl[i+1]) continue;
+  for(let i=0;i<n-1;i++){ if(fl[i] < 0.08*mx || (i && fl[i] < fl[i-1]) || fl[i] < fl[i+1]) continue;
     let m = 0, k0 = Math.max(0, i-10), k1 = Math.min(n, i+11); for(let k=k0;k<k1;k++) m += fl[k]; m /= (k1 - k0);
-    if(fl[i] < 1.6*m) continue; if(i - last < gap){ if(out.length && fl[i] > out[out.length-1].f){ out[out.length-1] = { t:(i-0.25)*hop/sr, f:fl[i] }; last = i; } continue; }
-    out.push({ t:(i-0.25)*hop/sr, f:fl[i] }); last = i; }
+    if(fl[i] < 1.6*m) continue; if(i - last < gap){ if(out.length && fl[i] > out[out.length-1].f){ out[out.length-1] = { t:Math.max(0, (i-0.25)*hop/sr), f:fl[i] }; last = i; } continue; }
+    out.push({ t:Math.max(0, (i-0.25)*hop/sr), f:fl[i] }); last = i; }
   return (s._hits = out.map(h=>h.t));
 }
 function lockSources(){ return channels.filter(c=> c !== ed.ch && c.sample && c.sample.buffer); }
@@ -263,5 +263,5 @@ function boot(){ build();
   const ob = $('optNotes'); if(ob) ob.addEventListener('click', ()=>{ const ch = selCh(); closeOptions(); if(ch){ if(ch.sample.folder === 'STEPS' && window.STEPS) STEPS.open(false); else { draw._fit = false; open(ch); } } });
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-API.open = ch => { draw._fit = false; return open(ch); }; API._ed = ()=>ed; API._parse = parseSMF; API._write = writeSMF; API._detect = detectNotes;
+API.open = ch => { draw._fit = false; return open(ch); }; API._ed = ()=>ed; API._hits = hitsOf; API._parse = parseSMF; API._write = writeSMF; API._detect = detectNotes;
 })();

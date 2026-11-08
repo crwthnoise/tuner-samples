@@ -95,9 +95,17 @@ async function render(){
   try{
     const sr = ed.src.sampleRate, len = ed.beats*ed.spb, oc = new OfflineAudioContext(ed.src.numberOfChannels, Math.ceil(len*sr), sr);
     ed.notes.forEach(n=>{ const r = Math.pow(2, (n.p - n.src.p0)/12), t = n.b*ed.spb; if(t >= len) return; const s = oc.createBufferSource(); s.buffer = ed.src; s.playbackRate.value = r;
-      const g = oc.createGain(); s.connect(g); g.connect(oc.destination); const avail = Math.max(0.01, (n.src.t1 - n.src.t0)/r), dur = Math.min(n.len*ed.spb, avail, len - t);
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.002); g.gain.setValueAtTime(1, t + Math.max(0.002, dur - 0.006)); g.gain.linearRampToValueAtTime(0, t + dur);
-      s.start(t, n.src.t0); s.stop(t + dur + 0.005); });
+      const g = oc.createGain(); s.connect(g); g.connect(oc.destination); const avail = Math.max(0.01, (n.src.t1 - n.src.t0)/r), want = Math.min(n.len*ed.spb, len - t), XF = 0.008;
+      if(want <= avail + 0.003 || avail < 0.04){ const dur = Math.min(want, avail);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.002); g.gain.setValueAtTime(1, t + Math.max(0.002, dur - 0.006)); g.gain.linearRampToValueAtTime(0, t + dur);
+        s.start(t, n.src.t0); s.stop(t + dur + 0.005); return; }
+      /* v10.47b: longer than its slice (GROOVE LOCK stretched it) → keep it ringing by looping the note's own tail, crossfaded — no bleed from the next note */
+      const a = t + avail - XF; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.002); g.gain.setValueAtTime(1, a); g.gain.linearRampToValueAtTime(0, a + XF);
+      s.start(t, n.src.t0); s.stop(a + XF + 0.002);
+      const tailLen = Math.min(0.06, (n.src.t1 - n.src.t0)*0.4), ls = n.src.t1 - tailLen, e = oc.createBufferSource(); e.buffer = ed.src; e.playbackRate.value = r; e.loop = true; e.loopStart = ls; e.loopEnd = n.src.t1;
+      const g2 = oc.createGain(); e.connect(g2); g2.connect(oc.destination); const end = t + want;
+      g2.gain.setValueAtTime(0, a); g2.gain.linearRampToValueAtTime(1, a + XF); g2.gain.setValueAtTime(1, Math.max(a + XF, end - 0.006)); g2.gain.linearRampToValueAtTime(0, end);
+      e.start(a, n.src.t1 - XF*r); e.stop(end + 0.005); });
     const buf = await oc.startRendering();
     if(!ed.edit){
       const wav = bufferToWav(buf, 24), o = ed.orig;
@@ -129,8 +137,8 @@ function hitsOf(s){
   const out = []; let last = -1e9; const gap = Math.round(0.04*sr/hop);
   for(let i=1;i<n-1;i++){ if(fl[i] < 0.08*mx || fl[i] < fl[i-1] || fl[i] < fl[i+1]) continue;
     let m = 0, k0 = Math.max(0, i-10), k1 = Math.min(n, i+11); for(let k=k0;k<k1;k++) m += fl[k]; m /= (k1 - k0);
-    if(fl[i] < 1.6*m) continue; if(i - last < gap){ if(out.length && fl[i] > out[out.length-1].f){ out[out.length-1] = { t:(i-1)*hop/sr, f:fl[i] }; last = i; } continue; }
-    out.push({ t:(i-1)*hop/sr, f:fl[i] }); last = i; }
+    if(fl[i] < 1.6*m) continue; if(i - last < gap){ if(out.length && fl[i] > out[out.length-1].f){ out[out.length-1] = { t:(i-0.25)*hop/sr, f:fl[i] }; last = i; } continue; }
+    out.push({ t:(i-0.25)*hop/sr, f:fl[i] }); last = i; }
   return (s._hits = out.map(h=>h.t));
 }
 function lockSources(){ return channels.filter(c=> c !== ed.ch && c.sample && c.sample.buffer); }
@@ -154,10 +162,18 @@ function lockMarks(){ /* where the perc hits land inside this bass loop (drawn a
   return out;
 }
 function applyLock(){
-  if(!ed) return; let moved = 0, near = 0; const cur = ed.notes[ed.sel];
-  ed.notes.forEach(n=>{ if(!lock.base.has(n)) lock.base.set(n, n.b); const b0 = lock.base.get(n); n.b = b0;
-    if(!lock.on || !lock.src) return; const d = lockDelta(b0); if(d == null || Math.abs(d) > LOCK_WIN) return; near++;
-    n.b = clamp(b0 + d*lock.amt/100, 0, ed.beats - 1/64); if(Math.abs(n.b - b0) > 1e-4) moved++; });
+  if(!ed) return; let near = 0; const cur = ed.notes[ed.sel];
+  ed.notes.forEach(n=>{ if(!lock.base.has(n)) lock.base.set(n, { b:n.b, len:n.len }); const o = lock.base.get(n); n.b = o.b; n.len = o.len; });
+  if(lock.on && lock.src){
+    ed.notes.forEach(n=>{ const o = lock.base.get(n), d = lockDelta(o.b); if(d == null || Math.abs(d) > LOCK_WIN) return; near++; n.b = clamp(o.b + d*lock.amt/100, 0, ed.beats - 1/64); });
+    /* v10.47b: lengths follow the groove — a note never gets shorter than you made it, and notes that touched still touch (no clipped gaps) */
+    const by = ed.notes.slice().sort((a,c)=> lock.base.get(a).b - lock.base.get(c).b);
+    by.forEach((n, i)=>{ const o = lock.base.get(n), nx = by[i+1], ox = nx && lock.base.get(nx);
+      const legato = ox && ox.b - (o.b + o.len) < 0.13;
+      let L = legato ? nx.b - n.b : o.len + Math.max(0, o.b - n.b);
+      if(nx && n.b + L > nx.b) L = nx.b - n.b;
+      n.len = Math.max(1/32, Math.min(L, ed.beats - n.b)); });
+  }
   ed.notes.sort((a,c)=>a.b-c.b); ed.sel = cur ? ed.notes.indexOf(cur) : -1;
   $('ntInfo').textContent = lock.on && lock.src ? near + ' of ' + ed.notes.length + ' notes locked to ' + (lock.src.sample.displayName || 'the perc').toUpperCase() : 'changes land on the track as you go';
   changed();
@@ -205,7 +221,7 @@ function events(cv){
     if(drag.mode === 'len'){ n.len = clamp(Math.round((drag.l0 + db)*4)/4 || 0.25, 0.125, ed.beats - n.b); }
     else { n.b = clamp(Math.round((drag.b0 + db)*4)/4, 0, ed.beats - 0.125); const np = snapPitch(drag.p0 + Math.round(dp), Math.sign(dp)); if(np !== n.p){ n.p = np; hear(n); } }
     draw(); });
-  const end = ()=>{ if(!drag) return; const moved = drag.moved; drag = null; if(moved){ const cur = ed.notes[ed.sel]; if(cur) lock.base.set(cur, cur.b); ed.notes.sort((a,c)=>a.b-c.b); ed.sel = ed.notes.indexOf(cur); changed(); } };
+  const end = ()=>{ if(!drag) return; const moved = drag.moved; drag = null; if(moved){ const cur = ed.notes[ed.sel]; if(cur) lock.base.set(cur, { b:cur.b, len:cur.len }); ed.notes.sort((a,c)=>a.b-c.b); ed.sel = ed.notes.indexOf(cur); changed(); } };
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
 }
 function nearest(b){ let best = null, bd = 1e9; ed.notes.forEach(n=>{ const d = Math.abs(n.b - b); if(d < bd){ bd = d; best = n; } }); return best; }

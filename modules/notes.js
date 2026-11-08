@@ -1,0 +1,190 @@
+/* NOTES (v10.45, TNR-4729.20) — change the notes of a bassline (or any one-note-at-a-time sound) right in TUNER.
+   It keeps YOUR sound: every note is the real slice of the audio, moved / re-pitched / shortened. Nothing gets re-synthesized.
+   Notes come from the sound's MIDI (MAKE / SING keep it); a plain loop gets its notes read from the audio.
+   The first change makes "<name> · EDIT" in the library and swaps it onto the track; the original stays untouched. */
+(function(){
+'use strict';
+const API = window.TNOTES = window.TNOTES || {};   /* (TUNER already has a NOTES list of note names) */
+const $ = id => document.getElementById(id);
+const mk = (t, c, h) => { const e = document.createElement(t); if(c) e.className = c; if(h != null) e.innerHTML = h; return e; };
+const NN = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const pname = p => NN[((p % 12) + 12) % 12] + (Math.floor(p/12) - 1);
+
+/* ---------- MIDI in / out ---------- */
+function parseSMF(ab){
+  const d = new DataView(ab); let i = 0; const str = n => { let s = ''; for(let k=0;k<n;k++) s += String.fromCharCode(d.getUint8(i+k)); return s; };
+  if(str(4) !== 'MThd') return null; const hl = d.getUint32(4); const ntr = d.getUint16(10), div = d.getUint16(12); const ppq = div & 0x8000 ? 480 : div; i = 8 + hl;
+  const notes = [];
+  for(let t=0; t<ntr && i < d.byteLength; t++){
+    if(str(4) !== 'MTrk'){ break; } const len = d.getUint32(i+4); let p = i + 8; const end = p + len; let tick = 0, run = 0; const on = {};
+    const vlq = ()=>{ let v = 0, b; do{ b = d.getUint8(p++); v = (v << 7) | (b & 0x7f); } while(b & 0x80); return v; };
+    while(p < end){ tick += vlq(); let st = d.getUint8(p); if(st & 0x80){ p++; run = st; } else st = run;
+      const ty = st & 0xf0;
+      if(st === 0xff){ p++; const l = vlq(); p += l; continue; } if(st === 0xf0 || st === 0xf7){ const l = vlq(); p += l; continue; }
+      if(ty === 0x90 || ty === 0x80){ const n = d.getUint8(p), v = d.getUint8(p+1); p += 2; const k = (st & 15) + ':' + n;
+        if(ty === 0x90 && v > 0){ on[k] = { tick, v }; } else if(on[k]){ notes.push({ b:on[k].tick/ppq, len:Math.max(1/64, (tick - on[k].tick)/ppq), p:n, v:on[k].v }); delete on[k]; } }
+      else if(ty === 0xc0 || ty === 0xd0) p += 1; else p += 2; }
+    i = end; }
+  return notes.sort((a,b)=>a.b-b.b);
+}
+function writeSMF(notes, bpm){
+  const ppq = 480, ev = []; notes.forEach(n=>{ const s = Math.round(n.b*ppq), e = Math.max(s+1, Math.round((n.b+n.len)*ppq)); ev.push([s, 0x90, n.p, n.v||100]); ev.push([e, 0x80, n.p, 0]); });
+  ev.sort((a,b)=> a[0]-b[0] || a[1]-b[1]);
+  const tr = []; const vlq = v => { const o = [v & 0x7f]; while(v >>= 7) o.unshift((v & 0x7f) | 0x80); return o; };
+  const us = Math.round(60000000/(bpm||120)); tr.push(0, 0xff, 0x51, 3, (us>>16)&255, (us>>8)&255, us&255);
+  let last = 0; ev.forEach(([t, s, n, v])=>{ tr.push(...vlq(t - last), s, n, v); last = t; }); tr.push(0, 0xff, 0x2f, 0);
+  const out = new Uint8Array(14 + 8 + tr.length), dv = new DataView(out.buffer);
+  out.set([0x4d,0x54,0x68,0x64], 0); dv.setUint32(4, 6); dv.setUint16(8, 0); dv.setUint16(10, 1); dv.setUint16(12, ppq);
+  out.set([0x4d,0x54,0x72,0x6b], 14); dv.setUint32(18, tr.length); out.set(tr, 22); return out.buffer;
+}
+
+/* ---------- read notes from audio (one note at a time: bass, leads) ---------- */
+function detectNotes(buf, spb){
+  /* pitch track at ~8 kHz, 20 ms frames; a new note starts when the pitch changes or the level jumps */
+  const sr0 = buf.sampleRate, k = Math.max(1, Math.floor(sr0/8000)), sr = sr0/k, src = buf.getChannelData(0), N = Math.floor(src.length/k), d = new Float32Array(N);
+  for(let i=0;i<N;i++){ let a = 0; for(let j=0;j<k;j++) a += src[i*k + j]; d[i] = a/k; }
+  const hop = Math.round(sr*0.02), W = Math.round(sr*0.064), F = Math.max(0, Math.floor((N - W)/hop)), minL = Math.floor(sr/500), maxL = Math.min(Math.floor(sr/27), W - 8);
+  const P = new Float32Array(F), E = new Float32Array(F); let mx = 0;
+  for(let f=0; f<F; f++){ const a = f*hop; let e0 = 0; for(let j=0;j<W;j++) e0 += d[a+j]*d[a+j]; E[f] = Math.sqrt(e0/W); if(E[f] > mx) mx = E[f];
+    if(e0 < 1e-7){ P[f] = 0; continue; } let best = 0, bl = 0; const Wc = W - maxL;
+    for(let L=minL; L<=maxL; L++){ let c = 0, e1 = 0, e2 = 0; for(let j=0;j<Wc;j++){ const x = d[a+j], y = d[a+j+L]; c += x*y; e1 += x*x; e2 += y*y; } const r = c/Math.sqrt(e1*e2 + 1e-12); if(r > best + 0.01){ best = r; bl = L; } }
+    P[f] = best > 0.6 && bl ? 69 + 12*Math.log2((sr/bl)/440) : 0; }
+  if(mx <= 0) return [];
+  const out = []; let cur = null;
+  const close = f => { if(cur){ const ps = cur.ps.slice().sort((a,b)=>a-b), p = Math.round(ps[Math.floor(ps.length/2)]); const t0 = Math.max(0, cur.f0*hop/sr - 0.008), t1 = f*hop/sr + W/sr*0.5; if(t1 - t0 > 0.05) out.push({ b:t0/spb, len:(t1 - t0)/spb, p, v:100 }); cur = null; } };
+  for(let f=0; f<F; f++){ const voiced = P[f] > 0 && E[f] > 0.08*mx, pr = Math.round(P[f]);
+    if(!voiced){ close(f); continue; }
+    const jump = f > 1 && E[f] - Math.min(E[f-1], E[f-2]) > 0.22*mx;
+    if(cur){ const cp = Math.round(cur.ps[cur.ps.length - 1]); const nxt = f + 1 < F ? Math.round(P[f+1]) : pr; if((pr !== cp && nxt === pr) || jump){ close(f); } }
+    if(!cur) cur = { f0:f, ps:[] }; cur.ps.push(P[f]); }
+  close(F);
+  return out;
+}
+/* ---------- state ---------- */
+let zone = null, ed = null;   /* ed = { ch, orig, src (buffer the slices come from), spb, notes[], beats, sel, edit (sample) } */
+const scaleSet = ()=>{ const k = songKeyState || (ed && parseKey(ed.orig.key)); if(!k) return null; const deg = k.minor ? [0,2,3,5,7,8,10] : [0,2,4,5,7,9,11]; return new Set(deg.map(x=>(x + k.root) % 12)); };
+let snapScale = true;
+function snapPitch(p, dir){ const S = scaleSet(); if(!snapScale || !S) return p; if(S.has(((p % 12) + 12) % 12)) return p; for(let k=1;k<7;k++){ const a = p + k*(dir || 1), b = p - k*(dir || 1); if(S.has(((a % 12)+12)%12)) return a; if(S.has(((b % 12)+12)%12)) return b; } return p; }
+
+async function open(ch){
+  if(!ch){ setStatus('tap a loop first'); return; }
+  const s = ch.sample; if(!s.buffer) await ensureLoaded(s); if(!s.buffer){ setStatus("can't read that sound"); return; }
+  let saved = null; try{ saved = await Store.get('notes:' + s.id); }catch(e){}
+  let orig = s, src = s.buffer, notes = null, how = 'MIDI';
+  if(saved && saved.notes){ const o = samples.find(x=>x.id === saved.orig); if(o){ if(!o.buffer) await ensureLoaded(o); if(o.buffer){ orig = o; src = o.buffer; notes = saved.notes.map(n=>Object.assign({}, n, { src:Object.assign({}, n.src) })); how = 'EDIT'; } } }
+  const spb = 60/sampleBpm(orig);
+  if(!notes){
+    let mid = null; if(s.midi || s.folder === 'MADE'){ try{ mid = await Store.get('smidi:' + s.id); }catch(e){} }
+    let L = mid ? parseSMF(mid instanceof ArrayBuffer ? mid : (mid.buffer || mid)) : null;
+    if(!L || !L.length){ L = detectNotes(src, spb); how = 'READ FROM THE AUDIO'; }
+    if(!L.length){ setStatus('no clear notes in this one (works best on one-note-at-a-time sounds)'); return; }
+    notes = L.map((n, i)=>{ const t0 = n.b*spb, nx = L[i+1], t1 = Math.min(src.duration, Math.max(t0 + n.len*spb, nx ? Math.min(nx.b*spb, t0 + n.len*spb + 0.04) : t0 + n.len*spb + 0.04));
+      return { b:n.b, len:n.len, p:n.p, v:n.v || 100, src:{ t0, t1, p0:n.p } }; });
+  }
+  ed = { ch, orig, src, spb, notes, beats:loopBeats(s), sel:-1, edit: saved && saved.notes ? s : null, how };
+  zone.classList.add('on'); $('ntTitle').textContent = (s.displayName || 'sound').toUpperCase(); $('ntHow').textContent = notes.length + ' notes · ' + how; paint(); draw(); headLoop();
+}
+function close(){ zone.classList.remove('on'); }
+
+/* ---------- render the edited notes from the original slices ---------- */
+let rT = null, saveT = null, busy = false, again = false;
+function changed(){ clearTimeout(rT); rT = setTimeout(render, 160); draw(); }
+async function render(){
+  if(busy){ again = true; return; } busy = true;
+  try{
+    const sr = ed.src.sampleRate, len = ed.beats*ed.spb, oc = new OfflineAudioContext(ed.src.numberOfChannels, Math.ceil(len*sr), sr);
+    ed.notes.forEach(n=>{ const r = Math.pow(2, (n.p - n.src.p0)/12), t = n.b*ed.spb; if(t >= len) return; const s = oc.createBufferSource(); s.buffer = ed.src; s.playbackRate.value = r;
+      const g = oc.createGain(); s.connect(g); g.connect(oc.destination); const avail = Math.max(0.01, (n.src.t1 - n.src.t0)/r), dur = Math.min(n.len*ed.spb, avail, len - t);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.002); g.gain.setValueAtTime(1, t + Math.max(0.002, dur - 0.006)); g.gain.linearRampToValueAtTime(0, t + dur);
+      s.start(t, n.src.t0); s.stop(t + dur + 0.005); });
+    const buf = await oc.startRendering();
+    if(!ed.edit){
+      const wav = bufferToWav(buf, 24), o = ed.orig;
+      const s = await addSample(new File([wav], (o.name || 'sound').replace(/\.[^.]+$/, '') + ' EDIT ' + Date.now() + '.wav', { type:'audio/wav' }), { folder:o.folder === 'MADE' ? 'MADE' : 'My samples', bpm:sampleBpm(o), key:o.key, displayName:(o.displayName || 'sound') + ' · EDIT', tags:(o.tags || []).concat(['edit']), arrayBuf:wav, quiet:true });
+      if(!s) return; ed.edit = s; s.midi = true;
+      const ch = ed.ch; ch.sample = s; ch.buffer = s.buffer; ch.env = s.env; rebuildBuffer(ch); if(isRunning) reschedule(); refreshTimeline(); drawTL(); markDirty(); commit();
+      setStatus('EDIT on the track · the original is still in your library');
+    } else {
+      const s = ed.edit; s.buffer = buf; s._st = new Map(); s._hq = new Map(); s.env = buildEnvelope(buf); s.peaks = buildPeaks(buf); try{ s.waveImg = renderWaveformImage(buf); }catch(e){}
+      channels.forEach(c=>{ if(c.sample === s){ c.buffer = buf; c.env = s.env; rebuildBuffer(c); } }); if(isRunning) reschedule(); drawTL(); markDirty();
+    }
+    clearTimeout(saveT); const s = ed.edit, notes = ed.notes.map(n=>Object.assign({}, n, { src:Object.assign({}, n.src) })), origId = ed.orig.id, bp = sampleBpm(ed.orig);
+    saveT = setTimeout(()=>{ try{ saveSampleAudio(s, bufferToWav(s.buffer, 24), 'audio/wav'); saveSampleMeta(s); Store.set('notes:' + s.id, { orig:origId, notes }); Store.set('smidi:' + s.id, writeSMF(notes, bp)); }catch(e){} commit(); }, 700);
+  }catch(e){ setStatus('NOTES: ' + (e && e.message || 'render failed')); }
+  finally{ busy = false; if(again){ again = false; render(); } }
+}
+
+/* ---------- the roll ---------- */
+let view = { lo:36, hi:60 };
+function fitView(){ const ps = ed.notes.map(n=>n.p); const lo = Math.min(...ps), hi = Math.max(...ps); const mid = Math.round((lo + hi)/2), span = Math.max(18, hi - lo + 8); view = { lo:mid - Math.ceil(span/2), hi:mid + Math.ceil(span/2) }; }
+function geom(){ const cv = $('ntRoll'), r = cv.getBoundingClientRect(), KW = 30; return { cv, r, KW, w:r.width - KW, h:r.height, rows:view.hi - view.lo + 1 }; }
+const xOf = (g, b)=> g.KW + b/ed.beats*g.w, yOf = (g, p)=> (view.hi - p)*g.h/g.rows;
+function draw(){
+  if(!ed || !zone.classList.contains('on')) return; const cv = $('ntRoll'), cx = cv.getContext('2d'); const s = fitCanvas(cv, cx); if(!s) return;
+  if(!draw._fit){ fitView(); draw._fit = true; }
+  const g = geom(), rh = g.h/g.rows, S = scaleSet(), cs = getComputedStyle(document.documentElement), green = cs.getPropertyValue('--green').trim() || '#4fd1a5', mono = cs.getPropertyValue('--mono').trim() || 'monospace';
+  cx.clearRect(0, 0, s.w, s.h);
+  for(let p=view.lo; p<=view.hi; p++){ const y = yOf(g, p), pc = ((p % 12) + 12) % 12, inS = S && S.has(pc);
+    cx.fillStyle = pc === 0 ? 'rgba(242,237,226,.07)' : inS ? 'rgba(79,209,165,.05)' : (S ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.015)'); cx.fillRect(g.KW, y, g.w, rh);
+    cx.fillStyle = [1,3,6,8,10].includes(pc) ? '#14110e' : '#2a2520'; cx.fillRect(0, y + 0.5, g.KW - 3, rh - 1);
+    if(pc === 0 || rh > 13){ cx.fillStyle = pc === 0 ? '#f2ede2' : '#8a8276'; cx.font = '7px ' + mono; cx.fillText(pname(p), 2, y + rh/2 + 2.5); } }
+  for(let b=0; b<=ed.beats*4; b++){ const x = xOf(g, b/4); cx.fillStyle = b % 16 === 0 ? 'rgba(242,237,226,.25)' : b % 4 === 0 ? 'rgba(242,237,226,.1)' : 'rgba(242,237,226,.035)'; cx.fillRect(x, 0, 1, g.h); }
+  ed.notes.forEach((n, i)=>{ const x = xOf(g, n.b), w = Math.max(3, n.len/ed.beats*g.w), y = yOf(g, n.p), sel = i === ed.sel;
+    cx.fillStyle = sel ? '#f2ede2' : green; cx.globalAlpha = sel ? 1 : 0.85; cx.fillRect(x + 0.5, y + 1, w - 1, rh - 2); cx.globalAlpha = 1;
+    cx.fillStyle = '#060504'; cx.fillRect(x + w - 3, y + 2, 1.5, rh - 4);
+    if(rh > 11 && w > 22){ cx.fillStyle = '#060504'; cx.font = '7px ' + mono; cx.fillText(pname(n.p), x + 3, y + rh/2 + 2.5); } });
+  const n = ed.notes[ed.sel]; $('ntSel').textContent = n ? pname(n.p) + ' · ' + (n.p - n.src.p0 >= 0 ? '+' : '') + (n.p - n.src.p0) + ' st' : 'tap a note';
+}
+function hit(g, px, py){ for(let i=ed.notes.length-1;i>=0;i--){ const n = ed.notes[i], x = xOf(g, n.b), w = Math.max(10, n.len/ed.beats*g.w), y = yOf(g, n.p), rh = g.h/g.rows; if(px >= x - 2 && px <= x + w + 2 && py >= y - 3 && py <= y + rh + 3) return { i, edge: px > x + w - Math.min(14, w*0.35) }; } return null; }
+let drag = null;
+function events(cv){
+  cv.addEventListener('pointerdown', e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId); const g = geom(), px = e.clientX - g.r.left, py = e.clientY - g.r.top; if(px < g.KW) return;
+    const h = hit(g, px, py);
+    if(h){ ed.sel = h.i; const n = ed.notes[h.i]; drag = { i:h.i, mode:h.edge ? 'len' : 'move', x0:px, y0:py, b0:n.b, p0:n.p, l0:n.len, moved:false }; hear(n); }
+    else { const b = Math.max(0, Math.floor((px - g.KW)/g.w*ed.beats*4)/4), p = snapPitch(view.hi - Math.floor(py/(g.h/g.rows))), base = ed.notes[ed.sel] || nearest(b); if(!base){ return; }
+      const nn = { b, len:Math.min(base.len, ed.beats - b), p, v:base.v, src:Object.assign({}, base.src) }; ed.notes.push(nn); ed.notes.sort((a,c)=>a.b-c.b); ed.sel = ed.notes.indexOf(nn); drag = null; hear(nn); changed(); }
+    draw(); });
+  cv.addEventListener('pointermove', e=>{ if(!drag) return; const g = geom(), px = e.clientX - g.r.left, py = e.clientY - g.r.top, n = ed.notes[drag.i]; const db = (px - drag.x0)/g.w*ed.beats, dp = -(py - drag.y0)/(g.h/g.rows);
+    if(Math.abs(px - drag.x0) + Math.abs(py - drag.y0) > 5) drag.moved = true; if(!drag.moved) return;
+    if(drag.mode === 'len'){ n.len = clamp(Math.round((drag.l0 + db)*4)/4 || 0.25, 0.125, ed.beats - n.b); }
+    else { n.b = clamp(Math.round((drag.b0 + db)*4)/4, 0, ed.beats - 0.125); const np = snapPitch(drag.p0 + Math.round(dp), Math.sign(dp)); if(np !== n.p){ n.p = np; hear(n); } }
+    draw(); });
+  const end = ()=>{ if(!drag) return; const moved = drag.moved; drag = null; if(moved){ const cur = ed.notes[ed.sel]; ed.notes.sort((a,c)=>a.b-c.b); ed.sel = ed.notes.indexOf(cur); changed(); } };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+}
+function nearest(b){ let best = null, bd = 1e9; ed.notes.forEach(n=>{ const d = Math.abs(n.b - b); if(d < bd){ bd = d; best = n; } }); return best; }
+let prev = null;
+function hear(n){ try{ if(prev) prev.stop(); }catch(e){} try{ ctx.resume(); }catch(e){} const r = Math.pow(2, (n.p - n.src.p0)/12), s = ctx.createBufferSource(); s.buffer = ed.src; s.playbackRate.value = r; const g = ctx.createGain(); g.gain.value = 0.8; s.connect(g); g.connect(masterGain); const dur = Math.min(0.5, (n.src.t1 - n.src.t0)/r); s.start(ctx.currentTime, n.src.t0); s.stop(ctx.currentTime + dur); prev = s; }
+
+/* playhead while the song plays */
+let raf = null;
+function headLoop(){ if(raf) return; const step = ()=>{ raf = null; if(!zone.classList.contains('on')) return; const ov = $('ntHead'), cx = ov.getContext('2d'), s = fitCanvas(ov, cx); if(s){ cx.clearRect(0, 0, s.w, s.h);
+      if(isRunning && ed){ const pos = samplePosAt(ed.ch, currentBeat()); if(pos >= 0){ const b = pos/ed.ch.sample.buffer.duration*ed.beats, g = geom(), x = xOf(g, b); cx.fillStyle = 'rgba(242,237,226,.6)'; cx.fillRect(x, 0, 1.2, s.h); } } }
+    paintPlay(); raf = requestAnimationFrame(step); }; raf = requestAnimationFrame(step); }
+function paintPlay(){ const b = $('ntPlay'); if(!b) return; const on = isRunning; if(b._on === on) return; b._on = on; b.classList.toggle('playing', on); b.innerHTML = on ? '<svg viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="1"/></svg>' : '<svg viewBox="0 0 20 20"><path d="M6 4l10 6-10 6z"/></svg>'; }
+function paint(){ $('ntSnap').classList.toggle('on', snapScale); $('ntSnap').textContent = scaleSet() ? (snapScale ? 'IN KEY' : 'ALL NOTES') : 'NO KEY'; }
+
+function build(){
+  zone = mk('div'); zone.id = 'notesZone';
+  zone.innerHTML = `<div class="nt-top"><div class="nt-t"><b>NOTES</b><span id="ntTitle"></span><i id="ntHow"></i></div><button class="stp-chip sm" id="ntSnap" data-k="NOTES SNAP">IN KEY</button></div>
+  <div class="nt-roll"><canvas id="ntRoll"></canvas><canvas id="ntHead"></canvas></div>
+  <div class="nt-hint">tap a note = hear · drag = move / pitch · drag its end = length · tap empty = add · the line plays your song</div>
+  <div class="nt-tools"><span id="ntSel">tap a note</span><button class="stp-chip sm" id="ntUp" data-k="NOTES UP">▲</button><button class="stp-chip sm" id="ntDown" data-k="NOTES DOWN">▼</button><button class="stp-chip sm" id="ntOctU" data-k="NOTES OCT+">OCT +</button><button class="stp-chip sm" id="ntOctD" data-k="NOTES OCT-">OCT −</button><button class="stp-chip sm" id="ntDel" data-k="NOTES DELETE">DELETE</button></div>
+  <div class="stp-bar"><button id="ntBack" data-k="NOTES BACK">◂ TUNER</button><div class="stp-info" id="ntInfo">changes land on the track as you go</div><button id="ntPlay" data-k="NOTES PLAY" aria-label="play"></button></div>`;
+  document.body.appendChild(zone);
+  $('ntBack').addEventListener('click', close);
+  $('ntPlay').addEventListener('click', ()=> $('transportBtn').click());
+  $('ntSnap').addEventListener('click', ()=>{ snapScale = !snapScale; paint(); });
+  const nudge = d => { const n = ed && ed.notes[ed.sel]; if(!n) return; n.p = Math.abs(d) === 12 ? n.p + d : snapPitch(n.p + d, Math.sign(d)); hear(n); changed(); };
+  $('ntUp').addEventListener('click', ()=> nudge(1)); $('ntDown').addEventListener('click', ()=> nudge(-1)); $('ntOctU').addEventListener('click', ()=> nudge(12)); $('ntOctD').addEventListener('click', ()=> nudge(-12));
+  $('ntDel').addEventListener('click', ()=>{ if(!ed || ed.sel < 0) return; ed.notes.splice(ed.sel, 1); ed.sel = -1; changed(); });
+  events($('ntRoll'));
+  window.addEventListener('resize', ()=> draw());
+}
+function boot(){ build();
+  const lp = $('loopPill'); if(lp){ lp.style.cursor = 'pointer'; lp.addEventListener('click', ()=>{ const ch = selCh(); if(!ch) return; if(ch.sample.folder === 'STEPS' && window.STEPS && STEPS.open) STEPS.open(false); else { draw._fit = false; open(ch); } }); }
+  const ob = $('optNotes'); if(ob) ob.addEventListener('click', ()=>{ const ch = selCh(); closeOptions(); if(ch){ if(ch.sample.folder === 'STEPS' && window.STEPS) STEPS.open(false); else { draw._fit = false; open(ch); } } });
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+API.open = ch => { draw._fit = false; return open(ch); }; API._ed = ()=>ed; API._parse = parseSMF; API._write = writeSMF; API._detect = detectNotes;
+})();

@@ -114,6 +114,20 @@
   #stpWave{ width:100%; flex:1; min-height:90px; background:#0a0806; border-radius:4px; touch-action:none; }
   #stpLive{ width:100%; height:46px; flex:none; background:#0a0806; border-radius:4px; }
   .stp-row2 #stpFadeTxt{ flex:1; }
+  /* v10.45 NOTES */
+  #notesZone{ position:fixed; inset:0; z-index:885; background:#060504; display:none; flex-direction:column; padding:env(safe-area-inset-top) 0 0; box-sizing:border-box; height:100dvh; font-family:var(--mono); color:#f2ede2; user-select:none; -webkit-user-select:none; }
+  #notesZone.on{ display:flex; } #notesZone button{ font-family:var(--mono); touch-action:manipulation; cursor:pointer; }
+  .nt-top{ display:flex; align-items:center; gap:8px; padding:12px 10px 8px; }
+  .nt-t{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; } .nt-t b{ font:700 13px var(--mono); letter-spacing:3px; color:var(--green,#4fd1a5); }
+  .nt-t span{ font-size:9px; color:#f2ede2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .nt-t i{ font-style:normal; font-size:7px; color:#8a8276; letter-spacing:.08em; }
+  .nt-roll{ position:relative; flex:1; min-height:0; margin:0 8px; border:1px solid #241d16; border-radius:6px; overflow:hidden; background:#0a0806; }
+  #ntRoll{ position:absolute; inset:0; width:100%; height:100%; touch-action:none; } #ntHead{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .nt-hint{ font-size:6.5px; color:#5a554e; padding:5px 10px 0; letter-spacing:.05em; }
+  .nt-tools{ display:flex; align-items:center; gap:5px; padding:6px 8px 0; justify-content:flex-end; } .nt-tools span{ flex:1; font-size:9px; color:#c9c1b4; }
+  .nt-tools .stp-chip{ padding:8px 9px; }
+  #ntBack{ background:#1a0a0a; border:1px solid #d32f2f; color:#f2ede2; font-size:10px; letter-spacing:.08em; padding:8px 10px; border-radius:4px; }
+  #ntPlay{ width:44px; height:44px; border-radius:50%; background:#0b0907; border:1.5px solid var(--green,#4fd1a5); display:flex; align-items:center; justify-content:center; padding:0; }
+  #ntPlay svg{ width:18px; height:18px; fill:var(--green,#4fd1a5); } #ntPlay.playing{ border-color:#d32f2f; } #ntPlay.playing svg{ fill:#d32f2f; }
   .stp-shw{ position:relative; flex:1; min-height:90px; display:flex; } .stp-shw #stpShape{ flex:1; min-height:90px; }
   #stpShapeOv{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
   .stp-c.now{ border-color:#f2ede2; } .stp-c.now:not(.on){ background:#2a2520; }
@@ -615,6 +629,7 @@
     <button class="btn-ghost" id="optMuteLoop">MUTE LOOP</button>
     <button class="btn-ghost" id="optSolo" style="grid-column:1 / -1">SOLO</button>
     <button class="btn-ghost" id="optKeyLock" style="grid-column:1 / -1">KEY LOCK</button>
+    <button class="btn-ghost" id="optNotes" style="grid-column:1 / -1">EDIT NOTES</button>
     <button class="btn-ghost danger" id="optRemoveClip">DELETE CLIP</button>
     <button class="btn-ghost danger" id="optRemove">DELETE LOOP</button>
   </div>
@@ -630,14 +645,14 @@ window.__tunerEarly = []; window.__tunerBar = function(m){ try{ var b = document
 window.addEventListener('error', function(e){ var m = (e.message || 'error') + (e.lineno ? ' @' + e.lineno : ''); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' + (e.reason && e.reason.message || e.reason); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 </script>
-<script src="modules/sky.js?v=10.44"></script>
-<script src="modules/rage.js?v=10.44"></script>
-<script src="modules/grinder.js?v=10.44"></script>
-<script src="modules/flame.js?v=10.44"></script>
+<script src="modules/sky.js?v=10.45"></script>
+<script src="modules/rage.js?v=10.45"></script>
+<script src="modules/grinder.js?v=10.45"></script>
+<script src="modules/flame.js?v=10.45"></script>
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.44';
+const APP_VERSION = 'v10.45';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -2118,6 +2133,7 @@ setTimeout(checkVersion, 1500); document.addEventListener('visibilitychange', ()
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 (async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); let lp = null; try{ lp = localStorage.getItem('tuner_lastProj'); }catch(e){} if(lp && !channels.length){ await loadProjectById(lp, { quiet:true }); } }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
 </script>
-<script src="modules/steps.js?v=10.44"></script>
+<script src="modules/steps.js?v=10.45"></script>
+<script src="modules/notes.js?v=10.45"></script>
 </body>
 </html>

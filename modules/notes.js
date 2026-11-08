@@ -245,29 +245,37 @@ const shuf = { ref:null, level:0, hist:[] };
 const copyNotes = L => L.map(n=> Object.assign({}, n, { src:Object.assign({}, n.src) }));
 function manual(){ shuf.ref = null; shuf.level = 0; paintShuf(); }
 function grooveSpots(){
-  const L = ed.beats, out = new Set(); for(let b=0; b<L; b+=0.25) out.add(Math.round(b*4)/4);
-  try{ const pc = (lock.src && channels.includes(lock.src)) ? lock.src : pickSource(); if(pc){ const keep = lock.src; lock.src = pc; lockMarks().forEach(b=> out.add(Math.round(b*8)/8)); lock.src = keep; } }catch(e){}
-  return [...out].filter(b=> b >= 0 && b < L).sort((a,b)=>a-b);
+  /* v10.52: linked to the perc — when a perc/drum track is in the song, SHUFFLE only puts notes on its hits */
+  const L = ed.beats, grid = []; for(let b=0; b<L; b+=0.25) grid.push(b);
+  try{ const pc = (lock.src && channels.includes(lock.src)) ? lock.src : pickSource(); if(pc){ const keep = lock.src; lock.src = pc; const m = lockMarks(); lock.src = keep;
+    const hits = [...new Set(m.map(b=> Math.round(b*48)/48))].filter(b=> b >= 0 && b < L).sort((a,b)=>a-b); if(hits.length >= 4) return { spots:hits, pc }; } }catch(e){}
+  return { spots:grid, pc:null };
 }
 const rnd = a => a[Math.floor(Math.random()*a.length)];
 function shuffleOnce(){
   if(!ed || !ed.notes.length) return;
   if(!shuf.ref){ shuf.ref = copyNotes(ed.notes).sort((a,c)=>a.b-c.b); shuf.level = 0; }
   shuf.hist.push(copyNotes(ed.notes)); if(shuf.hist.length > 30) shuf.hist.shift();
-  shuf.level++; const lv = shuf.level, ref = shuf.ref, n = ref.length, L = ed.beats, spots = grooveSpots();
-  /* 1 · rhythm: move notes to nearby groove spots (further each level); first note stays put until press 5 */
-  let on = ref.map(r=> r.b);
-  if(lv >= 5){ const pool = spots.slice(); on = []; for(let i=0; i<n && pool.length; i++) on.push(pool.splice(Math.floor(Math.random()*pool.length), 1)[0]); on.sort((a,b)=>a-b); }
+  shuf.level++; const lv = shuf.level, ref = shuf.ref, n = ref.length, L = ed.beats, gs = grooveSpots(), spots = gs.spots;
+  const sig = L => L.map(n=> n.b.toFixed(2) + ':' + n.p).join(','), now = sig(ed.notes); let out, spotsUse = spots;
+  for(let attempt = 0; attempt < 8; attempt++){
+  if(attempt === 5) spotsUse = [...new Set(spots.concat(Array.from({length:L*4}, (_, i)=> i/4)))].sort((a,b)=>a-b);
+  /* 1 · rhythm: move notes to nearby groove spotsUse (further each level); first note stays put until press 5 */
+  let on = ref.map(r=> r.b);  /* (try a few times so a press never gives the same thing back) */
+  if(lv >= 5){ const pool = spotsUse.slice(); on = []; for(let i=0; i<n && pool.length; i++) on.push(pool.splice(Math.floor(Math.random()*pool.length), 1)[0]); on.sort((a,b)=>a-b); }
   else { const reach = [0, 0.25, 0.5, 0.75, 1][lv], share = lv <= 2 ? 0.4 : 0.6;
-    on = on.map((b, i)=>{ if(i === 0 || Math.random() > share) return b; const near = spots.filter(x=> Math.abs(x - b) <= reach + 1e-6 && Math.abs(x - b) > 1e-6); return near.length ? rnd(near) : b; });
-    const used = new Set(); on = on.map(b=>{ let x = b; while(used.has(x.toFixed(3)) && x < L - 0.25) x += 0.25; used.add(x.toFixed(3)); return x; }).sort((a,b)=>a-b); }
+    on = on.map((b, i)=>{ if(i === 0 || Math.random() > share) return b; const near = spotsUse.filter(x=> Math.abs(x - b) <= reach + 1e-6 && Math.abs(x - b) > 1e-6); return near.length ? rnd(near) : b; });
+    if(gs.pc) on = on.map(b=>{ let best = b, bd = 1e9; spotsUse.forEach(x=>{ const d = Math.abs(x - b); if(d < bd){ bd = d; best = x; } }); return bd <= 0.125 ? best : b; });   /* close ones sit right on the hit */
+    const used = new Set(); on = on.map(b=>{ let x = b; if(used.has(x.toFixed(3))){ const free = spotsUse.filter(y=> y > x && !used.has(y.toFixed(3))); x = free.length ? free[0] : x + 0.25; } used.add(x.toFixed(3)); return x; }).sort((a,b)=>a-b); }
   /* 2 · which note goes where: same order (levels 1–2), a couple of neighbour swaps (3–4), shuffled (5+) */
   let order = ref.map((_, i)=> i);
   if(lv >= 5){ for(let i=n-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [order[i], order[j]] = [order[j], order[i]]; } }
   else if(lv >= 3){ const swaps = lv === 3 ? 1 : 2; for(let k=0;k<swaps && n > 2;k++){ const i = 1 + Math.floor(Math.random()*(n - 2)); [order[i], order[i+1]] = [order[i+1], order[i]]; } }
   /* 3 · lengths: each note keeps its length but never runs into the next one */
-  const out = on.slice(0, n).map((b, i)=>{ const r = ref[order[i]], nx = on[i+1]; const len = Math.max(0.125, Math.min(r.len, (nx != null ? nx : L) - b, L - b)); return Object.assign({}, r, { b, len, src:Object.assign({}, r.src) }); });
-  ed.notes = out; ed.sel = -1; lock.base = new WeakMap(); if(lock.on) applyLock(); else changed(); paintShuf();
+  out = on.slice(0, n).map((b, i)=>{ const r = ref[order[i]], nx = on[i+1]; const len = Math.max(0.125, Math.min(r.len, (nx != null ? nx : L) - b, L - b)); return Object.assign({}, r, { b, len, src:Object.assign({}, r.src) }); });
+  if(sig(out) !== now) break; }
+  ed.notes = out; ed.sel = -1; lock.base = new WeakMap();
+  if(gs.pc && !lock.on){ lock.src = gs.pc; setLock(true); } else if(lock.on) applyLock(); else changed(); paintShuf();
 }
 function unshuffle(){ if(!shuf.hist.length) return; ed.notes = shuf.hist.pop(); ed.sel = -1; shuf.level = Math.max(0, shuf.level - 1); if(!shuf.level) shuf.ref = null; lock.base = new WeakMap(); if(lock.on) applyLock(); else changed(); paintShuf(); }
 function paintShuf(){ const t = $('ntLvl'); if(!t) return; const lv = shuf.level;

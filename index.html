@@ -652,14 +652,14 @@ window.__tunerEarly = []; window.__tunerBar = function(m){ try{ var b = document
 window.addEventListener('error', function(e){ var m = (e.message || 'error') + (e.lineno ? ' @' + e.lineno : ''); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' + (e.reason && e.reason.message || e.reason); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 </script>
-<script src="modules/sky.js?v=10.51"></script>
-<script src="modules/rage.js?v=10.51"></script>
-<script src="modules/grinder.js?v=10.51"></script>
-<script src="modules/flame.js?v=10.51"></script>
+<script src="modules/sky.js?v=10.52"></script>
+<script src="modules/rage.js?v=10.52"></script>
+<script src="modules/grinder.js?v=10.52"></script>
+<script src="modules/flame.js?v=10.52"></script>
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.51';
+const APP_VERSION = 'v10.52';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -2140,8 +2140,8 @@ setTimeout(checkVersion, 1500); document.addEventListener('visibilitychange', ()
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 (async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); let lp = null; try{ lp = localStorage.getItem('tuner_lastProj'); }catch(e){} if(lp && !channels.length){ await loadProjectById(lp, { quiet:true }); } }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
 </script>
-<script src="modules/steps.js?v=10.51"></script>
-<script src="modules/notes.js?v=10.51"></script>
-<script src="modules/pad.js?v=10.51"></script>
+<script src="modules/steps.js?v=10.52"></script>
+<script src="modules/notes.js?v=10.52"></script>
+<script src="modules/pad.js?v=10.52"></script>
 </body>
 </html>

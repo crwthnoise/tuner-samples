@@ -82,6 +82,7 @@ async function open(ch){
       return { b:n.b, len:n.len, p:n.p, v:n.v || 100, src:{ t0, t1, p0:n.p } }; });
   }
   ed = { ch, orig, src, spb, notes, beats:loopBeats(s), sel:-1, edit: saved && saved.notes ? s : null, how };
+  lock.on = false; lock.base = new WeakMap(); lock.marks = []; if(zone){ paintLock(); $('ntInfo').textContent = 'changes land on the track as you go'; }
   zone.classList.add('on'); $('ntTitle').textContent = (s.displayName || 'sound').toUpperCase(); $('ntHow').textContent = notes.length + ' notes · ' + how; paint(); draw(); headLoop();
 }
 function close(){ zone.classList.remove('on'); }
@@ -114,6 +115,60 @@ async function render(){
   finally{ busy = false; if(again){ again = false; render(); } }
 }
 
+/* ---------- GROOVE LOCK (v10.47) — the notes that are CLOSE to a hit of another track (your perc) snap onto it ----------
+   Only notes within a 1/32 of a hit move; the rest stay where you put them. Strength 0 = your timing, 100 = dead on the perc.
+   Non-destructive: the slider always works from where the notes were, so OFF puts them back. */
+const LOCK_WIN = 0.125;   /* beats = a 1/32 note */
+const lock = { on:false, src:null, amt:100, base:new WeakMap(), marks:[] };
+function hitsOf(s){
+  if(s._hits) return s._hits; const buf = s.buffer; if(!buf) return [];
+  const sr = buf.sampleRate, hop = Math.max(64, Math.round(sr*0.005)), n = Math.floor(buf.length/hop), e = new Float32Array(n), chs = [];
+  for(let c=0;c<buf.numberOfChannels;c++) chs.push(buf.getChannelData(c));
+  for(let i=0;i<n;i++){ let a = 0; for(const d of chs) for(let j=i*hop, z=j+hop; j<z; j++) a += d[j]*d[j]; e[i] = Math.sqrt(a/(hop*chs.length)); }
+  let mx = 0; const fl = new Float32Array(n); for(let i=1;i<n;i++){ fl[i] = Math.max(0, e[i] - e[i-1]); if(fl[i] > mx) mx = fl[i]; }
+  const out = []; let last = -1e9; const gap = Math.round(0.04*sr/hop);
+  for(let i=1;i<n-1;i++){ if(fl[i] < 0.08*mx || fl[i] < fl[i-1] || fl[i] < fl[i+1]) continue;
+    let m = 0, k0 = Math.max(0, i-10), k1 = Math.min(n, i+11); for(let k=k0;k<k1;k++) m += fl[k]; m /= (k1 - k0);
+    if(fl[i] < 1.6*m) continue; if(i - last < gap){ if(out.length && fl[i] > out[out.length-1].f){ out[out.length-1] = { t:(i-1)*hop/sr, f:fl[i] }; last = i; } continue; }
+    out.push({ t:(i-1)*hop/sr, f:fl[i] }); last = i; }
+  return (s._hits = out.map(h=>h.t));
+}
+function lockSources(){ return channels.filter(c=> c !== ed.ch && c.sample && c.sample.buffer); }
+function pickSource(){ const L = lockSources(); return L.find(c=> /perc|drum|top|groove|hat|shak|conga|bongo|baile|loop/i.test(c.sample.displayName || c.sample.name || '')) || L[0] || null; }
+const percBeat = (pc, sb)=>{ const pos = samplePosAt(pc, sb); return pos < 0 ? null : pos*sampleBpm(pc.sample)/60; };
+function songBeatsOf(b){ const L = ed.beats, out = []; ed.ch.clips.forEach(c=>{ if(c.mute) return; let sb = c.start + (((b - c.off) % L) + L) % L; for(; sb < c.start + c.len; sb += L) out.push(sb); }); return out.sort((a,c)=>a-c); }
+function lockDelta(b){
+  const pc = lock.src, hits = hitsOf(pc.sample), pl = pc.sample.buffer.duration*sampleBpm(pc.sample)/60, spb = 60/sampleBpm(pc.sample); if(!hits.length) return null;
+  for(const sb of songBeatsOf(b)){ const pb = percBeat(pc, sb); if(pb == null) continue; let best = null;
+    for(const t of hits){ let d = t/spb - pb; d -= Math.round(d/pl)*pl; if(best == null || Math.abs(d) < Math.abs(best)) best = d; }
+    return best; }
+  return null;
+}
+function lockMarks(){ /* where the perc hits land inside this bass loop (drawn as ticks on the roll) */
+  const pc = lock.src, hits = hitsOf(pc.sample), spb = 60/sampleBpm(pc.sample), L = ed.beats, out = [];
+  const c = ed.ch.clips.find(x=>!x.mute); if(!c || !hits.length) return out; const hb = hits.map(t=>t/spb);
+  let prev = null; const st = 1/96;
+  for(let x=0; x<L; x+=st){ const sb = c.start + x; if(sb >= c.start + c.len) break; const pb = percBeat(pc, sb); if(pb == null){ prev = null; continue; }
+    if(prev != null){ hb.forEach(h=>{ if(pb >= prev ? (h >= prev && h < pb) : (h >= prev || h < pb)) out.push(((x - st + c.off) % L + L) % L); }); }
+    prev = pb; }
+  return out;
+}
+function applyLock(){
+  if(!ed) return; let moved = 0, near = 0; const cur = ed.notes[ed.sel];
+  ed.notes.forEach(n=>{ if(!lock.base.has(n)) lock.base.set(n, n.b); const b0 = lock.base.get(n); n.b = b0;
+    if(!lock.on || !lock.src) return; const d = lockDelta(b0); if(d == null || Math.abs(d) > LOCK_WIN) return; near++;
+    n.b = clamp(b0 + d*lock.amt/100, 0, ed.beats - 1/64); if(Math.abs(n.b - b0) > 1e-4) moved++; });
+  ed.notes.sort((a,c)=>a.b-c.b); ed.sel = cur ? ed.notes.indexOf(cur) : -1;
+  $('ntInfo').textContent = lock.on && lock.src ? near + ' of ' + ed.notes.length + ' notes locked to ' + (lock.src.sample.displayName || 'the perc').toUpperCase() : 'changes land on the track as you go';
+  changed();
+}
+function paintLock(){ const on = lock.on; $('ntLockBtn').classList.toggle('on', on); $('ntLock').style.display = on ? 'flex' : 'none';
+  $('ntLockSrc').textContent = lock.src ? '▸ ' + (lock.src.sample.displayName || 'track').toUpperCase() : 'NO OTHER TRACK'; $('ntLockVal').textContent = lock.amt; $('ntLockAmt').value = lock.amt; }
+function setLock(on){
+  if(!ed) return; if(on){ if(!lock.src || !channels.includes(lock.src) || lock.src === ed.ch) lock.src = pickSource(); if(!lock.src){ setStatus('add your perc loop to the song first, then LOCK'); return; } }
+  lock.on = on; lock.marks = on ? lockMarks() : []; paintLock(); applyLock();
+}
+
 /* ---------- the roll ---------- */
 let view = { lo:36, hi:60 };
 function fitView(){ const ps = ed.notes.map(n=>n.p); const lo = Math.min(...ps), hi = Math.max(...ps); const mid = Math.round((lo + hi)/2), span = Math.max(18, hi - lo + 8); view = { lo:mid - Math.ceil(span/2), hi:mid + Math.ceil(span/2) }; }
@@ -129,6 +184,7 @@ function draw(){
     cx.fillStyle = [1,3,6,8,10].includes(pc) ? '#14110e' : '#2a2520'; cx.fillRect(0, y + 0.5, g.KW - 3, rh - 1);
     if(pc === 0 || rh > 13){ cx.fillStyle = pc === 0 ? '#f2ede2' : '#8a8276'; cx.font = '7px ' + mono; cx.fillText(pname(p), 2, y + rh/2 + 2.5); } }
   for(let b=0; b<=ed.beats*4; b++){ const x = xOf(g, b/4); cx.fillStyle = b % 16 === 0 ? 'rgba(242,237,226,.25)' : b % 4 === 0 ? 'rgba(242,237,226,.1)' : 'rgba(242,237,226,.035)'; cx.fillRect(x, 0, 1, g.h); }
+  if(lock.on) lock.marks.forEach(b=>{ const x = xOf(g, b); cx.fillStyle = 'rgba(211,47,47,.55)'; cx.fillRect(x, 0, 1, g.h); });
   ed.notes.forEach((n, i)=>{ const x = xOf(g, n.b), w = Math.max(3, n.len/ed.beats*g.w), y = yOf(g, n.p), sel = i === ed.sel;
     cx.fillStyle = sel ? '#f2ede2' : green; cx.globalAlpha = sel ? 1 : 0.85; cx.fillRect(x + 0.5, y + 1, w - 1, rh - 2); cx.globalAlpha = 1;
     cx.fillStyle = '#060504'; cx.fillRect(x + w - 3, y + 2, 1.5, rh - 4);
@@ -149,7 +205,7 @@ function events(cv){
     if(drag.mode === 'len'){ n.len = clamp(Math.round((drag.l0 + db)*4)/4 || 0.25, 0.125, ed.beats - n.b); }
     else { n.b = clamp(Math.round((drag.b0 + db)*4)/4, 0, ed.beats - 0.125); const np = snapPitch(drag.p0 + Math.round(dp), Math.sign(dp)); if(np !== n.p){ n.p = np; hear(n); } }
     draw(); });
-  const end = ()=>{ if(!drag) return; const moved = drag.moved; drag = null; if(moved){ const cur = ed.notes[ed.sel]; ed.notes.sort((a,c)=>a.b-c.b); ed.sel = ed.notes.indexOf(cur); changed(); } };
+  const end = ()=>{ if(!drag) return; const moved = drag.moved; drag = null; if(moved){ const cur = ed.notes[ed.sel]; if(cur) lock.base.set(cur, cur.b); ed.notes.sort((a,c)=>a.b-c.b); ed.sel = ed.notes.indexOf(cur); changed(); } };
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
 }
 function nearest(b){ let best = null, bd = 1e9; ed.notes.forEach(n=>{ const d = Math.abs(n.b - b); if(d < bd){ bd = d; best = n; } }); return best; }
@@ -169,7 +225,8 @@ function build(){
   zone.innerHTML = `<div class="nt-top"><div class="nt-t"><b>NOTES</b><span id="ntTitle"></span><i id="ntHow"></i></div><button class="stp-chip sm" id="ntSnap" data-k="NOTES SNAP">IN KEY</button></div>
   <div class="nt-roll"><canvas id="ntRoll"></canvas><canvas id="ntHead"></canvas></div>
   <div class="nt-hint">tap a note = hear · drag = move / pitch · drag its end = length · tap empty = add · the line plays your song</div>
-  <div class="nt-tools"><span id="ntSel">tap a note</span><button class="stp-chip sm" id="ntUp" data-k="NOTES UP">▲</button><button class="stp-chip sm" id="ntDown" data-k="NOTES DOWN">▼</button><button class="stp-chip sm" id="ntOctU" data-k="NOTES OCT+">OCT +</button><button class="stp-chip sm" id="ntOctD" data-k="NOTES OCT-">OCT −</button><button class="stp-chip sm" id="ntDel" data-k="NOTES DELETE">DELETE</button></div>
+  <div class="nt-tools"><span id="ntSel">tap a note</span><button class="stp-chip sm" id="ntUp" data-k="NOTES UP">▲</button><button class="stp-chip sm" id="ntDown" data-k="NOTES DOWN">▼</button><button class="stp-chip sm" id="ntOctU" data-k="NOTES OCT+">OCT +</button><button class="stp-chip sm" id="ntOctD" data-k="NOTES OCT-">OCT −</button><button class="stp-chip sm" id="ntDel" data-k="NOTES DELETE">DELETE</button><button class="stp-chip sm" id="ntLockBtn" data-k="NOTES LOCK">LOCK</button></div>
+  <div class="nt-lock" id="ntLock"><button class="stp-chip sm" id="ntLockSrc" data-k="LOCK SOURCE"></button><input type="range" id="ntLockAmt" min="0" max="100" value="100"><span id="ntLockVal">100</span></div>
   <div class="stp-bar"><button id="ntBack" data-k="NOTES BACK">◂ TUNER</button><div class="stp-info" id="ntInfo">changes land on the track as you go</div><button id="ntPlay" data-k="NOTES PLAY" aria-label="play"></button></div>`;
   document.body.appendChild(zone);
   $('ntBack').addEventListener('click', close);
@@ -178,6 +235,10 @@ function build(){
   const nudge = d => { const n = ed && ed.notes[ed.sel]; if(!n) return; n.p = Math.abs(d) === 12 ? n.p + d : snapPitch(n.p + d, Math.sign(d)); hear(n); changed(); };
   $('ntUp').addEventListener('click', ()=> nudge(1)); $('ntDown').addEventListener('click', ()=> nudge(-1)); $('ntOctU').addEventListener('click', ()=> nudge(12)); $('ntOctD').addEventListener('click', ()=> nudge(-12));
   $('ntDel').addEventListener('click', ()=>{ if(!ed || ed.sel < 0) return; ed.notes.splice(ed.sel, 1); ed.sel = -1; changed(); });
+  $('ntLockBtn').addEventListener('click', ()=> setLock(!lock.on));
+  $('ntLockSrc').addEventListener('click', ()=>{ const L = lockSources(); if(L.length < 2) return; lock.src = L[(L.indexOf(lock.src) + 1) % L.length]; lock.marks = lockMarks(); paintLock(); applyLock(); });
+  $('ntLockAmt').addEventListener('input', e=>{ lock.amt = +e.target.value; $('ntLockVal').textContent = lock.amt; clearTimeout(lock._t); lock._t = setTimeout(applyLock, 60); });
+  paintLock();
   events($('ntRoll'));
   window.addEventListener('resize', ()=> draw());
 }

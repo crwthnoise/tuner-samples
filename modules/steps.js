@@ -131,6 +131,14 @@ function lazyHits(s){
 }
 STEPS.hitMode = function(){ const tr = sidechainTrigger; if(!tr || !scHits) return false; const isSteps = tr.sample.folder === 'STEPS'; if(!isSteps && !scHits.loopOn) return false; if(!(scHits.k.on || scHits.s.on)) return false; lazyHits(tr.sample); return true; };
 function shapeVal(pts, x){ if(x <= 0) return pts[0][1]; for(let i=1;i<pts.length;i++){ if(x <= pts[i][0]){ const a = pts[i-1], b = pts[i], w = b[0]-a[0]; return w > 0 ? a[1] + (b[1]-a[1])*(x-a[0])/w : b[1]; } } return pts[pts.length-1][1]; }
+function dtFor(beat, y){   /* beats since the last hit of type y on the trigger, -1 = none */
+  const tr = sidechainTrigger; if(!tr || !tr.sample.hits || !tr.sample.buffer) return -1; const s = tr.sample;
+  const c = clipAt(tr, beat); if(!c) return -1; const pos = samplePosAt(tr, beat); if(pos < 0) return -1;
+  if(!s._hk){ s._hk = { k:s.hits.filter(h=>h.y==='k').map(h=>h.t), s:s.hits.filter(h=>h.y==='s').map(h=>h.t) }; }
+  const T = s._hk[y], D = s.buffer.duration, toB = loopBeats(s)/D; if(!T || !T.length) return -1;
+  let dt = -1; for(let i=T.length-1;i>=0;i--){ if(T[i] <= pos + 1e-6){ dt = pos - T[i]; break; } }
+  if(dt < 0){ const w = pos + D - T[T.length-1]; if(w*toB <= beat - c.start + 1e-6) dt = w; }
+  return dt < 0 ? -1 : dt*toB; }
 STEPS.duckAt = function(beat){
   const tr = sidechainTrigger; if(!tr || tr.mute || !scHits) return 0; const s = tr.sample; if(!s.hits || !s.hits.length || !s.buffer) return 0;
   const c = clipAt(tr, beat); if(!c) return 0; const pos = samplePosAt(tr, beat); if(pos < 0) return 0;
@@ -165,6 +173,7 @@ function duckAll(){ let n = 0; const pi = FX_SLOTS.indexOf('PUMP');
   if(n){ renderRack(); refreshTimeline(); markDirty(); commit(); drawTL(); } return n; }
 
 /* ---------------- UI ---------------- */
+let gridCells = { k:[], s:[], h:[] }, recOn = false, nowCol = -1;
 let zone = null, scTab = 'k', panel = 'sc', selRow = 'k', page = 0, prevSrc = null;
 function stepsChOf(){ const ch = selCh(); return ch && ch.sample.folder === 'STEPS' ? ch : null; }
 /* STEPS button = always opens your pattern: the selected STEPS loop, else the one that's the TRIGGER, else the last one on the timeline */
@@ -193,7 +202,7 @@ function applyPreset(k){
   const H = hits(); H.k = Object.assign({}, H.k, JSON.parse(JSON.stringify(P.sc.k))); H.s.on = !!P.sc.s.on;
   if(patSample){ patSample.displayName = 'STEPS · ' + P.label; try{ saveSampleMeta(patSample); }catch(e){} }
   changed(); drawAll2();
-  setTimeout(()=>{ const ch = channels.find(c=>c.sample === patSample); if(ch && sidechainTrigger !== ch) setTrigger(ch); const n = duckAll(); setStatus(P.label + (n ? ' · ' + n + ' loop' + (n>1?'s':'') + ' ducked' : '')); }, 400);
+  setTimeout(()=>{ const ch = channels.find(c=>c.sample === patSample); if(ch && sidechainTrigger !== ch) setTrigger(ch); const n = duckAll(); paint(); drawAll2(); setStatus(P.label + (n ? ' · ' + n + ' loop' + (n>1?'s':'') + ' ducked' : '')); }, 400);
 }
 function setBars(n, quiet){ const old = pat.bars || 1; pat.bars = n; ['k','s','h'].forEach(r=>{ const a = pat[r].slice(0, 16*old), b = []; for(let i=0;i<16*n;i++) b.push(a[i % a.length] || 0); pat[r] = b; }); if(page >= n) page = n - 1; if(!quiet) changed(); }   /* new bars start as copies — then change them */
 function setSpeed(k){ const N = NS(pat); pat.speed = k; if(k === '8'){ for(let i=0;i<N;i++) pat.h[i] = i % 2 ? 0 : 1; } else if(!pat.h.some(Boolean)) pat.h.fill(1); else if(pat.h.every((v,i)=> v === (i % 2 ? 0 : 1))) pat.h.fill(1); changed(); }
@@ -214,7 +223,7 @@ function build(){
     </div>
     <div class="stp-pane" id="stpScp">
       <div class="stp-src" id="stpSrc"></div>
-      <canvas id="stpShape"></canvas>
+      <div class="stp-shw"><canvas id="stpShape"></canvas><canvas id="stpShapeOv"></canvas></div>
       <div class="stp-row2"><button class="stp-chip sm" id="stpAuto" data-k="STEPS AUTO">AUTO</button><div class="stp-lens" id="stpLens"></div><label>DEPTH</label><input type="range" id="stpDepth" min="0" max="100"><b id="stpDepthV"></b></div>
       <canvas id="stpLive"></canvas>
       <div class="stp-hint">dots: tap = add · drag = move · tap a dot = remove · bottom = live, kick vs your ducked loop</div>
@@ -224,7 +233,7 @@ function build(){
   document.body.appendChild(zone);
   $('stpBack').addEventListener('click', close);
   $('stpPlay').addEventListener('click', ()=>{ if(!channels.length && isEmpty(pat)){ setStatus('tap some steps first'); return; } $('transportBtn').click(); setTimeout(()=>{ paintPlay(); liveLoop(); }, 60); });
-  $('stpDuck').addEventListener('click', ()=>{ if(!sidechainTrigger){ setStatus('no TRIGGER yet — tap some steps'); return; } const n = duckAll(); setStatus(n ? n + ' loop' + (n>1?'s':'') + ' now DUCKED' : 'nothing new to duck'); });
+  $('stpDuck').addEventListener('click', ()=>{ if(!sidechainTrigger){ setStatus('no TRIGGER yet — tap some steps'); return; } const n = duckAll(); drawAll2(); setStatus(n ? n + ' loop' + (n>1?'s':'') + ' now DUCKED' : 'nothing new to duck'); });
   $('stpOn').addEventListener('click', ()=>{ const H = hits(); H[scTab].on = !H[scTab].on; markDirty(); commit(); paint(); drawShape(); });
   $('stpDepth').addEventListener('input', e=>{ const H = hits(); H[scTab].depth = +e.target.value/100; $('stpDepthV').textContent = e.target.value + '%'; markDirty(); drawShape(); });
   $('stpDepth').addEventListener('change', ()=> commit());
@@ -247,14 +256,15 @@ function paint(){
   const nw = mk('button', 'stp-chip ghost', '+ NEW'); nw.dataset.k = 'STEPS NEW'; nw.addEventListener('click', ()=> open(true)); pre.appendChild(nw);
   const ln = $('stpLen'); ln.innerHTML = '<span>LENGTH</span>';
   [1,2,4].forEach(n=>{ const b = mk('button', 'stp-chip sm' + (pat.bars === n ? ' on' : ''), n + (n === 1 ? ' BAR' : ' BARS')); b.addEventListener('click', ()=> setBars(n)); ln.appendChild(b); });
+  const rb = mk('button', 'stp-chip sm rec' + (recOn ? ' on' : ''), 'REC'); rb.dataset.k = 'STEPS REC'; rb.title = 'play the row names live — hits land on the grid'; rb.addEventListener('click', ()=>{ recOn = !recOn; if(recOn && !isRunning){ $('transportBtn').click(); setTimeout(()=>{ paintPlay(); liveLoop(); }, 80); } paint(); setStatus(recOn ? 'REC: tap KICK / SNARE / HATS in time' : 'REC off'); }); ln.appendChild(rb);
   if(pat.bars > 1){ const sp = mk('span', 'gap', 'BAR'); ln.appendChild(sp); for(let i=0;i<pat.bars;i++){ const b = mk('button', 'stp-chip sm' + (page === i ? ' on' : ''), String(i+1)); b.addEventListener('click', ()=>{ page = i; paint(); }); ln.appendChild(b); } }
-  const g = $('stpGrid'); g.innerHTML = ''; const o = page*16;
+  const g = $('stpGrid'); g.innerHTML = ''; const o = page*16; gridCells = { k:[], s:[], h:[] };
   ROWS.forEach(R=>{
     const row = mk('div', 'stp-r' + (selRow === R.k ? ' sel' : ''));
-    const lab = mk('button', 'stp-lab', `<b>${R.n}</b><i>${refName(pat.snd[R.k], R.k)}</i>`); lab.addEventListener('click', ()=>{ selRow = R.k; panel = 'snd'; hear(R.k); paint(); drawWave(); }); row.appendChild(lab);
+    const lab = mk('button', 'stp-lab' + (recOn ? ' rec' : ''), `<b>${R.n}</b><i>${recOn ? 'tap = play it in' : refName(pat.snd[R.k], R.k)}</i>`); lab.addEventListener('pointerdown', e=>{ if(!recOn) return; e.preventDefault(); recHit(R.k); }); lab.addEventListener('click', ()=>{ if(recOn) return; selRow = R.k; panel = 'snd'; hear(R.k); paint(); drawWave(); }); row.appendChild(lab);
     const cells = mk('div', 'stp-cells');
     const live = R.k === 'h' ? new Set(hatTimes(Object.assign({}, pat, { h:Array(NS(pat)).fill(1) })).map(t=>Math.floor(t/0.25 + 1e-6))) : null;
-    for(let i=0;i<16;i++){ const j = o + i; const c = mk('button', 'stp-c' + (pat[R.k][j] ? ' on' : '') + (i % 4 === 0 ? ' bt' : '') + (live && !live.has(j) ? ' dead' : '')); c.addEventListener('pointerdown', e=>{ e.preventDefault(); pat[R.k][j] = pat[R.k][j] ? 0 : 1; changed(); }); cells.appendChild(c); }
+    for(let i=0;i<16;i++){ const j = o + i; const c = mk('button', 'stp-c' + (pat[R.k][j] ? ' on' : '') + (i % 4 === 0 ? ' bt' : '') + (live && !live.has(j) ? ' dead' : '')); c.addEventListener('pointerdown', e=>{ e.preventDefault(); pat[R.k][j] = pat[R.k][j] ? 0 : 1; changed(); }); cells.appendChild(c); gridCells[R.k].push(c); }
     row.appendChild(cells); g.appendChild(row);
     if(R.k === 'h'){ const sp = mk('div', 'stp-sp'); sp.appendChild(mk('span', '', 'HAT SPEED')); SPEEDS.forEach(([k,,lb])=>{ const b = mk('button', 'stp-chip sm' + (pat.speed === k ? ' on' : ''), lb); b.addEventListener('click', ()=> setSpeed(k)); sp.appendChild(b); });
       const v = mk('div', 'stp-vols'); ROWS.forEach(Q=>{ const w = mk('label', '', Q.n[0]); const r = mk('input'); r.type = 'range'; r.min = 0; r.max = 100; r.value = Math.round(pat.vol[Q.k]*100); r.addEventListener('input', ()=>{ pat.vol[Q.k] = +r.value/100; clearTimeout(rT); rT = setTimeout(rerender, 150); }); w.appendChild(r); v.appendChild(w); }); sp.appendChild(v);
@@ -370,13 +380,29 @@ function shapeEvents(cv){
 
 /* ---------------- LIVE: the kick vs your ducked loop (bass), scrolling, while it plays ---------------- */
 const LIVE_N = 180, liveK = new Float32Array(LIVE_N), liveB = new Float32Array(LIVE_N); let liveI = 0, liveRaf = null, liveName = '';
+/* where the STEPS loop is right now (step index in the pattern), -1 = not playing */
+function stepNow(lag){ if(!isRunning || !patSample) return -1; const ch = channels.find(c=>c.sample === patSample); if(!ch || ch.mute) return -1;
+  const b = currentBeat() - (lag||0), pos = samplePosAt(ch, b); if(pos < 0) return -1; const beats = pos/patSample.buffer.duration*loopBeats(patSample); return Math.floor(beats*4 + 1e-6) % NS(pat); }
+function recHit(row){   /* live: the hit lands on the nearest 1/16 (with the phone's audio delay taken off) */
+  hear(row); if(!isRunning){ setStatus('press play first'); return; } if(!patSample){ setStatus('tap one step first so STEPS is on the timeline'); return; }
+  const ch = channels.find(c=>c.sample === patSample); if(!ch) return; const lat = ((ctx.outputLatency || 0) + (ctx.baseLatency || 0))/beatSec();
+  const pos = samplePosAt(ch, currentBeat() - lat); if(pos < 0) return; const beats = pos/patSample.buffer.duration*loopBeats(patSample);
+  const j = Math.round(beats*4) % NS(pat); if(!pat[row][j]){ pat[row][j] = 1; if(Math.floor(j/16) !== page){ page = Math.floor(j/16); } changed(); } }
 const tdBuf = new Float32Array(1024);
 function lvl(ch){ if(!ch.analyser) return 0; ch.analyser.getFloatTimeDomainData(tdBuf); let m = 0; for(let i=0;i<tdBuf.length;i++){ const v = tdBuf[i] < 0 ? -tdBuf[i] : tdBuf[i]; if(v > m) m = v; } return Math.min(1, m); }   /* real waveform level (after the duck) */
 function liveLoop(){ if(liveRaf) return; const step = ()=>{ liveRaf = null; if(!zone.classList.contains('on')) return;
     if(isRunning){ const tr = sidechainTrigger; let k = tr ? lvl(tr) : 0, bv = 0, bn = ''; channels.forEach(ch=>{ if(ch.scDuck && ch !== tr){ const v = lvl(ch); if(v >= bv){ bv = v; bn = ch.sample.displayName || ''; } } });
       liveK[liveI] = k; liveB[liveI] = bv; liveI = (liveI + 1) % LIVE_N; liveName = bn; }
-    drawLive(); if(isRunning) liveRaf = requestAnimationFrame(step); else paintPlay(); };
+    drawLive(); drawHeads(); if(isRunning) liveRaf = requestAnimationFrame(step); else { paintPlay(); drawHeads(); } };
   liveRaf = requestAnimationFrame(step); }
+function drawHeads(){
+  const j = stepNow(); const col = (j >= 0 && Math.floor(j/16) === page) ? j % 16 : -1;
+  if(col !== nowCol){ ['k','s','h'].forEach(r=>{ const L = gridCells[r]; if(nowCol >= 0 && L[nowCol]) L[nowCol].classList.remove('now'); if(col >= 0 && L[col]) L[col].classList.add('now'); }); nowCol = col; }
+  const ov = $('stpShapeOv'); if(!ov || panel !== 'sc') return; const cx = ov.getContext('2d'); const s = fitCanvas(ov, cx); if(!s) return; const { w, h } = s; cx.clearRect(0, 0, w, h);
+  if(!isRunning) return; const sh = hits()[scTab]; if(!sh.on) return; const db = dtFor(currentBeat(), scTab); if(db < 0 || db >= sh.len) return;
+  const pad = 10, x = db/sh.len, X = pad + x*(w - pad*2), Y = pad + shapeVal(sh.pts, x)*sh.depth*(h - pad*2), { green } = css();
+  cx.strokeStyle = 'rgba(242,237,226,.35)'; cx.lineWidth = 1; cx.beginPath(); cx.moveTo(X, pad); cx.lineTo(X, h - pad); cx.stroke();
+  cx.beginPath(); cx.arc(X, Y, 5, 0, Math.PI*2); cx.fillStyle = green; cx.fill(); }
 function drawLive(){
   const cv = $('stpLive'); if(!cv || panel !== 'sc') return; const cx = cv.getContext('2d'); const s = fitCanvas(cv, cx); if(!s) return; const { w, h } = s, { green, mono } = css(); cx.clearRect(0, 0, w, h);
   const dx = w/LIVE_N, y = v => h - 2 - v*(h - 12);

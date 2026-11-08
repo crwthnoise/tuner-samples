@@ -439,6 +439,7 @@ if(IN_TUNER){
   window.addEventListener('message',e=>{
     if(e.origin!==location.origin||e.source!==parent)return;const d=e.data||{};
     if(d.type==='tuner:init'){
+      try{if(ctx&&ctx.state==='suspended')ctx.resume()}catch(_){}
       if(d.bpm)$('bpm').value=Math.round(d.bpm);
       tunerKey=(typeof d.key==='number')?{root:d.key,minor:!!d.minor}:null;
       hasBeat=!!d.hasBeat;if(hasBeat&&!beatOn)$('beatBtn').onclick();
@@ -454,7 +455,7 @@ if(IN_TUNER){
       sounds[d.id]={pcm,sr:d.sr,root};say((d.name||'sound')+' ready'+(f2n(root)));
     }
     if(d.type==='tuner:got')say('in TUNER: '+d.id+' → track');
-    if(d.type==='tuner:close'){if(recording)stopRec();if(stream)micOff();}
+    if(d.type==='tuner:close'){if(recording)stopRec();if(stream)micOff();try{if(playing){$('player').pause();playing=false;$('playBtn').textContent='PLAY';}}catch(_){}try{if(ctx&&ctx.state==='running')ctx.suspend()}catch(_){}}   /* TNR-4729.20: back to TUNER = silence here */
   });
   toParent({type:'tuner:ready'});
 }

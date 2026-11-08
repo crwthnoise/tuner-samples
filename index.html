@@ -114,6 +114,11 @@
   #stpWave{ width:100%; flex:1; min-height:90px; background:#0a0806; border-radius:4px; touch-action:none; }
   #stpLive{ width:100%; height:46px; flex:none; background:#0a0806; border-radius:4px; }
   .stp-row2 #stpFadeTxt{ flex:1; }
+  .stp-shw{ position:relative; flex:1; min-height:90px; display:flex; } .stp-shw #stpShape{ flex:1; min-height:90px; }
+  #stpShapeOv{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .stp-c.now{ border-color:#f2ede2; } .stp-c.now:not(.on){ background:#2a2520; }
+  .stp-chip.rec.on{ color:#ff5a4f; border-color:#d32f2f; box-shadow:0 0 6px rgba(211,47,47,.3) inset; }
+  .stp-lab.rec{ border:1px solid #d32f2f; border-radius:4px; padding:3px 4px; }
   #tlPlus{ position:absolute; z-index:5; display:none; align-items:center; gap:5px; pointer-events:none; }
   #tlPlus.on{ display:flex; }
   #tlPlus button{ pointer-events:auto; font-family:var(--mono); touch-action:manipulation; cursor:pointer; }
@@ -625,14 +630,14 @@ window.__tunerEarly = []; window.__tunerBar = function(m){ try{ var b = document
 window.addEventListener('error', function(e){ var m = (e.message || 'error') + (e.lineno ? ' @' + e.lineno : ''); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' + (e.reason && e.reason.message || e.reason); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 </script>
-<script src="modules/sky.js?v=10.43"></script>
-<script src="modules/rage.js?v=10.43"></script>
-<script src="modules/grinder.js?v=10.43"></script>
-<script src="modules/flame.js?v=10.43"></script>
+<script src="modules/sky.js?v=10.44"></script>
+<script src="modules/rage.js?v=10.44"></script>
+<script src="modules/grinder.js?v=10.44"></script>
+<script src="modules/flame.js?v=10.44"></script>
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.43';
+const APP_VERSION = 'v10.44';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -2078,7 +2083,7 @@ TUNER.addMade = async function(s){
     if(!pin()){ showPin(true); info.textContent = 'enter your maker PIN once'; }
     if(!loaded){ loaded = true; fr.src = MAKER + '/samplemaker-phone?tuner=1'; } else init();
   }
-  function close(){ zone.classList.remove('on'); try{ renderLibrary(); }catch(e){} }
+  function close(){ zone.classList.remove('on'); try{ fr.contentWindow.postMessage({ type:'tuner:stop' }, MAKER); }catch(e){} try{ renderLibrary(); }catch(e){} }   /* v10.44: back to TUNER = the walkie goes quiet */
   $('makeBtn').addEventListener('click', open);
   $('makeBack').addEventListener('click', close);
   $('makePinOk').addEventListener('click', ()=>{ const v = $('makePinIn').value.trim(); if(!v) return; try{ localStorage.setItem('tuner_makerPin', v); }catch(e){} $('makePinIn').value = ''; showPin(false); info.innerHTML = 'linked · ★ a sound = send it to TUNER'; init(); });
@@ -2113,6 +2118,6 @@ setTimeout(checkVersion, 1500); document.addEventListener('visibilitychange', ()
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 (async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); let lp = null; try{ lp = localStorage.getItem('tuner_lastProj'); }catch(e){} if(lp && !channels.length){ await loadProjectById(lp, { quiet:true }); } }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
 </script>
-<script src="modules/steps.js?v=10.43"></script>
+<script src="modules/steps.js?v=10.44"></script>
 </body>
 </html>

@@ -18,7 +18,7 @@ const $ = id => document.getElementById(id);
 const mk = (t, c, h) => { const e = document.createElement(t); if(c) e.className = c; if(h != null) e.innerHTML = h; return e; };
 const pin = ()=>{ try{ return localStorage.getItem('tuner_makerPin') || ''; }catch(e){ return ''; } };
 
-function newPat(){ return { v:1, preset:null, k:Array(16).fill(0), s:Array(16).fill(0), h:Array(16).fill(0), speed:'16', snd:{ k:{src:'synth'}, s:{src:'synth'}, h:{src:'synth'} }, vol:{ k:1, s:0.85, h:0.5 }, bpm:null }; }
+function newPat(){ return { v:1, preset:null, k:Array(16).fill(0), s:Array(16).fill(0), h:Array(16).fill(0), speed:'16', snd:{ k:{src:'synth'}, s:{src:'synth'}, h:{src:'synth'} }, vol:{ k:1, s:0.85, h:0.5 }, bpm:null, bars:1, env:{} }; }
 function hits(){ if(!scHits) scHits = DEF_HITS(); return scHits; }
 let pending = {};   /* sampleId -> pattern (from a project file, before the sample exists) */
 let pat = null, patSample = null;   /* the pattern being edited + its sample (null until the first hit) */
@@ -59,20 +59,31 @@ function cands(row){
   return L; }
 const sameRef = (a,b)=> a && b && a.src === b.src && (a.src === 'synth' || (a.src === 'lib' ? a.id === b.id : (a.pack === b.pack && a.rel === b.rel)));
 
-/* ---------------- render a pattern into a 1-bar loop ---------------- */
-function patHits(p){ const H = []; for(let i=0;i<16;i++){ if(p.k[i]) H.push({ b:i*0.25, y:'k' }); if(p.s[i]) H.push({ b:i*0.25, y:'s' }); } return H; }
-function hatTimes(p){ const sp = SPEEDS.find(x=>x[0]===p.speed) || SPEEDS[1], iv = sp[1], T = []; for(let t=0; t < 4 - 1e-6; t += iv){ const slot = Math.floor(t/0.25 + 1e-6); if(p.h[slot]) T.push(t); } return T; }
+/* ---------------- render a pattern into a loop (1 · 2 · 4 bars) ---------------- */
+function norm(p){ if(!p) return p; p.bars = p.bars || Math.max(1, Math.round((p.k||[]).length/16)) || 1; const N = 16*p.bars;
+  ['k','s','h'].forEach(r=>{ const a = p[r] || []; while(a.length < N) a.push(a[a.length % 16] || 0); a.length = N; p[r] = a; });
+  p.env = p.env || {}; p.vol = p.vol || { k:1, s:0.85, h:0.5 }; p.snd = p.snd || { k:{src:'synth'}, s:{src:'synth'}, h:{src:'synth'} }; return p; }
+const NS = p => 16*(p.bars||1);
+function patHits(p){ const H = []; for(let i=0;i<NS(p);i++){ if(p.k[i]) H.push({ b:i*0.25, y:'k' }); if(p.s[i]) H.push({ b:i*0.25, y:'s' }); } return H; }
+function hatTimes(p){ const sp = SPEEDS.find(x=>x[0]===p.speed) || SPEEDS[1], iv = sp[1], T = [], L = 4*(p.bars||1); for(let k=0; k*iv < L - 1e-6; k++){ const t = k*iv, slot = Math.floor(t/0.25 + 1e-6); if(p.h[slot]) T.push(t); } return T; }
+/* FADE per sound: env = { fin, fo, end } in seconds (fade-in end · fade-out start · cut). none = the whole sound, as before */
+function envOf(p, row, buf){ const e = p.env && p.env[row]; const d = buf ? buf.duration : 2; if(!e) return null; const end = clamp(e.end ?? d, 0.01, d), fo = clamp(e.fo ?? end, 0, end), fin = clamp(e.fin ?? 0, 0, fo); return { fin, fo, end }; }
 async function renderPat(p){
-  const bs = 60/bpm, len = 4*bs, sr = ctx.sampleRate, tail = 2, N = Math.ceil(len*sr);
+  norm(p); const bs = 60/bpm, len = 4*p.bars*bs, sr = ctx.sampleRate, tail = 2, N = Math.ceil(len*sr);
   const oc = new OfflineAudioContext(2, Math.ceil((len + tail)*sr), sr);
-  const add = (buf, t, g)=>{ const s = oc.createBufferSource(); s.buffer = buf; const gn = oc.createGain(); gn.gain.value = g; s.connect(gn); gn.connect(oc.destination); s.start(t); };
+  const add = (buf, t, g, e)=>{ const s = oc.createBufferSource(); s.buffer = buf; const gn = oc.createGain(); s.connect(gn); gn.connect(oc.destination);
+    if(e){ if(e.fin > 0.0005){ gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g, t + e.fin); } else gn.gain.setValueAtTime(g, t); gn.gain.setValueAtTime(g, t + Math.max(e.fin, e.fo)); gn.gain.linearRampToValueAtTime(0, t + Math.max(e.fo + 0.002, e.end)); s.start(t); s.stop(t + e.end + 0.005); }
+    else { gn.gain.value = g; s.start(t); } };
   const bk = await soundBuf(p.snd.k, 'k'), bsn = await soundBuf(p.snd.s, 's'), bh = await soundBuf(p.snd.h, 'h');
-  for(let i=0;i<16;i++){ if(p.k[i]) add(bk, i*0.25*bs, p.vol.k); if(p.s[i]) add(bsn, i*0.25*bs, p.vol.s); }
-  hatTimes(p).forEach((t, j)=> add(bh, t*bs, p.vol.h * (p.speed === '32' || p.speed === '16T' ? (j % 2 ? 0.7 : 1) : (Math.abs(t % 0.5) < 1e-6 ? 1 : 0.8))));
+  rowBuf.k = bk; rowBuf.s = bsn; rowBuf.h = bh;
+  const ek = envOf(p, 'k', bk), es = envOf(p, 's', bsn), eh = envOf(p, 'h', bh);
+  for(let i=0;i<NS(p);i++){ if(p.k[i]) add(bk, i*0.25*bs, p.vol.k, ek); if(p.s[i]) add(bsn, i*0.25*bs, p.vol.s, es); }
+  hatTimes(p).forEach((t, j)=> add(bh, t*bs, p.vol.h * (p.speed === '32' || p.speed === '16T' ? (j % 2 ? 0.7 : 1) : (Math.abs(t % 0.5) < 1e-6 ? 1 : 0.8)), eh));
   const r = await oc.startRendering(), out = ctx.createBuffer(2, N, sr);
   for(let c=0;c<2;c++){ const src = r.getChannelData(c), dst = out.getChannelData(c); for(let i=0;i<N;i++) dst[i] = src[i]; for(let i=N, j=0; i<src.length; i++, j++) dst[j % N] += src[i]; }   /* tails fold back to the top = seamless loop */
   p.bpm = bpm; return out;
 }
+const rowBuf = {};   /* the decoded sound of each row (for the pictures) */
 function setSampleHits(s, p){ const rb = p.bpm || bpm; s.hits = patHits(p).map(h=>({ t:h.b*60/rb, y:h.y })).sort((a,b)=>a.t-b.t); s._hk = null; }
 function applyBuffer(s, buf){ s.buffer = buf; s.bpm = pat.bpm; s._gbpm = undefined; s._st = new Map(); s._hq = new Map(); s.env = buildEnvelope(buf); s.peaks = buildPeaks(buf); try{ s.waveImg = renderWaveformImage(buf); }catch(e){} }
 const isEmpty = p => !p.k.some(Boolean) && !p.s.some(Boolean) && !p.h.some(Boolean);
@@ -92,8 +103,13 @@ async function rerender(){
       if(ch && !sidechainTrigger){ setTrigger(ch); }
       setStatus('STEPS → track');
     } else {
+      const oldBeats = patSample.buffer ? loopBeats(patSample) : 4;
       applyBuffer(patSample, buf); setSampleHits(patSample, pat); patSample.pat = pat;
-      channels.forEach(ch=>{ if(ch.sample === patSample) rebuildBuffer(ch); });
+      const nb = 4*pat.bars;
+      channels.forEach(ch=>{ if(ch.sample !== patSample) return; rebuildBuffer(ch);
+        if(nb !== oldBeats){ const cl = ch.clips.slice().sort((x,y)=>x.start-y.start);   /* longer/shorter pattern: clips stay on the song grid, a lone clip grows to fit */
+          cl.forEach((c, i)=>{ c.off = ((c.start % nb) + nb) % nb; const nx = cl[i+1]; if(c.len === oldBeats && (!nx || nx.start >= c.start + nb)) c.len = nb; });
+          refreshTimeline(); } });
       if(isRunning) reschedule(); drawTL(); markDirty();
       clearTimeout(saveT); saveT = setTimeout(()=>{ try{ saveSampleAudio(patSample, bufferToWav(patSample.buffer, 24), 'audio/wav'); }catch(e){} savePat(); commit(); }, 700);
     }
@@ -109,7 +125,7 @@ function lazyHits(s){
   loading.add(s.id);
   (async ()=>{ try{
     let p = s.pat || pending[s.id] || (s.folder === 'STEPS' ? await Store.get('steps:' + s.id) : null);
-    if(p){ s.pat = p; setSampleHits(s, p); }
+    if(p){ s.pat = norm(p); setSampleHits(s, s.pat); }
     else if(hits().loopOn && s.buffer){ s.hits = await detectHits(s.buffer); s._hk = null; }
   }catch(e){} loading.delete(s.id); })();
 }
@@ -149,73 +165,105 @@ function duckAll(){ let n = 0; const pi = FX_SLOTS.indexOf('PUMP');
   if(n){ renderRack(); refreshTimeline(); markDirty(); commit(); drawTL(); } return n; }
 
 /* ---------------- UI ---------------- */
-let zone = null, scTab = 'k', cIdx = {}, prevSrc = null;
+let zone = null, scTab = 'k', panel = 'snd', selRow = 'k', page = 0, prevSrc = null;
 function stepsChOf(){ const ch = selCh(); return ch && ch.sample.folder === 'STEPS' ? ch : null; }
-async function open(){
-  const ch = stepsChOf() || channels.find(c=>c.sample.folder === 'STEPS' && c === sidechainTrigger) || null;
-  if(ch){ patSample = ch.sample; pat = patSample.pat || pending[patSample.id] || await Store.get('steps:' + patSample.id).catch(()=>null) || newPat(); patSample.pat = pat; }
-  else { patSample = null; pat = newPat(); }
-  hits(); zone.classList.add('on'); paint(); drawShape();
+/* STEPS button = always opens your pattern: the selected STEPS loop, else the one that's the TRIGGER, else the last one on the timeline */
+function findStepsCh(){ return stepsChOf() || channels.find(c=>c.sample.folder === 'STEPS' && c === sidechainTrigger) || channels.slice().reverse().find(c=>c.sample.folder === 'STEPS') || null; }
+async function loadPatFor(s){ let p = s.pat || pending[s.id] || null; if(!p){ try{ p = await Store.get('steps:' + s.id); }catch(e){} } return norm(p || newPat()); }
+async function open(fresh){
+  const ch = fresh ? null : findStepsCh();
+  if(ch){ patSample = ch.sample; pat = await loadPatFor(patSample); patSample.pat = pat; try{ selectChannel(ch.id); }catch(e){} }
+  else { patSample = null; pat = norm(newPat()); }
+  page = 0; hits(); zone.classList.add('on'); paint(); warmBufs(); drawAll2(); liveLoop();
   loadCloudIdx().then(()=>paint());
 }
-function close(){ zone.classList.remove('on'); stopPrev(); }
+function close(){ zone.classList.remove('on'); stopPrev(); if(!patSample){ try{ addAtBeat = null; hidePlus(); }catch(e){} } }
 function stopPrev(){ if(prevSrc){ try{ prevSrc.stop(); }catch(e){} prevSrc = null; } }
-async function hear(row){ stopPrev(); try{ await ctx.resume(); }catch(e){} const b = await soundBuf(pat.snd[row], row); const s = ctx.createBufferSource(); s.buffer = b; const g = ctx.createGain(); g.gain.value = pat.vol[row]*0.9; s.connect(g); g.connect(masterGain); s.start(); prevSrc = s; }
-function stepSound(row, dir){ const L = cands(row); let i = L.findIndex(r=>sameRef(r, pat.snd[row])); i = (i < 0 ? 0 : i) + dir; i = (i + L.length) % L.length; pat.snd[row] = L[i]; changed(); hear(row); }
+async function warmBufs(){ for(const r of ['k','s','h']) rowBuf[r] = await soundBuf(pat.snd[r], r); drawAll2(); }
+async function hear(row){ stopPrev(); try{ await ctx.resume(); }catch(e){} const b = rowBuf[row] = await soundBuf(pat.snd[row], row); const e = envOf(pat, row, b); const s = ctx.createBufferSource(); s.buffer = b; const g = ctx.createGain(); const v = pat.vol[row]*0.9, t = ctx.currentTime + 0.01; s.connect(g); g.connect(masterGain);
+  if(e){ if(e.fin > 0.0005){ g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + e.fin); } else g.gain.setValueAtTime(v, t); g.gain.setValueAtTime(v, t + e.fo); g.gain.linearRampToValueAtTime(0, t + Math.max(e.fo + 0.002, e.end)); s.start(t); s.stop(t + e.end + 0.01); } else { g.gain.value = v; s.start(t); } prevSrc = s; }
+async function pickSound(row, dir){ const L = cands(row); let i = L.findIndex(r=>sameRef(r, pat.snd[row]));
+  if(dir === 0){ i = Math.floor(Math.random()*L.length); } else { i = (i < 0 ? 0 : i) + dir; i = (i + L.length) % L.length; }
+  pat.snd[row] = L[i]; if(pat.env) delete pat.env[row];   /* new sound = its own full length */
+  rowBuf[row] = await soundBuf(pat.snd[row], row); changed(); hear(row); drawAll2(); }
 function applyPreset(k){
-  const P = PRESETS[k]; const keep = pat.snd, vol = pat.vol;
-  pat = Object.assign(newPat(), { preset:k, speed:P.speed, snd:keep, vol }); P.k.forEach(i=>pat.k[i]=1); P.s.forEach(i=>pat.s[i]=1); P.h.forEach(i=>pat.h[i]=1);
+  const P = PRESETS[k]; const keep = pat.snd, vol = pat.vol, env = pat.env, bars = pat.bars || 1;
+  pat = norm(Object.assign(newPat(), { preset:k, speed:P.speed, snd:keep, vol, env })); P.k.forEach(i=>pat.k[i]=1); P.s.forEach(i=>pat.s[i]=1); P.h.forEach(i=>pat.h[i]=1);
+  if(bars > 1) setBars(bars, true);
   const H = hits(); H.k = Object.assign({}, H.k, JSON.parse(JSON.stringify(P.sc.k))); H.s.on = !!P.sc.s.on;
   if(patSample){ patSample.displayName = 'STEPS · ' + P.label; try{ saveSampleMeta(patSample); }catch(e){} }
-  changed(); drawShape();
+  changed(); drawAll2();
   setTimeout(()=>{ const ch = channels.find(c=>c.sample === patSample); if(ch && sidechainTrigger !== ch) setTrigger(ch); const n = duckAll(); setStatus(P.label + (n ? ' · ' + n + ' loop' + (n>1?'s':'') + ' ducked' : '')); }, 400);
 }
-function setSpeed(k){ pat.speed = k; if(k === '8'){ for(let i=0;i<16;i++) pat.h[i] = i % 2 ? 0 : 1; } else if(!pat.h.some(Boolean)) pat.h.fill(1); else if(k !== '8' && pat.h.every((v,i)=> v === (i % 2 ? 0 : 1))) pat.h.fill(1); changed(); }
+function setBars(n, quiet){ const old = pat.bars || 1; pat.bars = n; ['k','s','h'].forEach(r=>{ const a = pat[r].slice(0, 16*old), b = []; for(let i=0;i<16*n;i++) b.push(a[i % a.length] || 0); pat[r] = b; }); if(page >= n) page = n - 1; if(!quiet) changed(); }   /* new bars start as copies — then change them */
+function setSpeed(k){ const N = NS(pat); pat.speed = k; if(k === '8'){ for(let i=0;i<N;i++) pat.h[i] = i % 2 ? 0 : 1; } else if(!pat.h.some(Boolean)) pat.h.fill(1); else if(pat.h.every((v,i)=> v === (i % 2 ? 0 : 1))) pat.h.fill(1); changed(); }
 
 function build(){
   zone = mk('div', '', ''); zone.id = 'stepsZone';
   zone.innerHTML = `
   <div class="stp-top"><div class="stp-title">STEPS</div><div class="stp-pre" id="stpPre"></div></div>
+  <div class="stp-len" id="stpLen"></div>
   <div class="stp-grid" id="stpGrid"></div>
   <div class="stp-sc">
-    <div class="stp-sch"><span>SIDECHAIN</span><div class="stp-tabs" id="stpTabs"></div><button class="stp-tg" id="stpOn">ON</button></div>
-    <div class="stp-src" id="stpSrc"></div>
-    <canvas id="stpShape"></canvas>
-    <div class="stp-row2"><div class="stp-lens" id="stpLens"></div><label>DEPTH</label><input type="range" id="stpDepth" min="0" max="100"><b id="stpDepthV"></b></div>
-    <div class="stp-hint">tap = add a dot · drag = move · tap a dot = remove</div>
+    <div class="stp-sch"><div class="stp-tabs l" id="stpPanels"></div><div class="stp-tabs" id="stpTabs"></div><button class="stp-tg" id="stpOn">ON</button></div>
+    <div class="stp-pane" id="stpSnd">
+      <div class="stp-pick"><button id="stpPrev" data-k="STEPS PREV">◂</button><div class="stp-nm" id="stpNm"></div><button id="stpRnd" data-k="STEPS RANDOM">RANDOM</button><button id="stpNext" data-k="STEPS NEXT">▸</button></div>
+      <canvas id="stpWave"></canvas>
+      <div class="stp-row2"><span id="stpFadeTxt"></span><button class="stp-chip sm ghost" id="stpFadeReset">FULL</button></div>
+      <div class="stp-hint">drag the dots: fade in · fade out · cut</div>
+    </div>
+    <div class="stp-pane" id="stpScp">
+      <div class="stp-src" id="stpSrc"></div>
+      <canvas id="stpShape"></canvas>
+      <div class="stp-row2"><div class="stp-lens" id="stpLens"></div><label>DEPTH</label><input type="range" id="stpDepth" min="0" max="100"><b id="stpDepthV"></b></div>
+      <canvas id="stpLive"></canvas>
+      <div class="stp-hint">dots: tap = add · drag = move · tap a dot = remove · bottom = live, kick vs your ducked loop</div>
+    </div>
   </div>
   <div class="stp-bar"><button id="stpBack" data-k="STEPS BACK">◂ TUNER</button><div class="stp-info" id="stpInfo"></div><button id="stpDuck" data-k="STEPS DUCK">DUCK LOOPS</button><button id="stpPlay" data-k="STEPS PLAY" aria-label="play"></button></div>`;
   document.body.appendChild(zone);
   $('stpBack').addEventListener('click', close);
-  $('stpPlay').addEventListener('click', ()=>{ if(!channels.length && isEmpty(pat)){ setStatus('tap some steps first'); return; } $('transportBtn').click(); setTimeout(paintPlay, 60); });
+  $('stpPlay').addEventListener('click', ()=>{ if(!channels.length && isEmpty(pat)){ setStatus('tap some steps first'); return; } $('transportBtn').click(); setTimeout(()=>{ paintPlay(); liveLoop(); }, 60); });
   $('stpDuck').addEventListener('click', ()=>{ if(!sidechainTrigger){ setStatus('no TRIGGER yet — tap some steps'); return; } const n = duckAll(); setStatus(n ? n + ' loop' + (n>1?'s':'') + ' now DUCKED' : 'nothing new to duck'); });
   $('stpOn').addEventListener('click', ()=>{ const H = hits(); H[scTab].on = !H[scTab].on; markDirty(); commit(); paint(); drawShape(); });
   $('stpDepth').addEventListener('input', e=>{ const H = hits(); H[scTab].depth = +e.target.value/100; $('stpDepthV').textContent = e.target.value + '%'; markDirty(); drawShape(); });
   $('stpDepth').addEventListener('change', ()=> commit());
-  shapeEvents($('stpShape'));
-  window.addEventListener('resize', ()=>{ if(zone.classList.contains('on')) drawShape(); });
+  $('stpPrev').addEventListener('click', ()=> pickSound(selRow, -1));
+  $('stpNext').addEventListener('click', ()=> pickSound(selRow, 1));
+  $('stpRnd').addEventListener('click', ()=> pickSound(selRow, 0));
+  $('stpNm').addEventListener('click', ()=> hear(selRow));
+  $('stpFadeReset').addEventListener('click', ()=>{ if(pat.env) delete pat.env[selRow]; changed(); drawWave(); hear(selRow); });
+  shapeEvents($('stpShape')); waveEvents($('stpWave'));
+  window.addEventListener('resize', ()=>{ if(zone.classList.contains('on')) drawAll2(); });
 }
+function drawAll2(){ drawWave(); drawShape(); }
 function paintPlay(){ const b = $('stpPlay'); if(!b) return; b.classList.toggle('playing', isRunning); b.innerHTML = isRunning ? '<svg viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="1"/></svg>' : '<svg viewBox="0 0 20 20"><path d="M6 4l10 6-10 6z"/></svg>'; }
 function paint(){
-  if(!zone || !pat) return; const H = hits();
+  if(!zone || !pat) return; const H = hits(); norm(pat);
   const pre = $('stpPre'); pre.innerHTML = '';
   Object.entries(PRESETS).forEach(([k, P])=>{ const b = mk('button', 'stp-chip' + (pat.preset === k ? ' on' : ''), P.label); b.dataset.k = 'STEPS ' + P.label; b.addEventListener('click', ()=> applyPreset(k)); pre.appendChild(b); });
   const clr = mk('button', 'stp-chip ghost', 'CLEAR'); clr.addEventListener('click', ()=>{ pat.k.fill(0); pat.s.fill(0); pat.h.fill(0); pat.preset = null; changed(); }); pre.appendChild(clr);
-  const g = $('stpGrid'); g.innerHTML = '';
+  const nw = mk('button', 'stp-chip ghost', '+ NEW'); nw.dataset.k = 'STEPS NEW'; nw.addEventListener('click', ()=> open(true)); pre.appendChild(nw);
+  const ln = $('stpLen'); ln.innerHTML = '<span>LENGTH</span>';
+  [1,2,4].forEach(n=>{ const b = mk('button', 'stp-chip sm' + (pat.bars === n ? ' on' : ''), n + (n === 1 ? ' BAR' : ' BARS')); b.addEventListener('click', ()=> setBars(n)); ln.appendChild(b); });
+  if(pat.bars > 1){ const sp = mk('span', 'gap', 'BAR'); ln.appendChild(sp); for(let i=0;i<pat.bars;i++){ const b = mk('button', 'stp-chip sm' + (page === i ? ' on' : ''), String(i+1)); b.addEventListener('click', ()=>{ page = i; paint(); }); ln.appendChild(b); } }
+  const g = $('stpGrid'); g.innerHTML = ''; const o = page*16;
   ROWS.forEach(R=>{
-    const row = mk('div', 'stp-r');
-    const lab = mk('button', 'stp-lab', `<b>${R.n}</b><i>${refName(pat.snd[R.k], R.k)}</i>`); lab.addEventListener('click', ()=> hear(R.k)); row.appendChild(lab);
+    const row = mk('div', 'stp-r' + (selRow === R.k ? ' sel' : ''));
+    const lab = mk('button', 'stp-lab', `<b>${R.n}</b><i>${refName(pat.snd[R.k], R.k)}</i>`); lab.addEventListener('click', ()=>{ selRow = R.k; panel = 'snd'; hear(R.k); paint(); drawWave(); }); row.appendChild(lab);
     const cells = mk('div', 'stp-cells');
-    const live = R.k === 'h' ? new Set(hatTimes(Object.assign({}, pat, { h:Array(16).fill(1) })).map(t=>Math.floor(t/0.25 + 1e-6))) : null;
-    for(let i=0;i<16;i++){ const c = mk('button', 'stp-c' + (pat[R.k][i] ? ' on' : '') + (i % 4 === 0 ? ' bt' : '') + (live && !live.has(i) ? ' dead' : '')); c.addEventListener('pointerdown', e=>{ e.preventDefault(); pat[R.k][i] = pat[R.k][i] ? 0 : 1; if(R.k !== 'h' || true) pat.preset = pat.preset; changed(); }); cells.appendChild(c); }
-    row.appendChild(cells);
-    const ar = mk('div', 'stp-ar'); const a1 = mk('button', '', '◂'), a2 = mk('button', '', '▸'); a1.addEventListener('click', ()=> stepSound(R.k, -1)); a2.addEventListener('click', ()=> stepSound(R.k, 1)); ar.appendChild(a1); ar.appendChild(a2); row.appendChild(ar);
-    g.appendChild(row);
+    const live = R.k === 'h' ? new Set(hatTimes(Object.assign({}, pat, { h:Array(NS(pat)).fill(1) })).map(t=>Math.floor(t/0.25 + 1e-6))) : null;
+    for(let i=0;i<16;i++){ const j = o + i; const c = mk('button', 'stp-c' + (pat[R.k][j] ? ' on' : '') + (i % 4 === 0 ? ' bt' : '') + (live && !live.has(j) ? ' dead' : '')); c.addEventListener('pointerdown', e=>{ e.preventDefault(); pat[R.k][j] = pat[R.k][j] ? 0 : 1; changed(); }); cells.appendChild(c); }
+    row.appendChild(cells); g.appendChild(row);
     if(R.k === 'h'){ const sp = mk('div', 'stp-sp'); sp.appendChild(mk('span', '', 'HAT SPEED')); SPEEDS.forEach(([k,,lb])=>{ const b = mk('button', 'stp-chip sm' + (pat.speed === k ? ' on' : ''), lb); b.addEventListener('click', ()=> setSpeed(k)); sp.appendChild(b); });
       const v = mk('div', 'stp-vols'); ROWS.forEach(Q=>{ const w = mk('label', '', Q.n[0]); const r = mk('input'); r.type = 'range'; r.min = 0; r.max = 100; r.value = Math.round(pat.vol[Q.k]*100); r.addEventListener('input', ()=>{ pat.vol[Q.k] = +r.value/100; clearTimeout(rT); rT = setTimeout(rerender, 150); }); w.appendChild(r); v.appendChild(w); }); sp.appendChild(v);
       g.appendChild(sp); }
   });
-  const tabs = $('stpTabs'); tabs.innerHTML = '';
+  const pn = $('stpPanels'); pn.innerHTML = '';
+  [['snd', ROWS.find(r=>r.k===selRow).n + ' SOUND'], ['sc', 'SIDECHAIN']].forEach(([k, n])=>{ const b = mk('button', 'stp-chip sm' + (panel === k ? ' on' : ''), n); b.addEventListener('click', ()=>{ panel = k; paint(); drawAll2(); }); pn.appendChild(b); });
+  $('stpSnd').style.display = panel === 'snd' ? '' : 'none'; $('stpScp').style.display = panel === 'sc' ? '' : 'none';
+  $('stpNm').innerHTML = '<b>' + refName(pat.snd[selRow], selRow) + '</b><i>tap = hear</i>';
+  const tabs = $('stpTabs'); tabs.innerHTML = ''; tabs.style.display = panel === 'sc' ? '' : 'none'; $('stpOn').style.display = panel === 'sc' ? '' : 'none';
   [['k','KICK'],['s','SNARE']].forEach(([k, n])=>{ const b = mk('button', 'stp-chip sm' + (scTab === k ? ' on' : '') + (H[k].on ? ' live' : ''), n); b.addEventListener('click', ()=>{ scTab = k; paint(); drawShape(); }); tabs.appendChild(b); });
   $('stpOn').textContent = H[scTab].on ? 'ON' : 'OFF'; $('stpOn').classList.toggle('on', !!H[scTab].on);
   $('stpDepth').value = Math.round(H[scTab].depth*100); $('stpDepthV').textContent = Math.round(H[scTab].depth*100) + '%';
@@ -225,19 +273,60 @@ function paint(){
   if(!tr) src.innerHTML = '<span>TRIGGER: none yet — tap some steps</span>';
   else if(tr.sample.folder === 'STEPS') src.innerHTML = '<span>TRIGGER: <b>' + (tr.sample.displayName||'STEPS') + '</b> · its kicks + snares</span>';
   else { src.innerHTML = '<span>TRIGGER: <b>' + (tr.sample.displayName||'loop') + '</b></span>'; const t = mk('button', 'stp-chip sm' + (H.loopOn ? ' on' : ''), H.loopOn ? 'KICK/SNARE HITS ON' : 'USE KICK/SNARE HITS'); t.addEventListener('click', async ()=>{ H.loopOn = !H.loopOn; if(H.loopOn && !tr.sample.hits && tr.sample.buffer){ setStatus('finding kicks + snares…'); tr.sample.hits = await detectHits(tr.sample.buffer); tr.sample._hk = null; const nk = tr.sample.hits.filter(h=>h.y==='k').length, ns = tr.sample.hits.length - nk; setStatus(nk + ' kicks · ' + ns + ' snares found'); } markDirty(); commit(); paint(); drawShape(); }); src.appendChild(t); }
-  const nk = pat.k.filter(Boolean).length, ns = pat.s.filter(Boolean).length;
-  $('stpInfo').textContent = (patSample ? 'on the timeline' : (isEmpty(pat) ? 'tap steps or a preset' : 'adding…')) + ' · ' + bpm + ' BPM';
+  $('stpInfo').textContent = (patSample ? 'editing ' + (patSample.displayName || 'STEPS') : (isEmpty(pat) ? 'tap steps or a preset' : 'adding…')) + ' · ' + bpm + ' BPM';
   paintPlay();
 }
 
-/* ---------------- drawn shape (dots, FL-style: the line = the ducked loop's volume) ---------------- */
+/* ---------------- shared canvas helpers ---------------- */
+function css(){ const cs = getComputedStyle(document.documentElement); return { green:cs.getPropertyValue('--green').trim() || '#4fd1a5', mono:cs.getPropertyValue('--mono').trim() || 'monospace' }; }
+function wavePath(cx, buf, x0, w, y0, h, t0, t1, col){   /* mirrored waveform of buf from t0..t1 seconds */
+  if(!buf) return; const d = buf.getChannelData(0), sr = buf.sampleRate, n = Math.max(1, Math.floor(w)); cx.fillStyle = col;
+  for(let i=0;i<n;i++){ const a = Math.floor((t0 + (t1-t0)*i/n)*sr), b = Math.floor((t0 + (t1-t0)*(i+1)/n)*sr); if(a >= d.length) break; let m = 0; for(let j=a;j<Math.min(b, d.length);j++){ const v = d[j] < 0 ? -d[j] : d[j]; if(v > m) m = v; } const hh = Math.max(0.5, m*h/2); cx.fillRect(x0 + i, y0 + h/2 - hh, 1, hh*2); } }
+
+/* ---------------- FADE editor (the picture of the sound + 3 dots) ---------------- */
+let wdrag = null;
+function waveView(){ const b = rowBuf[selRow]; const d = b ? Math.min(b.duration, 2.5) : 0.5; return { b, d }; }
+function drawWave(){
+  const cv = $('stpWave'); if(!cv || !zone.classList.contains('on') || panel !== 'snd') return; const cx = cv.getContext('2d'); const s = fitCanvas(cv, cx); if(!s) return;
+  const { w, h } = s, pad = 10, gw = w - pad*2, gh = h - pad*2, { green, mono } = css(), { b, d } = waveView(); cx.clearRect(0, 0, w, h);
+  if(!b){ cx.fillStyle = '#5a554e'; cx.font = '9px ' + mono; cx.fillText('loading…', pad, h/2); return; }
+  const e = envOf(pat, selRow, b) || { fin:0, fo:Math.min(b.duration, d), end:Math.min(b.duration, d) }, X = t => pad + gw*t/d;
+  wavePath(cx, b, pad, gw, pad, gh, 0, d, 'rgba(242,237,226,.55)');
+  cx.fillStyle = 'rgba(6,5,4,.72)'; cx.fillRect(X(e.end), pad, w - pad - X(e.end), gh);   /* cut part */
+  cx.beginPath(); cx.moveTo(X(0), pad + gh); cx.lineTo(X(e.fin), pad); cx.lineTo(X(e.fo), pad); cx.lineTo(X(e.end), pad + gh); cx.strokeStyle = green; cx.lineWidth = 1.5; cx.stroke();
+  [[e.fin, pad], [e.fo, pad], [e.end, pad + gh]].forEach(([t, y])=>{ cx.beginPath(); cx.arc(X(t), y, 5, 0, Math.PI*2); cx.fillStyle = '#060504'; cx.fill(); cx.strokeStyle = green; cx.lineWidth = 1.5; cx.stroke(); });
+  cx.fillStyle = '#8a8276'; cx.font = '8px ' + mono; cx.fillText('IN', X(e.fin) + 7, pad + 10); cx.fillText('OUT', X(e.fo) + 7, pad + 22); cx.textAlign = 'right'; cx.fillText('CUT', X(e.end) - 7, pad + gh - 3); cx.textAlign = 'left';
+  const ms = v => Math.round(v*1000) + 'ms'; $('stpFadeTxt').textContent = 'IN ' + ms(e.fin) + ' · OUT ' + ms(Math.max(0, e.end - e.fo)) + ' · LENGTH ' + ms(e.end);
+}
+function waveEvents(cv){
+  const tOf = ev => { const r = cv.getBoundingClientRect(), { d } = waveView(); return clamp((ev.clientX - r.left - 10)/(r.width - 20), 0, 1)*d; };
+  cv.addEventListener('pointerdown', ev=>{ ev.preventDefault(); const { b, d } = waveView(); if(!b) return; cv.setPointerCapture(ev.pointerId);
+    const e = envOf(pat, selRow, b) || { fin:0, fo:Math.min(b.duration, d), end:Math.min(b.duration, d) }; pat.env[selRow] = e;
+    const r = cv.getBoundingClientRect(), px = ev.clientX - r.left, py = ev.clientY - r.top, X = t => 10 + (r.width - 20)*t/d;
+    const cand = [['fin', e.fin, 10], ['fo', e.fo, 10], ['end', e.end, r.height - 10]]; let best = null, bd = 1e9;
+    cand.forEach(([k, t, y])=>{ const dd = Math.abs(px - X(t)) + Math.abs(py - y)*0.35; if(dd < bd){ bd = dd; best = k; } });
+    wdrag = best; move(ev); });
+  const move = ev => { if(!wdrag) return; const { b } = waveView(); const e = pat.env[selRow]; let t = tOf(ev);
+    if(wdrag === 'fin') e.fin = clamp(t, 0, e.fo); else if(wdrag === 'fo') e.fo = clamp(t, e.fin, e.end); else { e.end = clamp(t, 0.01, b.duration); if(e.fo > e.end) e.fo = e.end; if(e.fin > e.fo) e.fin = e.fo; }
+    drawWave(); };
+  cv.addEventListener('pointermove', move);
+  const end = ()=>{ if(!wdrag) return; wdrag = null; changed(); hear(selRow); };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+}
+
+/* ---------------- drawn sidechain (dots, FL-style) over the picture of the kick/snare that triggers it ---------------- */
 let drag = null;
 function shapeGeom(cv){ const r = cv.getBoundingClientRect(); return { w:r.width, h:r.height, pad:10, r }; }
+function trigPicture(){   /* what sound starts this shape: { buf, t0, secPerBeat } */
+  const tr = sidechainTrigger, bs = 60/bpm;
+  if(!tr || tr.sample.folder === 'STEPS' || !tr.sample.buffer){ const b = rowBuf[scTab]; return b ? { buf:b, t0:0, spb:bs, env:envOf(pat, scTab, b) } : null; }
+  const s = tr.sample, H = (s.hits||[]).find(x=>x.y === scTab); if(!H) return null; return { buf:s.buffer, t0:H.t, spb:s.buffer.duration/loopBeats(s) };
+}
 function drawShape(){
-  const cv = $('stpShape'); if(!cv || !zone.classList.contains('on')) return; const cx = cv.getContext('2d'); const s = fitCanvas(cv, cx); if(!s) return;
-  const { w, h } = s, pad = 10, gw = w - pad*2, gh = h - pad*2, sh = hits()[scTab];
+  const cv = $('stpShape'); if(!cv || !zone.classList.contains('on') || panel !== 'sc') return; const cx = cv.getContext('2d'); const s = fitCanvas(cv, cx); if(!s) return;
+  const { w, h } = s, pad = 10, gw = w - pad*2, gh = h - pad*2, sh = hits()[scTab], { green, mono } = css();
   cx.clearRect(0, 0, w, h);
-  const cs = getComputedStyle(document.documentElement), green = cs.getPropertyValue('--green').trim() || '#4fd1a5';
+  const pic = trigPicture(); if(pic){ const t1 = pic.t0 + sh.len*pic.spb; wavePath(cx, pic.buf, pad, gw, pad, gh, pic.t0, Math.min(t1, pic.buf.duration), 'rgba(242,237,226,.16)'); if(pic.env && pic.env.end < sh.len*pic.spb){ const xc = pad + gw*pic.env.end/(sh.len*pic.spb); cx.fillStyle = 'rgba(6,5,4,.6)'; cx.fillRect(xc, pad, pad + gw - xc, gh); } }
   cx.strokeStyle = 'rgba(255,255,255,.07)'; cx.lineWidth = 1; const div = Math.round(sh.len/0.0625);
   for(let i=0;i<=div;i++){ const x = pad + gw*i/div; cx.globalAlpha = (i % 4 === 0) ? 1 : 0.4; cx.beginPath(); cx.moveTo(x, pad); cx.lineTo(x, pad+gh); cx.stroke(); } cx.globalAlpha = 1;
   [0, 0.5, 1].forEach(v=>{ cx.beginPath(); cx.moveTo(pad, pad + gh*v); cx.lineTo(pad+gw, pad + gh*v); cx.stroke(); });
@@ -245,7 +334,7 @@ function drawShape(){
   cx.beginPath(); cx.moveTo(X(0), pad); sh.pts.forEach(([x, d])=> cx.lineTo(X(x), Y(d))); cx.lineTo(X(1), pad); cx.closePath(); cx.fillStyle = sh.on ? 'rgba(79,209,165,.10)' : 'rgba(255,255,255,.04)'; cx.fill();
   cx.beginPath(); sh.pts.forEach(([x, d], i)=> i ? cx.lineTo(X(x), Y(d)) : cx.moveTo(X(x), Y(d))); cx.strokeStyle = sh.on ? green : '#5a554e'; cx.lineWidth = 1.6; cx.stroke();
   sh.pts.forEach(([x, d])=>{ cx.beginPath(); cx.arc(X(x), Y(d), 4.5, 0, Math.PI*2); cx.fillStyle = '#060504'; cx.fill(); cx.strokeStyle = sh.on ? green : '#8a8276'; cx.lineWidth = 1.5; cx.stroke(); });
-  cx.fillStyle = '#8a8276'; cx.font = '8px ' + (cs.getPropertyValue('--mono').trim() || 'monospace'); cx.fillText((scTab === 'k' ? 'KICK' : 'SNARE') + ' HIT', pad + 3, h - 3); cx.textAlign = 'right'; cx.fillText('VOLUME ↑', w - pad - 3, pad + 9); cx.textAlign = 'left';
+  cx.fillStyle = '#8a8276'; cx.font = '8px ' + mono; cx.fillText((scTab === 'k' ? 'KICK' : 'SNARE') + (pic ? ' · its picture behind' : ' HIT'), pad + 3, h - 3); cx.textAlign = 'right'; cx.fillText('VOLUME ↑', w - pad - 3, pad + 9); cx.textAlign = 'left';
 }
 function shapeEvents(cv){
   const toPt = e => { const g = shapeGeom(cv), sh = hits()[scTab]; const x = clamp((e.clientX - g.r.left - g.pad)/(g.w - g.pad*2), 0, 1); const dRaw = clamp((e.clientY - g.r.top - g.pad)/(g.h - g.pad*2), 0, 1); return { x, d: sh.depth > 0.01 ? clamp(dRaw/sh.depth, 0, 1) : dRaw, g }; };
@@ -260,8 +349,25 @@ function shapeEvents(cv){
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
 }
 
+/* ---------------- LIVE: the kick vs your ducked loop (bass), scrolling, while it plays ---------------- */
+const LIVE_N = 180, liveK = new Float32Array(LIVE_N), liveB = new Float32Array(LIVE_N); let liveI = 0, liveRaf = null, liveName = '';
+const tdBuf = new Float32Array(1024);
+function lvl(ch){ if(!ch.analyser) return 0; ch.analyser.getFloatTimeDomainData(tdBuf); let m = 0; for(let i=0;i<tdBuf.length;i++){ const v = tdBuf[i] < 0 ? -tdBuf[i] : tdBuf[i]; if(v > m) m = v; } return Math.min(1, m); }   /* real waveform level (after the duck) */
+function liveLoop(){ if(liveRaf) return; const step = ()=>{ liveRaf = null; if(!zone.classList.contains('on')) return;
+    if(isRunning){ const tr = sidechainTrigger; let k = tr ? lvl(tr) : 0, bv = 0, bn = ''; channels.forEach(ch=>{ if(ch.scDuck && ch !== tr){ const v = lvl(ch); if(v >= bv){ bv = v; bn = ch.sample.displayName || ''; } } });
+      liveK[liveI] = k; liveB[liveI] = bv; liveI = (liveI + 1) % LIVE_N; liveName = bn; }
+    drawLive(); if(isRunning) liveRaf = requestAnimationFrame(step); else paintPlay(); };
+  liveRaf = requestAnimationFrame(step); }
+function drawLive(){
+  const cv = $('stpLive'); if(!cv || panel !== 'sc') return; const cx = cv.getContext('2d'); const s = fitCanvas(cv, cx); if(!s) return; const { w, h } = s, { green, mono } = css(); cx.clearRect(0, 0, w, h);
+  const dx = w/LIVE_N, y = v => h - 2 - v*(h - 12);
+  cx.fillStyle = 'rgba(242,237,226,.22)'; for(let i=0;i<LIVE_N;i++){ const v = liveK[(liveI + i) % LIVE_N]; cx.fillRect(i*dx, y(v), Math.ceil(dx), h - 2 - y(v)); }
+  cx.beginPath(); for(let i=0;i<LIVE_N;i++){ const v = liveB[(liveI + i) % LIVE_N]; i ? cx.lineTo(i*dx, y(v)) : cx.moveTo(0, y(v)); } cx.strokeStyle = green; cx.lineWidth = 1.5; cx.stroke();
+  cx.font = '7.5px ' + mono; cx.fillStyle = '#c9c1b4'; cx.fillText('KICK', 4, 9); cx.fillStyle = green; cx.fillText(liveName ? liveName.toUpperCase().slice(0, 28) : (isRunning ? 'no DUCKED loop' : 'press play'), 34, 9);
+}
+
 /* ---------------- boot ---------------- */
-function boot(){ build(); const b = $('stepsBtn'); if(b) b.addEventListener('click', open); $('transportBtn').addEventListener('click', ()=> setTimeout(paintPlay, 80)); }
+function boot(){ build(); const b = $('stepsBtn'); if(b) b.addEventListener('click', ()=> open(false)); $('transportBtn').addEventListener('click', ()=> setTimeout(()=>{ paintPlay(); liveLoop(); }, 80)); }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-STEPS.open = open; STEPS._pat = ()=>pat; STEPS._detect = detectHits; STEPS._applyPreset = applyPreset;
+STEPS.open = open; STEPS._pat = ()=>pat; STEPS._detect = detectHits; STEPS._applyPreset = applyPreset; STEPS._rowBuf = rowBuf;
 })();

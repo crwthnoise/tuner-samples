@@ -165,7 +165,7 @@ function duckAll(){ let n = 0; const pi = FX_SLOTS.indexOf('PUMP');
   if(n){ renderRack(); refreshTimeline(); markDirty(); commit(); drawTL(); } return n; }
 
 /* ---------------- UI ---------------- */
-let zone = null, scTab = 'k', panel = 'snd', selRow = 'k', page = 0, prevSrc = null;
+let zone = null, scTab = 'k', panel = 'sc', selRow = 'k', page = 0, prevSrc = null;
 function stepsChOf(){ const ch = selCh(); return ch && ch.sample.folder === 'STEPS' ? ch : null; }
 /* STEPS button = always opens your pattern: the selected STEPS loop, else the one that's the TRIGGER, else the last one on the timeline */
 function findStepsCh(){ return stepsChOf() || channels.find(c=>c.sample.folder === 'STEPS' && c === sidechainTrigger) || channels.slice().reverse().find(c=>c.sample.folder === 'STEPS') || null; }
@@ -215,7 +215,7 @@ function build(){
     <div class="stp-pane" id="stpScp">
       <div class="stp-src" id="stpSrc"></div>
       <canvas id="stpShape"></canvas>
-      <div class="stp-row2"><div class="stp-lens" id="stpLens"></div><label>DEPTH</label><input type="range" id="stpDepth" min="0" max="100"><b id="stpDepthV"></b></div>
+      <div class="stp-row2"><button class="stp-chip sm" id="stpAuto" data-k="STEPS AUTO">AUTO</button><div class="stp-lens" id="stpLens"></div><label>DEPTH</label><input type="range" id="stpDepth" min="0" max="100"><b id="stpDepthV"></b></div>
       <canvas id="stpLive"></canvas>
       <div class="stp-hint">dots: tap = add · drag = move · tap a dot = remove · bottom = live, kick vs your ducked loop</div>
     </div>
@@ -233,6 +233,7 @@ function build(){
   $('stpRnd').addEventListener('click', ()=> pickSound(selRow, 0));
   $('stpNm').addEventListener('click', ()=> hear(selRow));
   $('stpFadeReset').addEventListener('click', ()=>{ if(pat.env) delete pat.env[selRow]; changed(); drawWave(); hear(selRow); });
+  $('stpAuto').addEventListener('click', autoShape);
   shapeEvents($('stpShape')); waveEvents($('stpWave'));
   window.addEventListener('resize', ()=>{ if(zone.classList.contains('on')) drawAll2(); });
 }
@@ -322,11 +323,29 @@ function trigPicture(){   /* what sound starts this shape: { buf, t0, secPerBeat
   if(!tr || tr.sample.folder === 'STEPS' || !tr.sample.buffer){ const b = rowBuf[scTab]; return b ? { buf:b, t0:0, spb:bs, env:envOf(pat, scTab, b) } : null; }
   const s = tr.sample, H = (s.hits||[]).find(x=>x.y === scTab); if(!H) return null; return { buf:s.buffer, t0:H.t, spb:s.buffer.duration/loopBeats(s) };
 }
+function duckedPic(){   /* the loudest DUCKED loop (your bass), from a bar start, so you see what the shape does to it */
+  const tr = sidechainTrigger; let best = null, bl = -1; channels.forEach(ch=>{ if(!ch.scDuck || ch === tr || !ch.sample.buffer) return; const e = ch.sample.env; let m = 0; if(e) for(let i=0;i<e.data.length;i+=7) m += e.data[i]; if(m > bl){ bl = m; best = ch; } });
+  if(!best) return null; const s = best.sample; return { buf:s.buffer, t0:0, spb:s.buffer.duration/loopBeats(s), name:s.displayName || s.name }; }
+function autoShape(){   /* AUTO = the duck follows the kick: as long as it rings, as deep as it's loud */
+  const pic = trigPicture(), H = hits(), sh = H[scTab]; if(!pic){ setStatus('no ' + (scTab === 'k' ? 'kick' : 'snare') + ' to follow yet'); return; }
+  const b = pic.buf, sr = b.sampleRate, d = b.getChannelData(0), t0 = pic.t0, cut = pic.env ? pic.env.end : b.duration - t0, win = Math.floor(sr*0.01);
+  const env = t => { const a = Math.floor((t0 + t)*sr); let m = 0; for(let j=a; j<Math.min(d.length, a + win); j++){ const v = d[j] < 0 ? -d[j] : d[j]; if(v > m) m = v; } return m; };
+  let pk = 0; for(let t=0; t<0.05; t+=0.005) pk = Math.max(pk, env(t)); if(pk <= 0){ setStatus('that sound is silent'); return; }
+  let ring = Math.min(cut, 2*pic.spb*2); for(let t=0.02; t<ring; t+=0.005){ if(env(t) < pk*0.08){ ring = t; break; } }
+  const beats = ring/pic.spb, LENS = [0.25, 0.5, 1, 2]; sh.len = LENS.find(v=>v >= beats*1.1) || 2;
+  const span = sh.len*pic.spb, pts = [[0, 1]]; let last = 1;
+  for(let i=1;i<8;i++){ const x = i/8, t = x*span; let v = t >= ring ? 0 : Math.min(1, Math.pow(env(t)/pk, 0.6)*1.05); if(v > last) v = last; last = v; pts.push([x, +v.toFixed(3)]); }
+  pts.push([1, 0]); sh.pts = pts.filter((q, i, a)=> i === 0 || i === a.length - 1 || Math.abs(q[1] - a[i-1][1]) > 0.02); sh.on = true; if(!(sh.depth > 0.05)) sh.depth = 1;
+  markDirty(); commit(); paint(); drawShape(); setStatus('AUTO: the duck follows the ' + (scTab === 'k' ? 'kick' : 'snare')); }
 function drawShape(){
   const cv = $('stpShape'); if(!cv || !zone.classList.contains('on') || panel !== 'sc') return; const cx = cv.getContext('2d'); const s = fitCanvas(cv, cx); if(!s) return;
   const { w, h } = s, pad = 10, gw = w - pad*2, gh = h - pad*2, sh = hits()[scTab], { green, mono } = css();
   cx.clearRect(0, 0, w, h);
   const pic = trigPicture(); if(pic){ const t1 = pic.t0 + sh.len*pic.spb; wavePath(cx, pic.buf, pad, gw, pad, gh, pic.t0, Math.min(t1, pic.buf.duration), 'rgba(242,237,226,.16)'); if(pic.env && pic.env.end < sh.len*pic.spb){ const xc = pad + gw*pic.env.end/(sh.len*pic.spb); cx.fillStyle = 'rgba(6,5,4,.6)'; cx.fillRect(xc, pad, pad + gw - xc, gh); } }
+  const dk = duckedPic(); if(dk){ const n = Math.max(1, Math.floor(gw)), d = dk.buf.getChannelData(0), sr = dk.buf.sampleRate, span = sh.len*dk.spb, mid = pad + gh/2;
+    for(let i=0;i<n;i++){ const t0 = dk.t0 + span*i/n, t1 = dk.t0 + span*(i+1)/n; let m = 0; for(let j=Math.floor(t0*sr); j<Math.floor(t1*sr); j++){ const v = d[j % d.length]; const a = v < 0 ? -v : v; if(a > m) m = a; }
+      const x = i/n, gain = 1 - (sh.on ? shapeVal(sh.pts, x)*sh.depth : 0), hh = Math.max(0.5, m*gh*0.42);
+      cx.fillStyle = 'rgba(79,209,165,.10)'; cx.fillRect(pad + i, mid - hh, 1, hh*2); cx.fillStyle = 'rgba(79,209,165,.55)'; cx.fillRect(pad + i, mid - hh*gain, 1, Math.max(0.5, hh*gain*2)); } }
   cx.strokeStyle = 'rgba(255,255,255,.07)'; cx.lineWidth = 1; const div = Math.round(sh.len/0.0625);
   for(let i=0;i<=div;i++){ const x = pad + gw*i/div; cx.globalAlpha = (i % 4 === 0) ? 1 : 0.4; cx.beginPath(); cx.moveTo(x, pad); cx.lineTo(x, pad+gh); cx.stroke(); } cx.globalAlpha = 1;
   [0, 0.5, 1].forEach(v=>{ cx.beginPath(); cx.moveTo(pad, pad + gh*v); cx.lineTo(pad+gw, pad + gh*v); cx.stroke(); });
@@ -334,7 +353,7 @@ function drawShape(){
   cx.beginPath(); cx.moveTo(X(0), pad); sh.pts.forEach(([x, d])=> cx.lineTo(X(x), Y(d))); cx.lineTo(X(1), pad); cx.closePath(); cx.fillStyle = sh.on ? 'rgba(79,209,165,.10)' : 'rgba(255,255,255,.04)'; cx.fill();
   cx.beginPath(); sh.pts.forEach(([x, d], i)=> i ? cx.lineTo(X(x), Y(d)) : cx.moveTo(X(x), Y(d))); cx.strokeStyle = sh.on ? green : '#5a554e'; cx.lineWidth = 1.6; cx.stroke();
   sh.pts.forEach(([x, d])=>{ cx.beginPath(); cx.arc(X(x), Y(d), 4.5, 0, Math.PI*2); cx.fillStyle = '#060504'; cx.fill(); cx.strokeStyle = sh.on ? green : '#8a8276'; cx.lineWidth = 1.5; cx.stroke(); });
-  cx.fillStyle = '#8a8276'; cx.font = '8px ' + mono; cx.fillText((scTab === 'k' ? 'KICK' : 'SNARE') + (pic ? ' · its picture behind' : ' HIT'), pad + 3, h - 3); cx.textAlign = 'right'; cx.fillText('VOLUME ↑', w - pad - 3, pad + 9); cx.textAlign = 'left';
+  cx.fillStyle = '#8a8276'; cx.font = '8px ' + mono; cx.fillText((scTab === 'k' ? 'KICK' : 'SNARE') + (dk ? ' → ' + (dk.name||'').toUpperCase().slice(0, 26) + ' (green = after the duck)' : ' · DUCK a loop to see it here'), pad + 3, h - 3); cx.textAlign = 'right'; cx.fillText('VOLUME ↑', w - pad - 3, pad + 9); cx.textAlign = 'left';
 }
 function shapeEvents(cv){
   const toPt = e => { const g = shapeGeom(cv), sh = hits()[scTab]; const x = clamp((e.clientX - g.r.left - g.pad)/(g.w - g.pad*2), 0, 1); const dRaw = clamp((e.clientY - g.r.top - g.pad)/(g.h - g.pad*2), 0, 1); return { x, d: sh.depth > 0.01 ? clamp(dRaw/sh.depth, 0, 1) : dRaw, g }; };

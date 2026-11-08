@@ -625,14 +625,14 @@ window.__tunerEarly = []; window.__tunerBar = function(m){ try{ var b = document
 window.addEventListener('error', function(e){ var m = (e.message || 'error') + (e.lineno ? ' @' + e.lineno : ''); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' + (e.reason && e.reason.message || e.reason); window.__tunerEarly.push(m); if(!window.tunerErr) window.__tunerBar(m); });
 </script>
-<script src="modules/sky.js?v=10.42"></script>
-<script src="modules/rage.js?v=10.42"></script>
-<script src="modules/grinder.js?v=10.42"></script>
-<script src="modules/flame.js?v=10.42"></script>
+<script src="modules/sky.js?v=10.43"></script>
+<script src="modules/rage.js?v=10.43"></script>
+<script src="modules/grinder.js?v=10.43"></script>
+<script src="modules/flame.js?v=10.43"></script>
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.42';
+const APP_VERSION = 'v10.43';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -1456,6 +1456,7 @@ async function addChannelFromSample(sample, opts={}){
   gainNode.connect(lp); lp.connect(hp); hp.connect(tuneNodes.in); tuneNodes.out.connect(masterGain);
   const analyser = ctx.createAnalyser(); analyser.fftSize = 1024; gainNode.connect(analyser);
   const ch = { id: opts.persistedId || ('ch-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)), sample, buffer:sample.buffer, env:sample.env, gainNode, lp, hp, analyser, dataArray:new Uint8Array(analyser.frequencyBinCount), sources:[], volume:opts.volume??0.9, filterVal:opts.filterVal??0, pitchSemitones:opts.pitchSemitones??0, scTrigger:!!opts.scTrigger, scDuck:!!opts.scDuck, mute:!!opts.mute, fx:migrateFx(opts.fx), sw:migrateSw(opts.sw), rack:rack0, qSeed:opts.qSeed || newQuipuSeed(), keyLock:!!opts.keyLock, mp:(opts.mp && typeof opts.mp === 'object') ? JSON.parse(JSON.stringify(opts.mp)) : {}, mm:Object.assign({}, opts.mm), tuneNodes, clips:(opts.clips && opts.clips.length) ? opts.clips.map(c=>({start:c.start, len:c.len, off:c.off||0, mute:!!c.mute})) : [{ start:0, len:defaultClipLen(sample), off:0, mute:false }], lastPeakLevel:0 };
+  if(addAtBeat != null && Date.now() - addAtT > 300000) addAtBeat = null;
   if(addAtBeat != null && !restoring && !(opts.clips && opts.clips.length)){ ch.clips[0].start = addAtBeat; addAtBeat = null; hidePlus(); }   /* v10.42 + on empty timeline space = the new thing starts there */
   if(!channels.length && !restoring && !opts.quiet && sample.bpm && sample.bpm !== bpm){ bpm = sample.bpm; $('bpmInput').value = bpm; renderBpm(); }   /* first loop sets the song BPM */
   rebuildBuffer(ch);
@@ -1752,17 +1753,20 @@ tl.addEventListener('pointermove', e=>{
   refreshTimeline(); drawTL();
 });
 /* v10.42 + ANYWHERE: tap empty timeline space → a + shows on that bar → STEPS or LOOP lands right there */
-let addAtBeat = null, plusT = null;
+let addAtBeat = null, addAtT = 0, plusT = null;
 function plusEl(){ let el = $('tlPlus'); if(el) return el; el = document.createElement('div'); el.id = 'tlPlus';
-  el.innerHTML = '<button class="tp-p" data-k="TL PLUS" aria-label="add here">+</button><div class="tp-m"><button data-k="TL PLUS STEPS" id="tpSteps">STEPS</button><button data-k="TL PLUS LOOP" id="tpLoop">LOOP</button></div><b class="tp-bar"></b>';
+  el.innerHTML = '<button class="tp-p" data-k="TL PLUS" aria-label="add here">+</button><div class="tp-m"><button data-k="TL PLUS LOOP" id="tpLoop">LOOP</button><button data-k="TL PLUS STEPS" id="tpSteps">STEPS</button><button data-k="TL PLUS MAKE" id="tpMake">MAKE</button><button data-k="TL PLUS SING" id="tpSing">SING</button></div><b class="tp-bar"></b>';
   $('tlZone').appendChild(el);
   el.querySelector('.tp-p').addEventListener('click', e=>{ e.stopPropagation(); el.classList.add('open'); clearTimeout(plusT); plusT = setTimeout(hidePlus, 6000); });
-  $('tpSteps').addEventListener('click', e=>{ e.stopPropagation(); addAtBeat = +el.dataset.beat; clearTimeout(plusT); el.classList.remove('on','open'); if(window.STEPS && STEPS.open) STEPS.open(true); });
-  $('tpLoop').addEventListener('click', e=>{ e.stopPropagation(); addAtBeat = +el.dataset.beat; clearTimeout(plusT); el.classList.remove('on','open'); openSheet('packsSheet'); setStatus('pick a loop — it lands on bar ' + (addAtBeat/BAR + 1)); });
+  $('tpSteps').addEventListener('click', e=>{ e.stopPropagation(); addAtBeat = +el.dataset.beat; addAtT = Date.now(); clearTimeout(plusT); el.classList.remove('on','open'); if(window.STEPS && STEPS.open) STEPS.open(true); });
+  const go = id => e=>{ e.stopPropagation(); addAtBeat = +el.dataset.beat; addAtT = Date.now(); clearTimeout(plusT); el.classList.remove('on','open'); $(id).click(); };
+  $('tpMake').addEventListener('click', go('makeBtn')); $('tpSing').addEventListener('click', go('singBtn'));
+  $('tpLoop').addEventListener('click', e=>{ e.stopPropagation(); addAtBeat = +el.dataset.beat; addAtT = Date.now(); clearTimeout(plusT); el.classList.remove('on','open'); openSheet('packsSheet'); setStatus('pick a loop — it lands on bar ' + (addAtBeat/BAR + 1)); });
   return el; }
 function showPlus(x, y){ if(x == null) return; const el = plusEl(); const b = Math.max(0, Math.floor(beatAtX(x)/BAR)*BAR); el.dataset.beat = b; const px = b*zoomX - scrollX;
-  el.style.left = clamp(px, 2, (tl.clientWidth||320) - 120) + 'px'; el.style.top = clamp(y - 16, RULER_H + 2, (tl.clientHeight||200) - 40) + 'px'; el.querySelector('.tp-bar').textContent = 'BAR ' + (b/BAR + 1);
+  el.style.left = clamp(px, 2, (tl.clientWidth||320) - 250) + 'px'; el.style.top = clamp(y - 16, RULER_H + 2, (tl.clientHeight||200) - 40) + 'px'; el.querySelector('.tp-bar').textContent = 'BAR ' + (b/BAR + 1);
   el.classList.remove('open'); el.classList.add('on'); clearTimeout(plusT); plusT = setTimeout(hidePlus, 3000); }
+['makeBack','singBack'].forEach(id=>{ const b = $(id); if(b) b.addEventListener('click', ()=> setTimeout(()=>{ addAtBeat = null; }, 50)); });
 function hidePlus(){ const el = $('tlPlus'); if(el) el.classList.remove('on','open'); clearTimeout(plusT); }
 /* PLAY FROM TAP: a tap on the timeline drops the start point on that bar.
    stopped → PLAY starts there (STOP comes back to it) · playing → a tap on open lane space jumps there; tapping a clip only selects */
@@ -2109,6 +2113,6 @@ setTimeout(checkVersion, 1500); document.addEventListener('visibilitychange', ()
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
 (async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); let lp = null; try{ lp = localStorage.getItem('tuner_lastProj'); }catch(e){} if(lp && !channels.length){ await loadProjectById(lp, { quiet:true }); } }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
 </script>
-<script src="modules/steps.js?v=10.42"></script>
+<script src="modules/steps.js?v=10.43"></script>
 </body>
 </html>

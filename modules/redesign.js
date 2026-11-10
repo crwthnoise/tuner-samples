@@ -69,24 +69,22 @@
   body.rd .dock{ height:64px; padding:0 26px !important; gap:16px; justify-content:center; }
   body.rd .dgrid{ display:none; }
   #rdDock{ display:flex; flex:none; align-items:center; gap:16px; }
-  body.rd #rdDock .btn{ flex:0 0 40px; width:40px; min-width:0; height:42px; border-radius:7px !important; }
+  body.rd #rdDock .btn{ flex:0 0 42px; width:42px; min-width:0; height:40px; border-radius:7px !important; }
   #rdHidden{ display:none !important; }
   /* PLAY: small dark hardware key, thin red-orange gradient ring */
-  body.rd .dock .play{ width:46px; height:46px; flex:none; border-radius:50% !important; border:1.5px solid transparent !important; outline:0 !important; background:linear-gradient(#272320,#121010) padding-box, linear-gradient(135deg,#ff3d2e,#ff9600 60%,#ffd24a) border-box !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 3px 0 #050403,0 5px 9px #000 !important; padding:0; position:relative; display:flex; align-items:center; justify-content:center; transition:transform .06s, box-shadow .06s; }
+  body.rd .dock .play{ width:58px; height:58px; flex:none; border-radius:50% !important; border:1.5px solid transparent !important; outline:0 !important; background:linear-gradient(#272320,#121010) padding-box, linear-gradient(135deg,#ff3d2e,#ff9600 60%,#ffd24a) border-box !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 3px 0 #050403,0 5px 9px #000 !important; padding:0; position:relative; display:flex; align-items:center; justify-content:center; transition:transform .06s, box-shadow .06s; }
   body.rd .dock .play::before, body.rd .dock .play::after{ display:none !important; content:none !important; }
-  body.rd .dock .play svg{ width:18px; height:18px; transform:none; filter:none; fill:#ff4a38; color:#ff4a38; }
+  body.rd .dock .play svg{ width:24px; height:24px; transform:none; filter:none; fill:#ff4a38; color:#ff4a38; }
   body.rd .dock .play svg *{ fill:#ff4a38; }
   body.rd .dock .play:active{ transform:translateY(2px) !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 1px 0 #050403,0 2px 4px #000 !important; }
   body.rd .dock .play.playing{ box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 0 12px rgba(255,90,50,.55),0 3px 0 #050403,0 5px 9px #000 !important; }
   /* story-style thin gradient edges (top keys + dock keys) */
-  body.rd .rdbox, body.rd #rdDock .btn{ border:1.5px solid transparent !important; background:linear-gradient(#272320,#121010) padding-box, linear-gradient(135deg,var(--e1,#9c9284),var(--e2,#d8d2c6),var(--e3,#9c9284)) border-box !important; }
+  body.rd .rdbox{ border:1.5px solid transparent !important; background:linear-gradient(#272320,#121010) padding-box, linear-gradient(135deg,var(--e1,#9c9284),var(--e2,#d8d2c6),var(--e3,#9c9284)) border-box !important; }
   body.rd .rdbox::before{ display:none !important; }
   body.rd .rdbox.on{ box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 0 9px color-mix(in srgb,var(--e2) 45%,transparent),0 3px 0 #050403,0 5px 9px #000; }
   body.rd .rdbox.b-beats{ --e1:#ff3d2e; --e2:#ff9600; --e3:#ffd24a; } body.rd .rdbox.b-sounds{ --e1:#2fd6b0; --e2:#3b8cff; --e3:#9b6bff; }
   body.rd .rdbox.b-friends{ --e1:#8ee06a; --e2:#4fd1a5; --e3:#3bd0ff; } body.rd .rdbox.b-songs{ --e1:#ffb020; --e2:#ff5fa2; --e3:#a855f7; }
   body.rd .rdbox.b-key, body.rd .rdbox.b-bpm{ --e1:#8f877a; --e2:#f2ede2; --e3:#8fb4ff; }
-  body.rd #setBtn{ --e1:#8f877a; --e2:#f2ede2; --e3:#8f877a; } body.rd #saveBtn{ --e1:#8ee06a; --e2:#4fd1a5; --e3:#3bd0ff; }
-  body.rd #recBtn{ --e1:#ff3d2e; --e2:#ff5fa2; --e3:#a855f7; } body.rd #packsBtn{ --e1:#ffb020; --e2:#ff5fa2; --e3:#9b6bff; }
   /* middle-takeover: settings, packs, beats fill the space between top bar and dock */
   body.rd #stepsZone{ inset:auto !important; left:0 !important; right:0 !important; top:var(--rdT,62px) !important; bottom:var(--rdB,64px) !important; height:auto !important; padding:0 !important; }
   body.rd #setSheet, body.rd #packsSheet{ border-radius:10px !important; border-top-width:2px; border-bottom-width:2px; }
@@ -232,6 +230,7 @@
 
   /* ---------- TIMELINE: small undo + double-tap undo ---------- */
   const tctl = tlz.querySelector('.tlctl'), ub = document.createElement('button'); ub.id = 'rdUndo'; ub.dataset.k = 'TL UNDO'; ub.title = 'undo'; ub.textContent = '↶'; ub.setAttribute('aria-label','undo');
+  const fb = document.createElement('button'); fb.id = 'rdFeedBtn'; fb.dataset.k = 'FEED'; fb.textContent = 'FEED'; fb.style.cssText = 'font-size:9px;letter-spacing:1px'; fb.className = $('tlStart').className; if(tctl) tctl.insertBefore(fb, $('tlStart')); fb.addEventListener('click', ()=>{ if(feedKind === 'HOME') closeFeed(); else openFeed('HOME'); });
   if(tctl){ ub.className = $('tlStart').className; tctl.insertBefore(ub, $('tlStart')); }
   ub.addEventListener('click', ()=>{ try{ undo(); }catch(e){} });
   window.clearBoard = function(){};

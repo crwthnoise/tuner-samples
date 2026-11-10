@@ -4,7 +4,7 @@
 (()=>{
   'use strict';
   const $ = id => document.getElementById(id);
-  const RD_VER = 'REDESIGN v2';
+  const RD_VER = 'REDESIGN v3';
   const LS = { get:k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set:(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} } };
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   window.__RD_TAP = true;                                   /* index.html: tap a selected clip again = options */
@@ -66,19 +66,34 @@
   body.rd.rdfeed .tlctl, body.rd.rdfeed #tlPlus{ display:none !important; }
   #rdUndo{ font-size:13px; }
   /* BOTTOM: one row, equal gaps, equal distance from the screws */
-  body.rd .dock{ height:96px; padding:0 26px !important; gap:12px; justify-content:flex-start; }
+  body.rd .dock{ height:64px; padding:0 26px !important; gap:16px; justify-content:center; }
   body.rd .dgrid{ display:none; }
-  #rdDock{ display:flex; flex:1; align-items:center; gap:12px; min-width:0; }
-  body.rd #rdDock .btn{ flex:1 1 0; width:auto; min-width:0; height:54px; }
+  #rdDock{ display:flex; flex:none; align-items:center; gap:16px; }
+  body.rd #rdDock .btn{ flex:0 0 40px; width:40px; min-width:0; height:42px; border-radius:7px !important; }
   #rdHidden{ display:none !important; }
-  /* PLAY: a real hardware button — metal bezel, deep red dome cap */
-  body.rd .dock .play{ width:82px; height:82px; flex:none; border:0 !important; outline:0 !important; border-radius:50%; background:conic-gradient(from 200deg,#e9e6df,#8c8981,#f4f2ec,#6d6a64,#d4d1c9,#8c8981,#e9e6df) !important; box-shadow:0 0 0 2px #000,0 6px 0 #0a0807,0 9px 14px #000 !important; padding:0; position:relative; transition:transform .06s,box-shadow .06s; }
-  body.rd .dock .play::before{ content:'' !important; position:absolute; inset:7px !important; border-radius:50%; background:#0b0907 !important; -webkit-mask:none !important; mask:none !important; box-shadow:inset 0 3px 6px #000; }
-  body.rd .dock .play::after{ content:'' !important; position:absolute; inset:11px !important; border-radius:50%; background:radial-gradient(circle at 38% 28%,#ff9a8a 0,#e2392c 26%,#a81c15 62%,#5a0d0a 100%) !important; box-shadow:inset 0 -7px 11px rgba(0,0,0,.5),inset 0 3px 5px rgba(255,255,255,.38),0 3px 0 #2e0605,0 5px 6px #000 !important; pointer-events:none; transition:transform .06s,box-shadow .06s; }
-  body.rd .dock .play svg{ position:relative; z-index:2; transform:scale(.62); filter:drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
-  body.rd .dock .play:active{ transform:translateY(3px) !important; box-shadow:0 0 0 2px #000,0 3px 0 #0a0807,0 5px 8px #000 !important; }
-  body.rd .dock .play:active::after{ transform:translateY(2px); box-shadow:inset 0 -5px 9px rgba(0,0,0,.5),inset 0 2px 4px rgba(255,255,255,.3),0 1px 0 #2e0605 !important; }
-  body.rd .dock .play.playing::after{ background:radial-gradient(circle at 38% 28%,#ffc2b6 0,#ff5a48 28%,#d4281d 62%,#7a120d 100%) !important; box-shadow:inset 0 -7px 11px rgba(0,0,0,.4),inset 0 3px 5px rgba(255,255,255,.45),0 0 18px rgba(255,70,50,.65),0 3px 0 #2e0605 !important; }
+  /* PLAY: small dark hardware key, thin red-orange gradient ring */
+  body.rd .dock .play{ width:46px; height:46px; flex:none; border-radius:50% !important; border:1.5px solid transparent !important; outline:0 !important; background:linear-gradient(#272320,#121010) padding-box, linear-gradient(135deg,#ff3d2e,#ff9600 60%,#ffd24a) border-box !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 3px 0 #050403,0 5px 9px #000 !important; padding:0; position:relative; display:flex; align-items:center; justify-content:center; transition:transform .06s, box-shadow .06s; }
+  body.rd .dock .play::before, body.rd .dock .play::after{ display:none !important; content:none !important; }
+  body.rd .dock .play svg{ width:18px; height:18px; transform:none; filter:none; fill:#ff4a38; color:#ff4a38; }
+  body.rd .dock .play svg *{ fill:#ff4a38; }
+  body.rd .dock .play:active{ transform:translateY(2px) !important; box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 1px 0 #050403,0 2px 4px #000 !important; }
+  body.rd .dock .play.playing{ box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 0 12px rgba(255,90,50,.55),0 3px 0 #050403,0 5px 9px #000 !important; }
+  /* story-style thin gradient edges (top keys + dock keys) */
+  body.rd .rdbox, body.rd #rdDock .btn{ border:1.5px solid transparent !important; background:linear-gradient(#272320,#121010) padding-box, linear-gradient(135deg,var(--e1,#9c9284),var(--e2,#d8d2c6),var(--e3,#9c9284)) border-box !important; }
+  body.rd .rdbox::before{ display:none !important; }
+  body.rd .rdbox.on{ box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 0 9px color-mix(in srgb,var(--e2) 45%,transparent),0 3px 0 #050403,0 5px 9px #000; }
+  body.rd .rdbox.b-beats{ --e1:#ff3d2e; --e2:#ff9600; --e3:#ffd24a; } body.rd .rdbox.b-sounds{ --e1:#2fd6b0; --e2:#3b8cff; --e3:#9b6bff; }
+  body.rd .rdbox.b-friends{ --e1:#8ee06a; --e2:#4fd1a5; --e3:#3bd0ff; } body.rd .rdbox.b-songs{ --e1:#ffb020; --e2:#ff5fa2; --e3:#a855f7; }
+  body.rd .rdbox.b-key, body.rd .rdbox.b-bpm{ --e1:#8f877a; --e2:#f2ede2; --e3:#8fb4ff; }
+  body.rd #setBtn{ --e1:#8f877a; --e2:#f2ede2; --e3:#8f877a; } body.rd #saveBtn{ --e1:#8ee06a; --e2:#4fd1a5; --e3:#3bd0ff; }
+  body.rd #recBtn{ --e1:#ff3d2e; --e2:#ff5fa2; --e3:#a855f7; } body.rd #packsBtn{ --e1:#ffb020; --e2:#ff5fa2; --e3:#9b6bff; }
+  /* middle-takeover: settings, packs, beats fill the space between top bar and dock */
+  body.rd #stepsZone{ inset:auto !important; left:0 !important; right:0 !important; top:var(--rdT,62px) !important; bottom:var(--rdB,64px) !important; height:auto !important; padding:0 !important; }
+  body.rd #setSheet, body.rd #packsSheet{ border-radius:10px !important; border-top-width:2px; border-bottom-width:2px; }
+  body.rd #setSheet:not(.open), body.rd #packsSheet:not(.open){ transform:translateY(calc(100% + var(--rdB,64px) + 30px)) !important; pointer-events:none; }
+  body.rd .lrow{ isolation:isolate; position:relative; }
+  body.rd .lib-head{ z-index:20 !important; }
+  body.rd #usbStrip{ max-height:34vh !important; position:relative; z-index:1; }
   /* settings quick row */
   #rdQuick{ display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 10px; }
   #rdQuick button{ flex:1 1 30%; }
@@ -235,7 +250,7 @@
   const rz = $('rackZone'), rack = $('rack');
   const scroller = document.createElement('div'); scroller.id = 'rdScroll'; rack.parentNode.insertBefore(scroller, rack); scroller.appendChild(rack);
   const h = document.createElement('div'); h.id = 'rdHandle'; h.dataset.k = 'RACK HANDLE'; h.innerHTML = '<i></i><span>SLIDERS</span><b>▾</b><i></i>'; rz.insertBefore(h, rz.firstChild);
-  const HFIX = 138, WIDE = 1.3, GAP = 3;
+  const HFIX = 196, WIDE = 1, GAP = 3;
   window.layoutRack = function(){
     const Wv = scroller.clientWidth; if(!Wv) return;
     const sy = HFIX/330, sx = sy*WIDE, mw = 66*sx, n = RACK.length + 1, total = Math.max(Wv, n*mw + (n-1)*GAP);
@@ -274,8 +289,10 @@
 
   /* ---------- BOOT: land on the FEED ---------- */
   requestAnimationFrame(()=> requestAnimationFrame(()=>{ const wantOpen = sliderPref() ? false : (LS.get('tuner_rd_open') !== '0'); if(!wantOpen) setRack(false, true); }));
-  let tries = 0; const boot = ()=>{ if(samples.length || tries++ > 40){ if(!feedKind && !document.querySelector('.sheet.open') && !(channels && channels.length)) openFeed('HOME'); } else setTimeout(boot, 150); };
+  let tries = 0; const boot = ()=>{ if(samples.length || tries++ > 40){ if(!feedKind && !document.querySelector('.sheet.open') ) openFeed('HOME'); } else setTimeout(boot, 150); };
   setTimeout(boot, 200);
   let lastN = 0; setInterval(()=>{ if(feedKind === 'HOME' && !gesture && samples.length !== lastN){ lastN = samples.length; openFeed('HOME'); } }, 1200);
+  function fit(){ try{ const t = $('topZone').getBoundingClientRect(), d = $('dock').getBoundingClientRect(), T = Math.round(t.bottom), B = Math.round(innerHeight - d.top); const r = document.documentElement.style; r.setProperty('--rdT', T + 'px'); r.setProperty('--rdB', B + 'px'); ['setSheet','packsSheet'].forEach(id=>{ const e = $(id); if(!e) return; e.style.setProperty('top', T + 'px', 'important'); e.style.setProperty('bottom', B + 'px', 'important'); }); r.setProperty('--packsBot', B + 'px'); }catch(e){} }
+  fit(); window.addEventListener('resize', fit); setInterval(fit, 1500); ['setBtn','packsBtn','stepsBtn'].forEach(id => $(id) && $(id).addEventListener('click', fit, true));
   window.RD = { openFeed, closeFeed, setRack, version: RD_VER };
 })();

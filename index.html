@@ -1811,6 +1811,7 @@ function endPtr(e){
   tapStart(g.tapX, ht);
   if(ht.kind === 'clip' || ht.kind === 'trimL' || ht.kind === 'trimR'){
     const ch = ht.ch, k = ht.k;
+    if(window.__RD_TAP){ const was = sel.chId === ch.id && sel.clipIdx === k; if(was) openOptions(ch, k); else selectChannel(ch.id, k); return; }   /* REDESIGN: tap = select · tap the selected clip again = options */
     const same = pendingTap && pendingTap.ch === ch && pendingTap.k === k;
     const n = same ? pendingTap.n + 1 : 1;
     if(pendingTap) clearTimeout(pendingTap.t);

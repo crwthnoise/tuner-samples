@@ -2143,5 +2143,8 @@ if('serviceWorker' in navigator && (location.protocol==='https:' || location.hos
 <script src="modules/steps.js?v=10.52"></script>
 <script src="modules/notes.js?v=10.52"></script>
 <script src="modules/pad.js?v=10.52"></script>
+<script>/* REDESIGN opt-in: ?r=1 turns it on (and keeps it on) · ?r=0 back to classic */
+(function(){ try{ var m = location.search.match(/[?&]r=([01])/); if(m) localStorage.setItem('tuner_rd', m[1]); if(localStorage.getItem('tuner_rd') === '1'){ var s = document.createElement('script'); s.src = 'modules/redesign.js?v=' + Date.now(); document.body.appendChild(s); } }catch(e){} })();
+</script>
 </body>
 </html>

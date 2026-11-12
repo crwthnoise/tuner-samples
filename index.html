@@ -613,6 +613,7 @@
   <div class="sc-ctl"><label>THR</label><input type="range" id="scThreshold" min="1" max="100" value="35"><span id="scThresholdDisplay">35%</span></div>
   <div class="sc-ctl"><label>REL</label><input type="range" id="scRelease" min="0" max="400" value="90"><span id="scReleaseDisplay">90ms</span></div>
   <div class="sc-ctl"><label>CURVE</label><input type="range" id="scCurve" min="20" max="300" value="100"><span id="scCurveDisplay">1.0</span></div>
+  <div class="sc-ctl"><label>AUTO</label><button class="tog on" id="scAutoToggle">KICK + SNARE</button></div>
   <div class="sc-state-line" id="scState">no trigger</div>
   <div class="foot"><span id="verBadge"></span><span id="clickTop"></span></div>
 </div>
@@ -983,6 +984,7 @@ $('scIntensity').addEventListener('input', e=>{ scDepth = +e.target.value/100; $
 $('scThreshold').addEventListener('input', e=>{ scThreshold = +e.target.value/100; $('scThresholdDisplay').textContent = Math.round(scThreshold*100)+'%'; markDirty(); if(!isRunning) drawAll(); });
 $('scRelease').addEventListener('input', e=>{ scRelease = +e.target.value/1000; $('scReleaseDisplay').textContent = Math.round(scRelease*1000)+'ms'; markDirty(); if(!isRunning) drawAll(); });
 $('scCurve').addEventListener('input', e=>{ scCurve = +e.target.value/100; $('scCurveDisplay').textContent = scCurve.toFixed(1); markDirty(); if(!isRunning) drawAll(); });
+$('scAutoToggle').addEventListener('click', ()=>{ if(!window.STEPS || !STEPS.setAuto) return; STEPS.setAuto(!STEPS.autoOn()); $('scAutoToggle').classList.toggle('on', STEPS.autoOn()); markDirty(); commit(); setStatus(STEPS.autoOn() ? 'AUTO sidechain ON — DUCKED loops follow your drum loops' : 'AUTO sidechain OFF — pick a TRIGGER loop'); });
 $('limiterToggle').addEventListener('click', ()=>{ setLimiter(!limiterOn); markDirty(); commit(); });
 
 /* UNDO: tap = undo · hold = redo */
@@ -1108,7 +1110,8 @@ async function ensureLoaded(sample){
   })();
   return sample._loading;
 }
-function registerRemote(it){ if(samples.find(x=>x.id===it.id)) return; const meta = parseLoopMeta(it.file); samples.push({ id:it.id, name:it.file, displayName:it.name || cleanName(it.file), url:it.url, buffer:null, bpm:it.bpm ?? meta.bpm, key:it.key ?? meta.key, tags:it.tags || parseTagsFromName(it.file), folder:it.folder || 'Library', builtin:true, hidden:false, waveImg:null, env:null, peaks:null, lpk:Array.isArray(it.peaks) ? it.peaks : null, frames:it.frames||0, sr:it.sr||0, fpAt:it.fpAt||0, fpScale:it.fpScale||1, fp:it.fp||null }); }
+function registerRemote(it){ if(samples.find(x=>x.id===it.id)) return; const meta = parseLoopMeta(it.file); samples.push({ id:it.id, name:it.file, displayName:it.name || cleanName(it.file), url:it.url, buffer:null, bpm:it.bpm ?? meta.bpm, key:it.key ?? meta.key, tags:it.tags || parseTagsFromName(it.file), folder:it.folder || 'Library', builtin:true, hidden:false, waveImg:null, env:null, peaks:null, lpk:Array.isArray(it.peaks) ? it.peaks : null, frames:it.frames||0, sr:it.sr||0, fpAt:it.fpAt||0, fpScale:it.fpScale||1, fp:it.fp||null, hits:(it.hk || it.hs) ? bakedHits(it) : null }); }
+function bakedHits(it){ return (it.hk||[]).map(t=>({t, y:'k'})).concat((it.hs||[]).map(t=>({t, y:'s'}))).sort((a,b)=>a.t-b.t); }   /* v11: kick/snare times baked by tools/hits.js — [] = a loop with no drum hits */
 async function loadGithubLibrary(){
   const g = SAMPLE_SOURCE.github; if(!g || !g.repo) return;
   const base = (g.path||'').replace(/^\/|\/$/g,''); const key = 'ghlist:' + g.repo + '/' + base;
@@ -1125,7 +1128,7 @@ async function loadBuiltins(){
   /* register only — each loop downloads the first time it's used (fast startup) */
   try{
     const r = await fetch('samples/index.json', { cache:'no-cache' }); if(!r.ok) return; const idx = await r.json();
-    for(const it of idx){ if(samples.find(x=>x.id===it.id)) continue; registerRemote({ id:it.id, file:it.file.split('/').pop(), url:'samples/' + it.file.split('/').map(encodeURIComponent).join('/'), name:it.name, folder:it.folder||'Library', bpm:it.bpm, key:it.key, tags:it.tags||[], peaks:it.peaks, frames:it.frames, sr:it.sr, fpAt:it.fpAt, fpScale:it.fpScale, fp:it.fp }); }
+    for(const it of idx){ if(samples.find(x=>x.id===it.id)) continue; registerRemote({ id:it.id, file:it.file.split('/').pop(), url:'samples/' + it.file.split('/').map(encodeURIComponent).join('/'), name:it.name, folder:it.folder||'Library', bpm:it.bpm, key:it.key, tags:it.tags||[], peaks:it.peaks, frames:it.frames, sr:it.sr, fpAt:it.fpAt, fpScale:it.fpScale, fp:it.fp, hk:it.hk, hs:it.hs }); }
     renderLibrary(); setTimeout(preloadAll, 400);
   }catch(e){}
 }
@@ -1499,7 +1502,7 @@ function removeSelectedClip(){ const ch = channels.find(c=>c.id===sel.chId); if(
 function filterQ(ch){ return (ch.sw && ch.sw.FILTER) ? 0.7 + Math.min(1, Math.abs(ch.filterVal)/20)*5.3 : 0.7; }
 function applyFilter(ch){ const v=ch.filterVal, t=ctx.currentTime, q = filterQ(ch); ch.lp.Q.setTargetAtTime(v<0 ? q : 0.7, t, 0.02); ch.hp.Q.setTargetAtTime(v>0 ? q : 0.7, t, 0.02); if(v<0){ ch.lp.frequency.setTargetAtTime(20000-(Math.abs(v)/100)*19700, t, 0.02); ch.hp.frequency.setTargetAtTime(20, t, 0.02); } else { ch.hp.frequency.setTargetAtTime(20+(v/100)*3000, t, 0.02); ch.lp.frequency.setTargetAtTime(20000, t, 0.02); } }
 function songEndBeats(){ let e = 0; channels.forEach(ch=>ch.clips.forEach(c=>{ e = Math.max(e, c.start+c.len); })); return Math.max(BAR, Math.ceil(e/BAR)*BAR); }
-function refreshTimeline(){ exportBtn.disabled = channels.length === 0; const n = songEndBeats(); infoText = channels.length ? `${fmtLen(n*beatSec())} · ${n/BAR} bar${n/BAR!==1?'s':''}` : ''; renderInfo(); $('scState').textContent = sidechainTrigger ? ('trigger: ' + sidechainTrigger.sample.displayName) : 'no trigger — pick one with the TRIGGER light'; if(zoomX < minZoomX()) zoomX = minZoomX(); clampScroll(); renderKey(); ensureSel(); renderPill(); }
+function refreshTimeline(){ exportBtn.disabled = channels.length === 0; const n = songEndBeats(); infoText = channels.length ? `${fmtLen(n*beatSec())} · ${n/BAR} bar${n/BAR!==1?'s':''}` : ''; renderInfo(); $('scState').textContent = sidechainTrigger ? ('trigger: ' + sidechainTrigger.sample.displayName) : (window.STEPS && STEPS.autoOn && STEPS.autoOn() ? 'AUTO — ducking on the kick + snare of your drum loops' : 'no trigger — pick one with the TRIGGER light'); if(zoomX < minZoomX()) zoomX = minZoomX(); clampScroll(); renderKey(); ensureSel(); renderPill(); }
 function toggleClipMute(ch, k){ const c = ch.clips[k]; if(!c) return; c.mute = !c.mute; refreshTimeline(); if(isRunning) reschedule(); markDirty(); commit(); drawTL(); }
 
 /* ================= SELECTED LOOP · OPTIONS · TRIGGER|DUCKED PILL ================= */
@@ -1518,7 +1521,7 @@ $('pillDuck').addEventListener('click', ()=>{ const ch = selCh(); if(!ch){ setSt
   ch.scDuck = !ch.scDuck; if(ch.scDuck && ch.scTrigger){ ch.scTrigger = false; if(sidechainTrigger===ch) sidechainTrigger = null; }
   if(ch.scDuck){ const pi = FX_SLOTS.indexOf('PUMP'); if(!ch.rack.includes('PUMP')){ ch.rack.push('PUMP'); rewireLive(ch); } if(!(ch.fx[pi] > 0)) ch.fx[pi] = scDepth/0.95 > 1 ? 1 : scDepth/0.95; }
   renderRack();
-  if(ch.scDuck && !sidechainTrigger) setStatus('DUCKED — now pick a TRIGGER loop');
+  if(ch.scDuck && !sidechainTrigger) setStatus(window.STEPS && STEPS.autoOn && STEPS.autoOn() ? 'DUCKED — follows the kick + snare of your drum loops' : 'DUCKED — now pick a TRIGGER loop');
   refreshTimeline(); markDirty(); commit(); drawTL(); });
 
 function openOptions(ch, clipIdx){ selectChannel(ch.id, clipIdx); $('optName').textContent = ch.sample.displayName + (clipIdx >= 0 ? '  ·  clip ' + (clipIdx+1) : ''); $('optMuteLoop').textContent = ch.mute ? 'UNMUTE LOOP' : 'MUTE LOOP'; $('optSolo').textContent = ch.solo ? 'UNSOLO' : 'SOLO — hear only this loop'; $('optKeyLock').textContent = ch.keyLock ? 'KEY LOCK ON — ignores song key' : (parseKey(ch.sample.key) ? 'KEY LOCK — follows song key' : 'KEY LOCK — no key on this loop'); $('optRemoveClip').style.display = clipIdx >= 0 ? '' : 'none'; openSheet('optSheet'); }
@@ -1571,8 +1574,9 @@ function triggerHot(){ return !!(sidechainTrigger && !sidechainTrigger.mute && t
 function pumpAmt(ch){ return ch.rack.includes('PUMP') ? (ch.fx[FX_SLOTS.indexOf('PUMP')] || 0)*0.95 : 0; }   /* v10.27: PUMP fader = how hard THIS loop ducks under the trigger */
 function duckShape(d){ return Math.min(1, d / Math.max(0.001, scDepth)); }
 function updateChannelGain(ch){ let target = (isRunning && !isSilent(ch)) ? ch.volume : 0; let tau = 0.01; if(isRunning && ch.scDuck && ch !== sidechainTrigger){ let f = duckNow > 0 ? duckShape(duckNow) : 0; if(hitDuckNow > f) f = hitDuckNow; if(f > 0){ target *= (1 - f*pumpAmt(ch)); tau = ATTACK; } } ch.gainNode.gain.setTargetAtTime(target, ctx.currentTime, tau); }
-function advanceSidechain(now, beat){ hitDuckNow = 0; if(!sidechainTrigger){ duckNow = 0; trigLevel = 0; wasHot = false; return; } if(hitMode()){ hitDuckNow = hitDuckAt(beat); duckNow = 0; trigLevel = 0; wasHot = false; return; } const pos = samplePosAt(sidechainTrigger, beat); trigPos = pos < 0 ? 0 : pos; trigLevel = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); const hot = triggerHot(); if(hot){ duckNow = scDepth; releaseStart = now; } else { const p = (now - releaseStart) / Math.max(0.001, scRelease); duckNow = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } wasHot = hot; }
-let playheadRaf = null, songTimer = null;
+function advanceSidechain(now, beat){ hitDuckNow = 0; if(!sidechainTrigger && window.STEPS && STEPS.autoActive && STEPS.autoActive()){ hitDuckNow = STEPS.autoDuck(beat); duckNow = 0; trigLevel = 0; wasHot = false; return; } if(!sidechainTrigger){ duckNow = 0; trigLevel = 0; wasHot = false; return; } if(hitMode()){ hitDuckNow = hitDuckAt(beat); duckNow = 0; trigLevel = 0; wasHot = false; return; } const pos = samplePosAt(sidechainTrigger, beat); trigPos = pos < 0 ? 0 : pos; trigLevel = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); const hot = triggerHot(); if(hot){ duckNow = scDepth; releaseStart = now; } else { const p = (now - releaseStart) / Math.max(0.001, scRelease); duckNow = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } wasHot = hot; }
+let playheadRaf = null, songTimer = null, autoTimer = null;
+function autoStep(){ if(!isRunning || sidechainTrigger || !(window.STEPS && STEPS.autoActive && STEPS.autoActive())) return; hitDuckNow = STEPS.autoDuck(currentBeat()); for(const ch of channels) if(ch.scDuck) updateChannelGain(ch); }
 let scHits = null;   /* v10.39 per-hit drawn sidechain (STEPS) — engine in modules/steps.js */
 function hitMode(){ return !!(window.STEPS && STEPS.hitMode && STEPS.hitMode()); }
 function hitDuckAt(beat){ return window.STEPS && STEPS.duckAt ? STEPS.duckAt(beat) : 0; }
@@ -1588,9 +1592,10 @@ async function ensureRunning(fromBeat){
   isRunning = true; setPlay(true); vzResetSong();
   scheduleFrom(fromBeat ?? playBeat);
   songTimer = setInterval(tick, 40);
+  clearInterval(autoTimer); autoTimer = setInterval(autoStep, 10);   /* v11: auto-sidechain checks every 10 ms so a duck lands ON the kick */
   playheadRaf = requestAnimationFrame(frame);
 }
-function stopAll(){ isRunning = false; quietQuipu(); if(songTimer){ clearInterval(songTimer); songTimer = null; } if(playheadRaf){ cancelAnimationFrame(playheadRaf); playheadRaf = null; } setPlay(false); stopSources(); const t = ctx.currentTime; channels.forEach(ch=>{ ch.gainNode.gain.cancelScheduledValues(t); ch.gainNode.gain.setValueAtTime(0, t); ch.lastPeakLevel = 0; ch.dataArray.fill(0); }); masterPeak = 0; duckNow = 0; trigLevel = 0; masterData.fill(0); lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; vizCaps.fill(0); drawAll(); updatePumpDot(); updateRackLevel(); if(recState !== 'idle') stopRec(); vizDecay(); }
+function stopAll(){ isRunning = false; clearInterval(autoTimer); autoTimer = null; quietQuipu(); if(songTimer){ clearInterval(songTimer); songTimer = null; } if(playheadRaf){ cancelAnimationFrame(playheadRaf); playheadRaf = null; } setPlay(false); stopSources(); const t = ctx.currentTime; channels.forEach(ch=>{ ch.gainNode.gain.cancelScheduledValues(t); ch.gainNode.gain.setValueAtTime(0, t); ch.lastPeakLevel = 0; ch.dataArray.fill(0); }); masterPeak = 0; duckNow = 0; trigLevel = 0; masterData.fill(0); lufsHist.length = 0; lufsM = lufsS = lufsPeakHold = -70; vizCaps.fill(0); drawAll(); updatePumpDot(); updateRackLevel(); if(recState !== 'idle') stopRec(); vizDecay(); }
 transportBtn.addEventListener('click', async ()=>{ try{ if(isRunning) stopAll(); else await ensureRunning(); }catch(err){ setStatus('error: ' + err.message); } });
 /* ===== v10.12 REC — mic into a new lane.
    stopped + TAP  = 1-bar count-in, then plays + records (count-in can be turned off in ⚙)
@@ -1838,7 +1843,8 @@ function drawCurve(){ const s = fitCanvas(curveCanvas, curveCtx); if(!s) return;
 /* ================= EXPORT ================= */
 exportBtn.addEventListener('click', async ()=>{ if(!channels.length){ setStatus('add loops first'); return; } setStatus('rendering…'); exportBtn.disabled = true; try{ const rendered = await renderArrangementOffline(ctx.sampleRate); const blob = new Blob([bufferToWav(rendered, 24)], {type:'audio/wav'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = (currentProjectId ? currentProjectName.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_') : 'threat') + '-' + Date.now() + '.wav'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 10000); setStatus('exported'); }catch(err){ setStatus('export failed: ' + (err && err.message ? err.message : '')); } exportBtn.disabled = false; });
 function buildOfflineMasterChain(offline){ const oMaster=offline.createGain(); oMaster.gain.value=masterGain.gain.value; const oLow=offline.createBiquadFilter(); oLow.type='lowshelf'; oLow.frequency.value=200; oLow.gain.value=eqLow.gain.value; const oMid=offline.createBiquadFilter(); oMid.type='peaking'; oMid.frequency.value=1000; oMid.Q.value=0.9; oMid.gain.value=eqMid.gain.value; const oHigh=offline.createBiquadFilter(); oHigh.type='highshelf'; oHigh.frequency.value=4000; oHigh.gain.value=eqHigh.gain.value; oMaster.connect(oLow); oLow.connect(oMid); oMid.connect(oHigh); if(limiterOn){ const oLim=offline.createDynamicsCompressor(); oLim.threshold.value=-2; oLim.knee.value=0; oLim.ratio.value=20; oLim.attack.value=0.002; oLim.release.value=0.15; oHigh.connect(oLim); oLim.connect(offline.destination); } else oHigh.connect(offline.destination); return oMaster; }
-function duckTrackFor(totalLen, stepSec){ const out = new Float32Array(Math.ceil(totalLen/stepSec) + 1); if(!sidechainTrigger || sidechainTrigger.mute) return out; if(hitMode()){ const bs0 = beatSec(), dd = Math.max(0.001, scDepth); for(let i=0;i<out.length;i++) out[i] = hitDuckAt(i*stepSec/bs0)*dd; return out; } let rStart = -99, duck = 0; const rel = Math.max(0.001, scRelease), bs = beatSec(); for(let i=0;i<out.length;i++){ const t = i*stepSec; const pos = samplePosAt(sidechainTrigger, t/bs); const lvl = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); if(lvl > scThreshold){ duck = scDepth; rStart = t; } else { const p = (t - rStart)/rel; duck = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } out[i] = duck; } return out; }
+function autoSC(){ return !sidechainTrigger && !!(window.STEPS && STEPS.autoActive && STEPS.autoActive()); }
+function duckTrackFor(totalLen, stepSec){ const out = new Float32Array(Math.ceil(totalLen/stepSec) + 1); if(autoSC()){ const bs0 = beatSec(), dd = Math.max(0.001, scDepth); for(let i=0;i<out.length;i++) out[i] = STEPS.autoDuck(i*stepSec/bs0)*dd; return out; } if(!sidechainTrigger || sidechainTrigger.mute) return out; if(hitMode()){ const bs0 = beatSec(), dd = Math.max(0.001, scDepth); for(let i=0;i<out.length;i++) out[i] = hitDuckAt(i*stepSec/bs0)*dd; return out; } let rStart = -99, duck = 0; const rel = Math.max(0.001, scRelease), bs = beatSec(); for(let i=0;i<out.length;i++){ const t = i*stepSec; const pos = samplePosAt(sidechainTrigger, t/bs); const lvl = pos < 0 ? 0 : envAt(sidechainTrigger.env, pos); if(lvl > scThreshold){ duck = scDepth; rStart = t; } else { const p = (t - rStart)/rel; duck = p >= 1 ? 0 : scDepth * releaseShape(p, scCurve); } out[i] = duck; } return out; }
 async function renderArrangementOffline(sampleRate){
   await hqSettle();   /* export = always the HQ stretch */
   const bs = beatSec(), totalLen = songEndBeats()*bs;
@@ -1852,7 +1858,7 @@ async function renderArrangementOffline(sampleRate){
     const oTune = buildTune(offline, ch.rack, quipuOpts(ch, 0)); oTune._mp = ch.mp; oTune._mm = ch.mm; setTune(oTune, ch.fx, offline, null, ch.sw); { const gr = oTune.lab && oTune.lab.GRINDER; if(gr && !gr._fake) gr.transport({ t0:0, bs, loopBeats: loopBeats(ch.sample), reset:true }, ch.buffer); } g.connect(lp); lp.connect(hp); hp.connect(oTune.in); oTune.out.connect(oMaster);
     const rate = playRate(ch), dur = ch.buffer.duration;
     ch.clips.forEach(c=>{ if(c.mute) return; const src = offline.createBufferSource(); src.buffer = ch.buffer; src.loop = true; src.detune.value = chPitch(ch)*100; src.connect(g); src.start(c.start*bs, (c.off*bs*rate) % dur); src.stop((c.start+c.len)*bs); });
-    const ducks = ch.scDuck && sidechainTrigger && ch !== sidechainTrigger;
+    const ducks = ch.scDuck && (sidechainTrigger ? ch !== sidechainTrigger : autoSC());
     if(!ducks){ g.gain.setValueAtTime(ch.volume, 0); return; }
     g.gain.setValueAtTime(ch.volume, 0); let last = -1, lastT = 0;
     for(let i=0;i<track.length;i++){ const t = i*STEP; if(t > totalLen) break; const v = ch.volume * (1 - duckShape(track[i])*pumpAmt(ch)); if(last < 0 || Math.abs(v - last) > 0.0015){ if(last >= 0 && t - lastT > STEP*1.5) g.gain.linearRampToValueAtTime(last, t - STEP); g.gain.linearRampToValueAtTime(v, t); last = v; lastT = t; } }

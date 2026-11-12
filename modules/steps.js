@@ -8,7 +8,7 @@ window.STEPS = window.STEPS || {}; const STEPS = window.STEPS;
 const CLOUD = 'https://space.crwth.workers.dev';
 const ROWS = [ { k:'k', n:'KICK', re:/KICK|BD\b/i }, { k:'s', n:'SNARE', re:/SNARE|CLAP/i }, { k:'h', n:'HATS', re:/HAT|\bHH\b/i } ];
 const SPEEDS = [ ['8', 0.5, '1/8'], ['16', 0.25, '1/16'], ['16T', 1/6, '1/16T'], ['32', 0.125, '1/32'] ];
-const DEF_HITS = ()=>({ k:{ on:true, len:1, depth:1, pts:[[0,1],[0.08,0.95],[0.45,0.35],[1,0]] }, s:{ on:false, len:0.5, depth:0.6, pts:[[0,1],[0.35,0.4],[1,0]] }, loopOn:false });
+const DEF_HITS = ()=>({ k:{ on:true, len:1, depth:1, pts:[[0,1],[0.08,0.95],[0.45,0.35],[1,0]] }, s:{ on:false, len:0.5, depth:0.6, pts:[[0,1],[0.35,0.4],[1,0]] }, loopOn:false, auto:true });
 const PRESETS = {
   '4OTF':{ label:'4 ON THE FLOOR', k:[0,4,8,12], s:[4,12], h:[2,6,10,14], speed:'16', sc:{ k:{ on:true, len:1, depth:1, pts:[[0,1],[0.08,0.95],[0.45,0.35],[1,0]] }, s:{ on:false } } },
   'TRAP':{ label:'TRAP', k:[0,3,10], s:[8], h:[0,2,4,6,8,10,12,14], speed:'8', sc:{ k:{ on:true, len:0.5, depth:0.75, pts:[[0,1],[0.25,0.6],[1,0]] }, s:{ on:false } } }
@@ -139,16 +139,40 @@ function dtFor(beat, y){   /* beats since the last hit of type y on the trigger,
   let dt = -1; for(let i=T.length-1;i>=0;i--){ if(T[i] <= pos + 1e-6){ dt = pos - T[i]; break; } }
   if(dt < 0){ const w = pos + D - T[T.length-1]; if(w*toB <= beat - c.start + 1e-6) dt = w; }
   return dt < 0 ? -1 : dt*toB; }
-STEPS.duckAt = function(beat){
-  const tr = sidechainTrigger; if(!tr || tr.mute || !scHits) return 0; const s = tr.sample; if(!s.hits || !s.hits.length || !s.buffer) return 0;
+/* v11 AUTO-SIDECHAIN: every drum loop that carries kick/snare hits (baked in samples/index.json, or found once in the browser
+   for your own uploads) ducks the DUCKED loops by itself — no TRIGGER to pick. A manual TRIGGER still wins when one is set. */
+function duckFrom(tr, beat, force){
+  const s = tr.sample; if(!s.hits || !s.hits.length || !s.buffer) return 0;
   const c = clipAt(tr, beat); if(!c) return 0; const pos = samplePosAt(tr, beat); if(pos < 0) return 0;
   if(!s._hk){ s._hk = { k:s.hits.filter(h=>h.y==='k').map(h=>h.t), s:s.hits.filter(h=>h.y==='s').map(h=>h.t) }; }
   const D = s.buffer.duration, toB = loopBeats(s)/D, into = beat - c.start; let best = 0;
-  for(const y of ['k','s']){ const sh = scHits[y]; if(!sh || !sh.on) continue; const T = s._hk[y]; if(!T.length) continue;
+  for(const y of ['k','s']){ const sh = scHits[y]; if(!sh || !(force || sh.on)) continue; const T = s._hk[y]; if(!T.length) continue;
     let dt = -1; for(let i=T.length-1;i>=0;i--){ if(T[i] <= pos + 1e-6){ dt = pos - T[i]; break; } }
     if(dt < 0){ const w = pos + D - T[T.length-1]; if(w*toB <= into + 1e-6) dt = w; }
     if(dt < 0) continue; const db = dt*toB; if(db >= sh.len) continue;
     const v = shapeVal(sh.pts, db/sh.len) * sh.depth; if(v > best) best = v; }
+  return best > 1 ? 1 : best;
+}
+STEPS.duckAt = function(beat){
+  const tr = sidechainTrigger; if(!tr || tr.mute || !scHits) return 0; return duckFrom(tr, beat, false);
+};
+const DRUMISH = /KICK|SNARE|DRUM|DROP|CLAP|BREAK|\bBD\b/i, NOT_DRUM = /HAT|\bTOP\b|PERC|BASS_LOOP|LEAD|VOCAL|CHORD|MELODY|SYNTH|PAD|RISER/i;
+function lazyAuto(s){   /* a loop with no baked hits (your own upload): look once, only if its name says drums */
+  if(s.hits || loading.has(s.id) || !s.buffer) return;
+  if(s.folder === 'STEPS' || s.pat || pending[s.id]){ lazyHits(s); return; }
+  const nm = (s.name||'') + ' ' + (s.displayName||''), base = (s.name||'').split('/').pop();
+  if(!(DRUMISH.test(nm) && !(NOT_DRUM.test(base) && !/DRUM|KICK|SNARE/i.test(base)))){ s.hits = []; return; }
+  loading.add(s.id);
+  (async ()=>{ try{ s.hits = await detectHits(s.buffer); s._hk = null; }catch(e){ s.hits = []; } loading.delete(s.id); })();
+}
+STEPS.autoOn = function(){ return hits().auto !== false; };
+STEPS.setAuto = function(on){ hits().auto = !!on; };
+STEPS.autoActive = function(){ if(sidechainTrigger || !STEPS.autoOn()) return false; return channels.some(c=>c.scDuck); };
+STEPS.autoDuck = function(beat){
+  let best = 0;
+  for(const ch of channels){ if(ch.mute || ch.scDuck) continue; const s = ch.sample; if(!s.buffer) continue;
+    if(!s.hits){ lazyAuto(s); continue; } if(!s.hits.length) continue;
+    const v = duckFrom(ch, beat, true); if(v > best) best = v; }
   return best > 1 ? 1 : best;
 };
 async function detectHits(buf){

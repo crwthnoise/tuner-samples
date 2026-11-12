@@ -151,14 +151,24 @@
   const seasonName = () => (($('seasonLine')||{}).textContent || '').split(' ')[0].toUpperCase();
   function ordered(kind){
     const season = seasonName();
-    const all = samples.filter(s=>!s.failed && !s.hidden);
+    const all = samples.filter(s=>!s.failed && !s.hidden && !s.cloud);
     const rank = s => (s.folder === 'MADE' ? 0 : (season && String(s.folder).toUpperCase() === season ? 1 : 2));
     const sorted = all.slice().reverse().map((s,i)=>({s,i})).sort((a,b)=> rank(a.s) - rank(b.s) || a.i - b.i).map(x=>x.s);
     if(kind === 'BEATS') return sorted.filter(isDrum);
     if(kind === 'SOUNDS') return sorted.filter(s=>!isDrum(s));
     const a = sorted.filter(s=>!isDrum(s)), d = sorted.filter(isDrum), out = [];       /* HOME: alternate sounds + beats */
     for(let i=0; i<Math.max(a.length, d.length) && out.length < 80; i++){ if(a[i]) out.push(a[i]); if(d[i]) out.push(d[i]); }
-    return out;
+    return cloudMix(out, kind);
+  }
+  /* online THREAT PACKS: a random handful (with waveforms) every 3rd card · fixed per feed open so scrolling is stable */
+  let cloudPick = null;
+  function cloudMix(out, kind){
+    const cl = samples.filter(s=>s.cloud && s.lpk && !s.failed); if(!cl.length) return out;
+    if(!cloudPick || cloudPick.n !== cl.length){ const a = cl.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } cloudPick = { n: cl.length, a: a.slice(0, 200) }; }
+    const pool = cloudPick.a.filter(s => kind === 'HOME' || (kind === 'BEATS') === isDrum(s)), res = [];
+    let ci = 0; out.forEach((s,i)=>{ res.push(s); if(i % 2 === 1 && pool[ci]) res.push(pool[ci++]); });
+    while(res.length < 80 && pool[ci]) res.push(pool[ci++]);
+    return res;
   }
   const fmt = s => [s.bpm ? s.bpm + ' BPM' : '', s.key || ''].filter(Boolean).join(' · ');
   const artOf = s => { try{ return packArt(packOf(s)); }catch(e){ return null; } };
@@ -290,6 +300,8 @@
   requestAnimationFrame(()=> requestAnimationFrame(()=>{ const wantOpen = sliderPref() ? false : (LS.get('tuner_rd_open') !== '0'); if(!wantOpen) setRack(false, true); }));
   let tries = 0; const boot = ()=>{ if(samples.length || tries++ > 40){ if(!feedKind && !document.querySelector('.sheet.open') ) openFeed('HOME'); } else setTimeout(boot, 150); };
   setTimeout(boot, 200);
+  /* online packs (needs the maker PIN on this device) — loads quietly, feed refreshes when it lands */
+  try{ const cs = document.createElement('script'); cs.src = 'modules/cloudpacks.js?v=' + Date.now(); cs.onload = ()=>{ try{ window.CLOUDPK.load().then(n=>{ if(n && feedKind){ cloudPick = null; openFeed(feedKind); } }); }catch(e){} }; document.body.appendChild(cs); }catch(e){}
   let lastN = 0; setInterval(()=>{ if(feedKind === 'HOME' && !gesture && samples.length !== lastN){ lastN = samples.length; openFeed('HOME'); } }, 1200);
   function fit(){ try{ const t = $('topZone').getBoundingClientRect(), d = $('dock').getBoundingClientRect(), T = Math.round(t.bottom), B = Math.round(innerHeight - d.top); const r = document.documentElement.style; r.setProperty('--rdT', T + 'px'); r.setProperty('--rdB', B + 'px'); ['setSheet','packsSheet'].forEach(id=>{ const e = $(id); if(!e) return; e.style.setProperty('top', T + 'px', 'important'); e.style.setProperty('bottom', B + 'px', 'important'); }); r.setProperty('--packsBot', B + 'px'); }catch(e){} }
   fit(); window.addEventListener('resize', fit); setInterval(fit, 1500); ['setBtn','packsBtn','stepsBtn'].forEach(id => $(id) && $(id).addEventListener('click', fit, true));

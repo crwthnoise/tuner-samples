@@ -1007,7 +1007,7 @@ $('packsBtn').addEventListener('click', ()=>{ if($('packsSheet').classList.conta
 $('setBtn').addEventListener('click', ()=>{ if($('setSheet').classList.contains('open')) closeSheet('setSheet'); else openProjectsPanel(); });
 $('addLoopBtn').addEventListener('click', ()=> $('fileInput').click());
 $('fileInput').addEventListener('change', async e=>{ const files = Array.from(e.target.files); e.target.value = ''; for(const f of files){ const s = await addSample(f); if(s) await addChannelFromSample(s); } });
-$('librarySearch').addEventListener('input', renderLibrary);
+$('librarySearch').addEventListener('input', ()=>{ libCap = 150; renderLibrary(); });
 $('dots').addEventListener('click', e=>{ const i = [...$('dots').children].indexOf(e.target); if(i > 0) setStatus('RACK ' + (i+1) + ' — coming soon'); });
 
 /* confirm card */
@@ -1093,7 +1093,7 @@ async function fetchRaw(sample){
   if(sample.raw) return sample.raw;
   const key = sample.url + (sample.frames ? (sample.url.includes('?') ? '&' : '?') + 'f=' + sample.frames : '');
   let cache = null; try{ cache = await caches.open(RAW_CACHE); const hit = await cache.match(key); if(hit){ sample.raw = await hit.arrayBuffer(); return sample.raw; } }catch(e){ cache = null; }
-  const r = await withTimeout(fetch(sample.url), 30000, 'download timed out'); if(!r.ok) throw new Error('HTTP ' + r.status);
+  const r = await withTimeout(fetch(sample.url, sample.hdr ? { headers: sample.hdr() } : undefined), 30000, 'download timed out'); if(!r.ok) throw new Error('HTTP ' + r.status);
   const buf = await r.arrayBuffer(); sample.raw = buf;
   if(cache){ try{ await cache.put(key, new Response(buf.slice(0), { headers:{ 'Content-Type': r.headers.get('Content-Type') || 'audio/mp4' } })); }catch(e){} }
   return buf;
@@ -1165,12 +1165,12 @@ function moodClass(t){ return MOODS.includes(t) ? ' m-' + t : ''; }
 async function loadCFolders(){ let v = null; try{ if(Store.mode !== 'none') v = await Store.get('cfolders'); }catch(e){} if(!v){ try{ v = JSON.parse(localStorage.getItem('tuner_cfolders') || 'null'); }catch(e){} } cfolders = Array.isArray(v) ? v : []; renderLibrary(); }
 function saveCFolders(){ try{ if(Store.mode !== 'none') Store.set('cfolders', cfolders).catch(()=>{}); }catch(e){} try{ localStorage.setItem('tuner_cfolders', JSON.stringify(cfolders)); }catch(e){} }
 function packOf(smp){ if(!smp.builtin) return 'MY SAMPLES'; const f = (smp.folder||'').split(' / ')[0]; const p = TUNER_PACKS.find(p=>p.folders.some(x=>x.toUpperCase() === f.toUpperCase())); return p ? p.name : f.toUpperCase(); }
-function inSel(smp, sel){ if(sel === 'ALL') return true; if(sel === 'MY') return !smp.builtin; if(sel.startsWith('cf:')){ const f = cfolders.find(x=>'cf:'+x.id === sel); return !!f && f.ids.includes(smp.id); } if(sel.startsWith('pk:')) return smp.builtin && packOf(smp) === sel.slice(3); return false; }
+function inSel(smp, sel){ if(sel === 'ALL') return !smp.cloud || !!(($('librarySearch')||{}).value||'').trim(); if(sel === 'MY') return !smp.builtin; if(sel.startsWith('cf:')){ const f = cfolders.find(x=>'cf:'+x.id === sel); return !!f && f.ids.includes(smp.id); } if(sel.startsWith('pk:')) return smp.builtin && packOf(smp) === sel.slice(3); return false; }
 /* v10.22 PREFETCH: opening a pack quietly downloads its loops 2 at a time, so a tap plays right away */
 let prefetchQ = [], prefetchRun = 0;
 function prefetchSel(){ prefetchQ = samples.filter(x=>!x.buffer && !x.failed && !x.hidden && inSel(x, libSel)); pumpPrefetch(); }
 function pumpPrefetch(){ while(prefetchRun < 2 && prefetchQ.length){ const x = prefetchQ.shift(); if(x.buffer) continue; prefetchRun++; ensureLoaded(x).finally(()=>{ prefetchRun--; pumpPrefetch(); }); } }
-function setLibSel(s){ setTimeout(prefetchSel, 50); libSel = s; libEdit = null; libShowHidden = false; try{ localStorage.setItem('tuner_libSel', s); }catch(e){} renderLibrary(); }
+function setLibSel(s){ libCap = 150; setTimeout(prefetchSel, 50); libSel = s; libEdit = null; libShowHidden = false; try{ localStorage.setItem('tuner_libSel', s); }catch(e){} renderLibrary(); }
 /* v10.23 PRELOAD: on open, every library sound downloads (small .m4a, 4 at a time) with a progress line on the LCD; the open pack also decodes */
 let preloadDone = false;
 async function preloadAll(){
@@ -1253,6 +1253,7 @@ function renderUsbStrip(){
   locked.forEach(p=> st.appendChild(usb(p.name, 'LOCKED', { locked:true, art:packArt(p.name), on: libSel==='pk:'+p.name, tap:()=>setLibSel('pk:'+p.name) })));
   st.scrollLeft = keep;
 }
+let libCap = 150;
 function renderLibrary(){
   const tagsBox = $('libTags'), list = $('libList'); if(!tagsBox || !list) return;
   renderUsbStrip();
@@ -1274,11 +1275,13 @@ function renderLibrary(){
   const vis = samples.filter(libMatches);
   if(!vis.length){ list.innerHTML = '<div class="lib-empty">' + (libShowHidden ? 'nothing hidden here' : libSel.startsWith('cf:') ? 'empty folder — hold a sound → FOLDER → tap this one' : libSel === 'MY' ? 'your own sounds land here — tap + in the dock' : samples.length ? 'nothing matches' : 'no samples yet') + '</div>'; return; }
   let lastPack = null;
-  vis.forEach(smp=>{
+  const CAP = 150, shown = vis.length > CAP ? vis.slice(0, libCap) : vis;
+  shown.forEach(smp=>{
     if(libSel === 'ALL'){ const p = packOf(smp); if(p !== lastPack){ const hd = el('div','lib-sec'); hd.textContent = p; list.appendChild(hd); lastPack = p; } }
     list.appendChild(libRow(smp));
     if(libEdit === smp.id) list.appendChild(buildEdit(smp));
   });
+  if(shown.length < vis.length){ const mo = el('div','lib-empty'); mo.style.cursor='pointer'; mo.textContent = 'SHOW MORE · ' + (vis.length - shown.length) + ' left'; mo.addEventListener('click', ()=>{ libCap += 150; renderLibrary(); }); list.appendChild(mo); }
 }
 function libRow(smp){
   const row = el('div','lrow' + (previewId===smp.id?' playing':'') + (libEdit===smp.id?' editing':'')); row.dataset.id = smp.id; row.dataset.k = 'LIB ROW';

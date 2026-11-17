@@ -13,6 +13,13 @@ const GLIDE = 0.03;   /* legato glide time constant (s) */
 
 let zone = null, oct = 2, quant = true, view = 'pad', filt = 'BASS';
 let snd = { kind:'synth', preset:'BASS' };
+/* PARTIALS synth (modules/partials.js): sound = table of partials. Presets = built-ins + ones made from your own sounds (saved on this device). */
+const PS = () => window.PartialsSynth;
+const PP_KEY = 'tuner_pp_user', PK_KEY = 'tuner_pp_knobs';
+let ppUser = []; try{ ppUser = JSON.parse(localStorage.getItem(PP_KEY) || '[]'); }catch(e){}
+let ppKn = { stretch:.5, bright:.5, oe:.5, decay:.5, shim:0, hit:0, sus:.35, atk:0, cut:1, parts:16 }; try{ Object.assign(ppKn, JSON.parse(localStorage.getItem(PK_KEY) || '{}')); }catch(e){}
+const ppAll = () => (PS() ? PS().BUILTIN : []).concat(ppUser);
+const ppSave = () => { try{ localStorage.setItem(PP_KEY, JSON.stringify(ppUser)); localStorage.setItem(PK_KEY, JSON.stringify(ppKn)); }catch(e){} };
 let rhythm = null;            /* channel whose hits drive the notes, or null = freestyle */
 let rhHits = [], rhKey = '';  /* song beats of that track's hits */
 const touches = new Map();    /* pointerId -> { p, y } */
@@ -27,6 +34,7 @@ function pitchAt(y, h){ const R = scale(); return R[clamp(Math.floor((1 - y/h)*R
 /* ---------- sounds ---------- */
 const PRESETS = ['BASS','808','LEAD'];
 function voice(ac, dest, p, t){
+  if(snd.kind === 'partials' && PS()) return PS().voice(ac, dest, p, t, ppKn, snd.pre);
   const out = ac.createGain(); out.connect(dest); out.gain.setValueAtTime(0, t);
   const srcs = [], freqs = [], rates = []; let lp = null, lpMul = 1, sus = 0.8, rel = 0.06;
   const f = 440*Math.pow(2, (p - 69)/12);
@@ -47,7 +55,7 @@ function voice(ac, dest, p, t){
     stop(at){ out.gain.cancelScheduledValues(at); out.gain.setValueAtTime(sus, at); out.gain.linearRampToValueAtTime(0, at + rel); srcs.forEach(o=>{ try{ o.stop(at + rel + 0.02); }catch(e){} }); }
   };
 }
-function soundName(){ return snd.kind === 'synth' ? snd.preset + ' SYNTH' : (snd.s.displayName || 'sound').toUpperCase(); }
+function soundName(){ if(snd.kind === 'partials') return snd.pre.name + ' ◇'; return snd.kind === 'synth' ? snd.preset + ' SYNTH' : (snd.s.displayName || 'sound').toUpperCase(); }
 async function pickSample(s){
   if(!s.buffer){ $('padInfo').textContent = 'loading ' + (s.displayName || 'sound') + '…'; await ensureLoaded(s); }
   if(!s.buffer){ $('padInfo').textContent = "couldn't load that one"; return false; }
@@ -55,6 +63,12 @@ async function pickSample(s){
   try{ const N = TNOTES._detect(s.buffer, 60/sampleBpm(s)); if(N.length){ const ps = N.map(n=>n.p).sort((a,b)=>a-b); root = ps[Math.floor(ps.length/2)]; t0 = Math.max(0, N[0].b*60/sampleBpm(s)); } else { const k = parseKey(s.key); if(k) root = 48 + k.root; } }catch(e){}
   snd = { kind:'sample', s, root, t0 }; return true;
 }
+function makePartials(){
+  if(!(snd.kind === 'sample' && snd.s.buffer && PS())) return; const b = snd.s.buffer, n = Math.min(b.length, Math.floor(b.sampleRate*6)), m = new Float32Array(n);
+  for(let c=0;c<b.numberOfChannels;c++){ const d = b.getChannelData(c); for(let i=0;i<n;i++) m[i] += d[i]/b.numberOfChannels; }
+  let pre = null; try{ pre = PS().sampleToPreset(m, b.sampleRate, snd.s.displayName || snd.s.name || 'SOUND'); }catch(e){}
+  if(!pre){ $('padInfo').textContent = 'no clear pitch in that sound — try a one-shot'; return; }
+  ppUser.push(pre); ppSave(); snd = { kind:'partials', pre }; $('padInfo').textContent = 'SYNTH MADE: ' + pre.name + ' · ' + pre.parts.length + ' partials'; audition(); renderPicker(); paintTop(); }
 function audition(){ try{ ctx.resume(); }catch(e){} const R = scale(), v = voice(ctx, masterGain, R[0] + 12, ctx.currentTime + 0.01); v.stop(ctx.currentTime + 0.45); }
 
 /* ---------- RHYTHM: where the chosen track hits, in song beats ---------- */
@@ -127,7 +141,7 @@ async function recOff(){
     for(let c=0;c<2;c++) buf.copyToChannel(full.getChannelData(c).subarray(0, buf.length), c);
     const wav = bufferToWav(buf, 24); takes++;
     const k = key(), kname = NN[k.root] + (k.minor ? 'min' : 'maj');
-    const s = await TUNER.addMade({ wav, name:'PAD TAKE ' + Date.now().toString(36).toUpperCase(), title:'PAD TAKE ' + takes, kind:snd.kind === 'synth' && snd.preset !== 'LEAD' ? 'bass' : 'lead', bpm, key:kname, midi:TNOTES._write(notes, bpm), track:false });
+    const s = await TUNER.addMade({ wav, name:'PAD TAKE ' + Date.now().toString(36).toUpperCase(), title:'PAD TAKE ' + takes, kind:(snd.kind === 'synth' && snd.preset !== 'LEAD') ? 'bass' : 'lead', bpm, key:kname, midi:TNOTES._write(notes, bpm), track:false });
     if(!s){ $('padInfo').textContent = "couldn't save the take"; return; }
     await addChannelFromSample(s, { clips:[{ start:r.bar, len:beats, off:0 }] });
     try{ refreshTimeline(); drawTL(); if(isRunning) reschedule(); markDirty(); commit(); }catch(e){}
@@ -150,6 +164,11 @@ function libList(){
 function renderPicker(){
   const box = $('padPick'); box.innerHTML = '';
   const row = mk('div', 'pp-row'); PRESETS.forEach(p=>{ const b = mk('button', 'stp-chip' + (snd.kind === 'synth' && snd.preset === p ? ' on' : ''), p + ' SYNTH'); b.dataset.k = 'PAD SYNTH ' + p; b.onclick = ()=>{ snd = { kind:'synth', preset:p }; audition(); renderPicker(); paintTop(); }; row.appendChild(b); }); box.appendChild(row);
+  if(PS()){
+    const pr = mk('div', 'pp-row'); ppAll().forEach(pre=>{ const b = mk('button', 'stp-chip sm' + (snd.kind === 'partials' && snd.pre === pre ? ' on' : ''), pre.name + ' ◇'); b.dataset.k = 'PAD PARTIALS'; b.onclick = ()=>{ snd = { kind:'partials', pre }; audition(); renderPicker(); paintTop(); }; pr.appendChild(b); }); box.appendChild(pr);
+    if(snd.kind === 'partials'){ const kr = mk('div', 'pp-knobs'); [['stretch','STRETCH'],['bright','BRIGHT'],['oe','ODD/EVEN'],['decay','DECAY'],['sus','SUSTAIN'],['hit','HIT'],['shim','SHIMMER'],['atk','ATTACK'],['cut','CUTOFF']].forEach(([k,l])=>{ const w = mk('label', 'pp-k', '<span>' + l + '</span>'), r = mk('input'); r.type = 'range'; r.min = 0; r.max = 1; r.step = .01; r.value = ppKn[k]; r.oninput = ()=>{ ppKn[k] = +r.value; ppSave(); }; r.onchange = ()=> audition(); w.appendChild(r); kr.appendChild(w); }); box.appendChild(kr); }
+    if(snd.kind === 'sample'){ const mr = mk('div', 'pp-row'), b = mk('button', 'stp-chip on', 'MAKE SYNTH FROM THIS SOUND'); b.dataset.k = 'PAD MAKE PARTIALS'; b.onclick = makePartials; mr.appendChild(b); box.appendChild(mr); }
+  }
   const fr = mk('div', 'pp-row'); FILTERS.forEach(f=>{ const b = mk('button', 'stp-chip sm' + (filt === f ? ' on' : ''), f); b.onclick = ()=>{ filt = f; renderPicker(); }; fr.appendChild(b); }); box.appendChild(fr);
   const L = libList(), list = mk('div', 'pp-list');
   if(!L.length) list.appendChild(mk('div', 'pp-empty', filt === 'ONE-SHOTS' || filt === 'BASS' ? 'no one-shots in the library yet — use the synths above for now' : 'nothing here'));
@@ -175,7 +194,7 @@ function paintPlay(){ const b = $('padPlay'); if(!b || !zone.classList.contains(
 /* ---------- open / build ---------- */
 function open(){ zone.classList.add('on'); if(rhythm && !channels.includes(rhythm)) rhythm = null;
   if(!rhythm && !open._did){ open._did = true; rhythm = rhythmTracks().find(c=> /perc|drum|top|groove|baile|conga|bongo/i.test(c.sample.displayName || c.sample.name || '')) || null; }
-  if(snd.kind === 'sample' && !samples.includes(snd.s)) snd = { kind:'synth', preset:'BASS' };
+  if((snd.kind === 'sample' && !samples.includes(snd.s)) || (snd.kind === 'partials' && !PS())) snd = { kind:'synth', preset:'BASS' };
   $('padInfo').textContent = rhythm ? 'play the beat · hold the pad = notes on the ' + (rhythm.sample.displayName || 'track').toLowerCase() + ' rhythm' : 'play the beat · touch the pad · slide = glide'; setView('pad'); paintPlay(); }
 function close(){ if(rec) recOff(); touches.clear(); stopSched(); if(live){ live.v.stop(ctx.currentTime); live = null; } zone.classList.remove('on'); }
 function build(){
@@ -192,6 +211,7 @@ function build(){
   .pp-item{ display:flex; justify-content:space-between; align-items:center; gap:8px; background:#0b0907; border:1px solid #241d16; border-radius:4px; padding:9px 8px; color:#c9c1b4; text-align:left; }
   .pp-item b{ font-weight:400; font-size:8.5px; letter-spacing:.04em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .pp-item i{ font-style:normal; font-size:7px; color:#5a554e; white-space:nowrap; }
   .pp-item.on{ border-color:var(--green,#4fd1a5); color:var(--green,#4fd1a5); } .pp-empty{ font-size:8px; color:#5a554e; padding:10px 4px; }
+  .pp-knobs{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px 8px; padding:4px 0; } .pp-k{ display:flex; flex-direction:column; gap:2px; font-size:7px; color:#8a8276; letter-spacing:.08em; } .pp-k input{ width:100%; accent-color:var(--green,#4fd1a5); }
   .pd-tools{ display:flex; align-items:center; gap:5px; padding:6px 8px 0; justify-content:flex-end; } .pd-tools .stp-chip{ padding:8px 9px; }
   #padBack{ background:#1a0a0a; border:1px solid #d32f2f; color:#f2ede2; font-size:10px; letter-spacing:.08em; padding:8px 10px; border-radius:4px; }
   #padRec{ width:44px; height:44px; border-radius:50%; background:#0b0907; border:1.5px solid #5a554e; display:flex; align-items:center; justify-content:center; padding:0; }

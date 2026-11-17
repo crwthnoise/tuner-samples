@@ -660,7 +660,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.52';
+const APP_VERSION = 'v10.53';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -2152,7 +2152,8 @@ if('serviceWorker' in navigator && (location.protocol==='https:' || location.hos
 </script>
 <script src="modules/steps.js?v=10.52"></script>
 <script src="modules/notes.js?v=10.52"></script>
-<script src="modules/pad.js?v=10.52"></script>
+<script src="modules/partials.js?v=10.53"></script>
+<script src="modules/pad.js?v=10.53"></script>
 <script>/* REDESIGN opt-in: ?r=1 turns it on (and keeps it on) · ?r=0 back to classic */
 (function(){ try{ var m = location.search.match(/[?&]r=([01])/); if(m) localStorage.setItem('tuner_rd', m[1]); if(localStorage.getItem('tuner_rd') === null) localStorage.setItem('tuner_rd', '1'); if(localStorage.getItem('tuner_rd') === '1'){ var s = document.createElement('script'); s.src = 'modules/redesign.js?v=' + Date.now(); document.body.appendChild(s); } }catch(e){} })();
 </script>

@@ -62,7 +62,16 @@ function detectNotes(buf, spb){
 }
 /* ---------- state ---------- */
 let zone = null, ed = null;   /* ed = { ch, orig, src (buffer the slices come from), spb, notes[], beats, sel, edit (sample) } */
-const scaleSet = ()=>{ const k = songKeyState || (ed && parseKey(ed.orig.key)); if(!k) return null; const deg = k.minor ? [0,2,3,5,7,8,10] : [0,2,4,5,7,9,11]; return new Set(deg.map(x=>(x + k.root) % 12)); };
+/* v10.53 ANDEAN scales — pentatonic minor is the backbone of yaravi / huayno / sikuri lines (1 b3 4 5 b7); pentatonic major is the bright sibling;
+   harmonic minor is the Spanish-colonial colour you hear in mestizo yaravi. KEY = the old behaviour (your song key, 7 notes). */
+const SCALES = { 'KEY':null, 'PENT MIN':[0,3,5,7,10], 'PENT MAJ':[0,2,4,7,9], 'HARM MIN':[0,2,3,5,7,8,11] };
+let scaleMode = 'PENT MIN'; try{ const sv = localStorage.getItem('tuner_notes_scale'); if(sv && sv in SCALES) scaleMode = sv; }catch(e){}
+const keyOf = ()=> songKeyState || (ed && parseKey(ed.orig.key));
+function curTonic(){ const k = keyOf(), wantMinor = scaleMode !== 'PENT MAJ';
+  if(k) return wantMinor ? (k.minor ? k.root : (k.root + 9) % 12) : (k.minor ? (k.root + 3) % 12 : k.root);
+  const ps = ed && ed.notes.length ? ed.notes.map(n=>n.p) : [57]; return ((Math.min(...ps) % 12) + 12) % 12; }
+const scaleSet = ()=>{ if(scaleMode === 'KEY'){ const k = keyOf(); if(!k) return null; const deg = k.minor ? [0,2,3,5,7,8,10] : [0,2,4,5,7,9,11]; return new Set(deg.map(x=>(x + k.root) % 12)); }
+  const t = curTonic(); return new Set(SCALES[scaleMode].map(x=>(x + t) % 12)); };
 let snapScale = true;
 function snapPitch(p, dir){ const S = scaleSet(); if(!snapScale || !S) return p; if(S.has(((p % 12) + 12) % 12)) return p; for(let k=1;k<7;k++){ const a = p + k*(dir || 1), b = p - k*(dir || 1); if(S.has(((a % 12)+12)%12)) return a; if(S.has(((b % 12)+12)%12)) return b; } return p; }
 
@@ -83,7 +92,7 @@ async function open(ch){
   }
   ed = { ch, orig, src, spb, notes, beats:loopBeats(s), sel:-1, edit: saved && saved.notes ? s : null, how };
   lock.on = false; lock.base = new WeakMap(); lock.marks = []; shuf.ref = null; shuf.level = 0; shuf.hist = []; if(zone){ paintLock(); $('ntInfo').textContent = 'changes land on the track as you go'; }
-  zone.classList.add('on'); $('ntTitle').textContent = (s.displayName || 'sound').toUpperCase(); $('ntHow').textContent = notes.length + ' notes · ' + how; paint(); draw(); headLoop();
+  zone.classList.add('on'); $('ntTitle').textContent = (s.displayName || 'sound').toUpperCase(); $('ntHow').textContent = notes.length + ' notes · ' + how; paint(); draw(); headLoop(); loadKept(); paintScale();
 }
 function close(){ zone.classList.remove('on'); }
 
@@ -281,18 +290,66 @@ function unshuffle(){ if(!shuf.hist.length) return; ed.notes = shuf.hist.pop(); 
 function paintShuf(){ const t = $('ntLvl'); if(!t) return; const lv = shuf.level;
   t.textContent = !lv ? 'keeps your notes · new rhythm' : lv <= 2 ? 'v' + lv + ' · new rhythm, same notes' : lv <= 4 ? 'v' + lv + ' · rhythm + a few swaps' : 'v' + lv + ' · full shuffle'; $('ntUndo').disabled = !shuf.hist.length; }
 
+/* ---------- ANDEAN RANDOM (v10.53) — roll new melodies in the chosen scale, keep the ones you like ----------
+   Uses YOUR sound's own slices (nearest one to each new pitch), so it still sounds like your bass/lead.
+   Shape: 2-bar call & answer. Rhythm cells lean on the huayno gallop (long-short-short) + straight 8ths.
+   The call ends open (on the 5th), the answer lands home (on the tonic). Melody mostly walks by step and tends to fall, with the odd leap.
+   If LOCK is on, the new notes snap to your perc like everything else. ◂ goes back one roll. */
+const pcOf = p => ((p % 12) + 12) % 12;
+const CELLS = [[0.5,0.25,0.25],[0.5,0.25,0.25],[0.5,0.25,0.25],[0.25,0.25,0.5],[0.5,0.5],[1],[0.25,0.25,0.25,0.25],[0.75,0.25]];
+const STEPPY = [-1,-1,-1,1,1,0,-2,2,-3,3,-2];
+function applyNew(){ ed.sel = -1; lock.base = new WeakMap(); manual(); if(lock.on) applyLock(); else changed(); }
+function andeanRoll(){
+  if(!ed || !ed.notes.length) return;
+  if(!ed._srcs){ ed._srcs = ed.notes.map(n=>Object.assign({}, n.src)); const ps = ed.notes.map(n=>n.p); ed._lo = Math.min(...ps); ed._hi = Math.max(...ps); if(ed._hi - ed._lo < 9) ed._hi = ed._lo + 9; }
+  const S = scaleSet(); if(!S) return; const t = curTonic();
+  const pool = []; for(let p = ed._lo; p <= ed._hi; p++) if(S.has(pcOf(p))) pool.push(p); if(pool.length < 4) return;
+  const near = (target, pcs)=>{ let bi = -1, bd = 1e9; pool.forEach((p, i)=>{ if(!pcs.includes(pcOf(p))) return; const d = Math.abs(p - target); if(d < bd){ bd = d; bi = i; } }); return bi < 0 ? Math.round(target) : bi; };
+  const mid = (ed._lo + ed._hi)/2, L = ed.beats, barLen = Math.min(4, L), bars = Math.max(1, Math.round(L/barLen));
+  const barRhythm = ()=>{ const out = []; let b = 0; while(b < barLen - 1e-6){ const c = rnd(CELLS); c.forEach(d=>{ if(b < barLen - 1e-6){ out.push({ b, d:Math.min(d, barLen - b) }); b += d; } }); } return out; };
+  const rA = barRhythm(); let idx = near(mid + 2, [t, (t + 7) % 12]); const notes = [];
+  for(let bar = 0; bar < bars; bar++){
+    const r = (bar % 2 === 0 || Math.random() < 0.7) ? rA : barRhythm(), last = bar === bars - 1;
+    r.forEach((o, i)=>{
+      const end = i === r.length - 1;
+      if(end){ idx = last ? near(ed._lo + 2, [t]) : (bar % 2 === 0 ? near(mid, [(t + 7) % 12]) : near(mid, [t, (t + 7) % 12])); }
+      else if(!(bar === 0 && i === 0)){ const down = i/r.length > 0.5 ? [-1,-2] : []; idx += rnd(STEPPY.concat(down)); idx = Math.max(0, Math.min(pool.length - 1, idx)); }
+      const p = pool[idx]; let sr = ed._srcs[0], bd = 1e9; ed._srcs.forEach(x=>{ const d = Math.abs(x.p0 - p) + Math.random()*0.5; if(d < bd){ bd = d; sr = x; } });
+      notes.push({ b:bar*barLen + o.b, len:o.d, p, v:100, src:Object.assign({}, sr) }); }); }
+  shuf.hist.push(copyNotes(ed.notes)); if(shuf.hist.length > 30) shuf.hist.shift();
+  ed.notes = notes; applyNew(); paintKept(); $('ntInfo').textContent = 'new ' + scaleMode.toLowerCase() + ' line · heart it to keep it';
+}
+function setScale(m){ scaleMode = m; try{ localStorage.setItem('tuner_notes_scale', m); }catch(e){} paintScale(); draw(); }
+function paintScale(){ if(!zone) return; zone.querySelectorAll('.nt-sc button').forEach(b=> b.classList.toggle('on', b.dataset.s === scaleMode)); }
+
+/* kept melodies: per original sound, saved on the phone */
+let kept = [], keptIx = -1;
+const sigOf = L => L.map(n=> n.b.toFixed(2) + ':' + n.p + ':' + n.len.toFixed(2)).join(',');
+async function loadKept(){ try{ kept = (await Store.get('nkept:' + ed.orig.id)) || []; }catch(e){ kept = []; } keptIx = -1; paintKept(); }
+function saveKept(){ try{ Store.set('nkept:' + ed.orig.id, kept); }catch(e){} }
+function keepNow(){ if(!ed || !ed.notes.length) return; const sg = sigOf(ed.notes), at = kept.findIndex(k=> sigOf(k) === sg);
+  if(at >= 0){ keptIx = at; } else { kept.push(copyNotes(ed.notes)); keptIx = kept.length - 1; saveKept(); } paintKept(); }
+function recall(i){ if(!kept[i]) return; shuf.hist.push(copyNotes(ed.notes)); ed.notes = copyNotes(kept[i]); keptIx = i; applyNew(); paintKept(); }
+function dropKept(){ if(keptIx < 0) return; kept.splice(keptIx, 1); keptIx = -1; saveKept(); paintKept(); }
+function paintKept(){ const el = $('ntKept'); if(!el || !ed) return; const sg = sigOf(ed.notes), cur = kept.findIndex(k=> sigOf(k) === sg); if(cur >= 0) keptIx = cur; else if(keptIx >= 0 && sigOf(kept[keptIx] || []) !== sg) keptIx = -1;
+  el.innerHTML = kept.map((_, i)=> '<button class="stp-chip sm' + (i === keptIx ? ' on' : '') + '" data-i="' + i + '" data-k="KEPT">' + (i + 1) + '</button>').join('') + (keptIx >= 0 ? '<button class="stp-chip sm" id="ntDrop" data-k="KEPT DROP" aria-label="remove">x</button>' : '');
+  el.querySelectorAll('button[data-i]').forEach(b=> b.addEventListener('click', ()=> recall(+b.dataset.i))); const d = $('ntDrop'); if(d) d.addEventListener('click', dropKept);
+  const h = $('ntHeart'); if(h) h.classList.toggle('on', keptIx >= 0); }
+
 function build(){
   zone = mk('div'); zone.id = 'notesZone';
   zone.innerHTML = `<div class="nt-top"><div class="nt-t"><b>NOTES</b><span id="ntTitle"></span><i id="ntHow"></i></div><button class="stp-chip sm" id="ntLockBtn" data-k="NOTES LOCK">LOCK</button></div>
   <div class="nt-roll"><canvas id="ntRoll"></canvas><canvas id="ntHead"></canvas></div>
   <div class="nt-hint">tap = add · tap a note = delete · drag = move</div>
+  <div class="nt-sc"><span>SCALE</span><button class="stp-chip sm" data-s="PENT MIN" data-k="SCALE PENT MIN">PENT MIN</button><button class="stp-chip sm" data-s="PENT MAJ" data-k="SCALE PENT MAJ">PENT MAJ</button><button class="stp-chip sm" data-s="HARM MIN" data-k="SCALE HARM MIN">HARM MIN</button><button class="stp-chip sm" data-s="KEY" data-k="SCALE KEY">KEY</button></div>
+  <div class="nt-kept" id="ntKept"></div>
   <div class="nt-lock" id="ntLock"><button class="stp-chip sm" id="ntLockSrc" data-k="LOCK SOURCE"></button><input type="range" id="ntLockAmt" min="0" max="100" value="100"><span id="ntLockVal">100</span></div>
-  <div class="nt-tools"><span id="ntLvl"></span><button class="stp-chip" id="ntUndo" data-k="SHUFFLE BACK" aria-label="back">◂</button><button class="nt-shuf" id="ntShuf" data-k="SHUFFLE">SHUFFLE</button></div>
+  <div class="nt-tools"><span id="ntLvl"></span><button class="stp-chip" id="ntUndo" data-k="SHUFFLE BACK" aria-label="back">◂</button><button class="stp-chip" id="ntHeart" data-k="KEEP" aria-label="keep this melody"><svg viewBox="0 0 16 14" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.1"><path d="M8 13 L2.2 7.2 C0 4.6 1.8 1.2 4.8 1.6 C6.3 1.8 7.4 2.9 8 4.1 C8.6 2.9 9.7 1.8 11.2 1.6 C14.2 1.2 16 4.6 13.8 7.2 Z"/></svg></button><button class="nt-shuf nt-rnd" id="ntRnd" data-k="ANDEAN RANDOM">ANDEAN</button><button class="nt-shuf" id="ntShuf" data-k="SHUFFLE">SHUFFLE</button></div>
   <div class="stp-bar"><button id="ntBack" data-k="NOTES BACK">◂ TUNER</button><div class="stp-info" id="ntInfo">changes land on the track as you go</div><button id="ntPlay" data-k="NOTES PLAY" aria-label="play"></button></div>`;
   document.body.appendChild(zone);
   $('ntBack').addEventListener('click', close);
   $('ntPlay').addEventListener('click', ()=> $('transportBtn').click());
-  $('ntShuf').addEventListener('click', shuffleOnce); $('ntUndo').addEventListener('click', unshuffle);
+  $('ntShuf').addEventListener('click', shuffleOnce); $('ntRnd').addEventListener('click', andeanRoll); $('ntHeart').addEventListener('click', keepNow); zone.querySelectorAll('.nt-sc button').forEach(b=> b.addEventListener('click', ()=> setScale(b.dataset.s))); $('ntUndo').addEventListener('click', unshuffle);
   $('ntLockBtn').addEventListener('click', ()=> setLock(!lock.on));
   $('ntLockSrc').addEventListener('click', ()=>{ const L = lockSources(); if(L.length < 2) return; lock.src = L[(L.indexOf(lock.src) + 1) % L.length]; lock.marks = lockMarks(); paintLock(); applyLock(); });
   $('ntLockAmt').addEventListener('input', e=>{ lock.amt = +e.target.value; $('ntLockVal').textContent = lock.amt; clearTimeout(lock._t); lock._t = setTimeout(applyLock, 60); });
@@ -305,5 +362,5 @@ function boot(){ build();
   const ob = $('optNotes'); if(ob) ob.addEventListener('click', ()=>{ const ch = selCh(); closeOptions(); if(ch){ if(ch.sample.folder === 'STEPS' && window.STEPS) STEPS.open(false); else { draw._fit = false; open(ch); } } });
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-API.open = ch => { draw._fit = false; return open(ch); }; API._ed = ()=>ed; API._shuffle = shuffleOnce; API._unshuffle = unshuffle; API._hits = hitsOf; API._parse = parseSMF; API._write = writeSMF; API._detect = detectNotes;
+API.open = ch => { draw._fit = false; return open(ch); }; API._ed = ()=>ed; API._shuffle = shuffleOnce; API._roll = andeanRoll; API._keep = keepNow; API._scale = setScale; API._unshuffle = unshuffle; API._hits = hitsOf; API._parse = parseSMF; API._write = writeSMF; API._detect = detectNotes;
 })();

@@ -362,6 +362,13 @@ function boot(){ build();
   const ob = $('optNotes'); if(ob) ob.addEventListener('click', ()=>{ const ch = selCh(); closeOptions(); if(ch){ if(ch.sample.folder === 'STEPS' && window.STEPS) STEPS.open(false); else { draw._fit = false; open(ch); } } });
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-API.openSel = ()=>{ const ch = selCh(); if(!ch){ setStatus('tap a bass clip first, then NOTES'); return; } if(ch.sample.folder === 'STEPS' && window.STEPS && STEPS.open) STEPS.open(false); else { draw._fit = false; open(ch); } };
+API.openSel = async (fromMake)=>{   /* v10.55: no clip picked → uses your newest MADE sound (puts it on a track if it isn't yet) */
+  let ch = fromMake ? null : selCh();
+  if(!ch){ const made = samples.filter(x=> x.folder === 'MADE' || /EDIT/.test(x.displayName || '')).pop();
+    if(!made){ setStatus('make a loop in MAKE first (or tap a clip), then NOTES'); return; }
+    ch = channels.slice().reverse().find(c=> c.sample === made) || null;
+    if(!ch){ await addChannelFromSample(made); ch = channels.slice().reverse().find(c=> c.sample === made) || null; }
+    if(!ch){ setStatus("couldn't open that sound"); return; } }
+  if(ch.sample.folder === 'STEPS' && window.STEPS && STEPS.open) STEPS.open(false); else { draw._fit = false; open(ch); } };
 API.open = ch => { draw._fit = false; return open(ch); }; API._ed = ()=>ed; API._shuffle = shuffleOnce; API._roll = andeanRoll; API._keep = keepNow; API._scale = setScale; API._unshuffle = unshuffle; API._hits = hitsOf; API._parse = parseSMF; API._write = writeSMF; API._detect = detectNotes;
 })();

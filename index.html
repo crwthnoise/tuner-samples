@@ -664,7 +664,7 @@ window.addEventListener('unhandledrejection', function(e){ var m = 'promise: ' +
 <script>let RED='#d32f2f', RED_HI='#ff4d4d', RED_LT='#ff8a8a', REDRGB='211,47,47', REDHIRGB='255,48,48';   /* v10.22 season accent (STORM = blue) */
 
 /* ================= CORE ================= */
-const APP_VERSION = 'v10.54';
+const APP_VERSION = 'v10.55';
 /* ---- SAMPLE SOURCE ----------------------------------------------------------
    1. local:  files in this site's /samples folder (+ samples/index.json)
    2. github: a public repo folder, listed on every launch. Subfolders = library folders.
@@ -813,9 +813,12 @@ async function loadAll(){
   const m = await Store.probe(); renderStoreStatus();
   await loadBuiltins(); loadGithubLibrary();
   if(m === 'none'){ $('storeWarn').classList.add('show'); setStatus('no storage here — use save as file'); refreshTimeline(); drawAll(); return; }
-  try{ const keys = await Store.keys('sample:'); for(const k of keys){ const rec = await Store.get(k); if(!rec) continue; const buf = rec.buf ? rec.buf : (rec.base64 ? b64ToAb(rec.base64) : null); if(!buf) continue; const file = new File([new Blob([buf], {type:rec.mime||'audio/wav'})], rec.name||'loop.wav', {type:rec.mime||'audio/wav'}); await addSample(file, { persistedId:k.slice(7), arrayBuf:buf, bpm:rec.bpm, key:rec.key, skipSave:true, quiet:true }); } }catch(e){}
+  /* v10.55 CRASH FIX: your saved sounds (MADE, EDIT, SING…) are NOT decoded at start any more — only listed. Each one decodes the first time you use it.
+     Before, every sound you ever made was decoded into memory on open, so the phone ran out and Safari killed the page. */
+  try{ const keys = await Store.keys('sample:'); for(const k of keys){ const rec = await Store.get(k); if(!rec) continue; const id = k.slice(7), nm = rec.name || 'loop.wav', meta = parseLoopMeta(nm);
+    samples.push({ id, name:nm, displayName:cleanName(nm), url:'local:' + id, localKey:k, mime:rec.mime || 'audio/wav', buffer:null, bpm:rec.bpm ?? meta.bpm, key:rec.key ?? meta.key, tags:parseTagsFromName(nm), folder:'My samples', builtin:false, hidden:false, waveImg:null, env:null, peaks:null }); } renderLibrary(); }catch(e){}
   await applySampleMetaOverrides(); await loadCFolders();
-  try{ let idx = await getProjectIndex(); if(idx.length){ idx.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)); await loadProjectById(idx[0].id, { quiet:true }); } else { applySettings({}); } }catch(e){}
+  try{ applySettings({}); }catch(e){}   /* v10.55: TUNER opens on a fresh page; old projects live in ⚙ PROJECTS */
   dirty = false; updateProjectLabel(); refreshTimeline(); drawAll();
   if(channels.length) setStatus(channels.length + ' loop' + (channels.length>1?'s':'') + ' restored');
 }
@@ -1095,6 +1098,7 @@ function trimLoop(s, ab){
 const RAW_CACHE = 'tuner-loops-v1';
 async function fetchRaw(sample){
   if(sample.raw) return sample.raw;
+  if(sample.localKey){ const rec = await Store.get(sample.localKey); const b = rec && (rec.buf ? rec.buf : (rec.base64 ? b64ToAb(rec.base64) : null)); if(!b) throw new Error('sound missing'); return b; }   /* v10.55: no sample.raw copy kept = less memory */
   const key = sample.url + (sample.frames ? (sample.url.includes('?') ? '&' : '?') + 'f=' + sample.frames : '');
   let cache = null; try{ cache = await caches.open(RAW_CACHE); const hit = await cache.match(key); if(hit){ sample.raw = await hit.arrayBuffer(); return sample.raw; } }catch(e){ cache = null; }
   const r = await withTimeout(fetch(sample.url, sample.hdr ? { headers: sample.hdr() } : undefined), 30000, 'download timed out'); if(!r.ok) throw new Error('HTTP ' + r.status);
@@ -1172,7 +1176,7 @@ function packOf(smp){ if(!smp.builtin) return 'MY SAMPLES'; const f = (smp.folde
 function inSel(smp, sel){ if(sel === 'ALL') return !smp.cloud || !!(($('librarySearch')||{}).value||'').trim(); if(sel === 'MY') return !smp.builtin; if(sel.startsWith('cf:')){ const f = cfolders.find(x=>'cf:'+x.id === sel); return !!f && f.ids.includes(smp.id); } if(sel.startsWith('pk:')) return smp.builtin && packOf(smp) === sel.slice(3); return false; }
 /* v10.22 PREFETCH: opening a pack quietly downloads its loops 2 at a time, so a tap plays right away */
 let prefetchQ = [], prefetchRun = 0;
-function prefetchSel(){ prefetchQ = samples.filter(x=>!x.buffer && !x.failed && !x.hidden && inSel(x, libSel)); pumpPrefetch(); }
+function prefetchSel(){ prefetchQ = samples.filter(x=>!x.buffer && !x.failed && !x.hidden && !x.cloud && !x.localKey && inSel(x, libSel)).slice(0, 8); pumpPrefetch(); }   /* v10.55 CRASH FIX: was decoding a whole folder (or ALL) into memory; now max 8 built-ins, the rest load on tap */
 function pumpPrefetch(){ while(prefetchRun < 2 && prefetchQ.length){ const x = prefetchQ.shift(); if(x.buffer) continue; prefetchRun++; ensureLoaded(x).finally(()=>{ prefetchRun--; pumpPrefetch(); }); } }
 function setLibSel(s){ libCap = 150; setTimeout(prefetchSel, 50); libSel = s; libEdit = null; libShowHidden = false; try{ localStorage.setItem('tuner_libSel', s); }catch(e){} renderLibrary(); }
 /* v10.23 PRELOAD: on open, every library sound downloads (small .m4a, 4 at a time) with a progress line on the LCD; the open pack also decodes */
@@ -2120,7 +2124,7 @@ TUNER.addMade = async function(s){
     if(!loaded){ loaded = true; fr.src = MAKER + '/samplemaker-phone?tuner=1'; } else init();
   }
   function close(){ zone.classList.remove('on'); try{ fr.contentWindow.postMessage({ type:'tuner:stop' }, MAKER); }catch(e){} try{ renderLibrary(); }catch(e){} }   /* v10.44: back to TUNER = the walkie goes quiet */
-  $('makeNotes').addEventListener('click', ()=>{ close(); try{ TNOTES.openSel(); }catch(e){} });   /* v10.54: NOTES lives next to MAKE */
+  $('makeNotes').addEventListener('click', ()=>{ close(); setTimeout(()=>{ try{ TNOTES.openSel(true); }catch(e){ setStatus('NOTES: ' + (e && e.message || e)); } }, 60); });   /* v10.54: NOTES lives next to MAKE */
   $('makeBtn').addEventListener('click', open);
   $('makeBack').addEventListener('click', close);
   $('makePinOk').addEventListener('click', ()=>{ const v = $('makePinIn').value.trim(); if(!v) return; try{ localStorage.setItem('tuner_makerPin', v); }catch(e){} $('makePinIn').value = ''; showPin(false); try{ window.CLOUDPK && CLOUDPK.load(); }catch(e){} info.innerHTML = 'linked · ★ a sound = send it to TUNER'; init(); });
@@ -2153,7 +2157,7 @@ TUNER.addMade = async function(s){
 async function checkVersion(){ try{ const r = await fetch('version.txt?t=' + Date.now(), { cache:'no-store' }); if(!r.ok) return; const v = (await r.text()).trim(); if(!v || v === APP_VERSION) return; let tried = ''; try{ tried = sessionStorage.getItem('tuner_upd') || ''; }catch(e){} if(tried === v) return; try{ sessionStorage.setItem('tuner_upd', v); }catch(e){} if(isRunning || channels.length && dirty) return; location.replace(location.pathname + '?v=' + encodeURIComponent(v)); }catch(e){} }
 setTimeout(checkVersion, 1500); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkVersion(); });
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
-(async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); let lp = null; try{ lp = localStorage.getItem('tuner_lastProj'); }catch(e){} if(lp && !channels.length){ await loadProjectById(lp, { quiet:true }); } }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
+(async ()=>{ try{ fitTL(); drawAll(); await loadAll(); resetHistory(); let lp = null; try{ lp = localStorage.getItem('tuner_lastProj'); }catch(e){} /* v10.55: no auto-open of the last project */ }catch(e){ const el=$('dockInfo'); el.textContent='startup error: '+(e&&e.message?e.message:e); el.classList.add('hl'); } })();
 </script>
 <script src="modules/steps.js?v=10.52"></script>
 <script src="modules/notes.js?v=10.52"></script>

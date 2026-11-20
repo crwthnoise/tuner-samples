@@ -362,5 +362,6 @@ function boot(){ build();
   const ob = $('optNotes'); if(ob) ob.addEventListener('click', ()=>{ const ch = selCh(); closeOptions(); if(ch){ if(ch.sample.folder === 'STEPS' && window.STEPS) STEPS.open(false); else { draw._fit = false; open(ch); } } });
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+API.openSel = ()=>{ const ch = selCh(); if(!ch){ setStatus('tap a bass clip first, then NOTES'); return; } if(ch.sample.folder === 'STEPS' && window.STEPS && STEPS.open) STEPS.open(false); else { draw._fit = false; open(ch); } };
 API.open = ch => { draw._fit = false; return open(ch); }; API._ed = ()=>ed; API._shuffle = shuffleOnce; API._roll = andeanRoll; API._keep = keepNow; API._scale = setScale; API._unshuffle = unshuffle; API._hits = hitsOf; API._parse = parseSMF; API._write = writeSMF; API._detect = detectNotes;
 })();

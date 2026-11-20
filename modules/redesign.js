@@ -4,7 +4,7 @@
 (()=>{
   'use strict';
   const $ = id => document.getElementById(id);
-  const RD_VER = 'REDESIGN v3';
+  const RD_VER = 'REDESIGN v4';
   const LS = { get:k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }, set:(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} } };
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   window.__RD_TAP = true;                                   /* index.html: tap a selected clip again = options */
@@ -207,14 +207,15 @@
   $('rdFeedX').addEventListener('click', closeFeed);
   document.addEventListener('keydown', e=>{ if(e.key === 'Escape') closeFeed(); });
   /* tap the logo = back to the feed */
-  top.querySelector('.brand').addEventListener('click', ()=>{ $('rdSnd').classList.remove('on'); if(feedKind === 'HOME') closeFeed(); else openFeed('HOME'); });
+  top.querySelector('.brand').addEventListener('click', ()=>{ $('rdSnd').classList.remove('on'); /* v10.54: logo no longer opens the feed */ });
 
   /* ---------- BEATS / SOUNDS / FRIENDS / SONGS ---------- */
-  const snd = document.createElement('div'); snd.id = 'rdSnd'; snd.innerHTML = '<button data-k="SND MAKE" id="rdsMake">MAKE</button><button data-k="SND PAD" id="rdsPad">PAD</button><button data-k="SND SING" id="rdsSing">SING</button>'; top.appendChild(snd);
+  const snd = document.createElement('div'); snd.id = 'rdSnd'; snd.innerHTML = '<button data-k="SND MAKE" id="rdsMake">MAKE</button><button data-k="SND PAD" id="rdsPad">PAD</button><button data-k="SND SING" id="rdsSing">SING</button><button data-k="SND NOTES" id="rdsNotes">NOTES</button>'; top.appendChild(snd);
   const toggleSnd = on => { snd.classList.toggle('on', on); bSounds.classList.toggle('on', on); };
   bBeats.addEventListener('click', ()=>{ burst(bBeats); toggleSnd(false); closeFeed(); $('stepsBtn').click(); });            /* BEATS = the step sequencer (redesign coming) */
   bSounds.addEventListener('click', ()=>{ burst(bSounds); toggleSnd(!snd.classList.contains('on')); });                       /* SOUNDS = MAKE · PAD · SING (new space coming) */
   [['rdsMake','makeBtn'],['rdsPad','padBtn'],['rdsSing','singBtn']].forEach(([a,b])=> $(a).addEventListener('click', ()=>{ toggleSnd(false); closeFeed(); $(b).click(); }));
+  $('rdsNotes').addEventListener('click', ()=>{ toggleSnd(false); closeFeed(); try{ TNOTES.openSel(); }catch(e){ setStatus('NOTES: ' + (e && e.message || 'not ready')); } });
   document.addEventListener('pointerdown', e=>{ if(!e.target.closest('#rdSnd') && !e.target.closest('.b-sounds')) toggleSnd(false); }, true);
   bFriends.addEventListener('click', ()=>{ burst(bFriends); setStatus('FRIENDS · share songs, collab · coming soon'); });
   bSongs.addEventListener('click', ()=>{ burst(bSongs); setStatus('SONGS · your FL library lives here · coming soon'); });
@@ -240,7 +241,7 @@
 
   /* ---------- TIMELINE: small undo + double-tap undo ---------- */
   const tctl = tlz.querySelector('.tlctl'), ub = document.createElement('button'); ub.id = 'rdUndo'; ub.dataset.k = 'TL UNDO'; ub.title = 'undo'; ub.textContent = '↶'; ub.setAttribute('aria-label','undo');
-  const fb = document.createElement('button'); fb.id = 'rdFeedBtn'; fb.dataset.k = 'FEED'; fb.textContent = 'FEED'; fb.style.cssText = 'font-size:9px;letter-spacing:1px'; fb.className = $('tlStart').className; if(tctl) tctl.insertBefore(fb, $('tlStart')); fb.addEventListener('click', ()=>{ if(feedKind === 'HOME') closeFeed(); else openFeed('HOME'); });
+  const fb = null;
   if(tctl){ ub.className = $('tlStart').className; tctl.insertBefore(ub, $('tlStart')); }
   ub.addEventListener('click', ()=>{ try{ undo(); }catch(e){} });
   window.clearBoard = function(){};
@@ -297,12 +298,13 @@
   new ResizeObserver(()=>{ try{ window.layoutRack(); }catch(e){} }).observe(scroller);
 
   /* ---------- BOOT: land on the FEED ---------- */
-  requestAnimationFrame(()=> requestAnimationFrame(()=>{ const wantOpen = sliderPref() ? false : (LS.get('tuner_rd_open') !== '0'); if(!wantOpen) setRack(false, true); }));
-  let tries = 0; const boot = ()=>{ if(samples.length || tries++ > 40){ if(!feedKind && !document.querySelector('.sheet.open') ) openFeed('HOME'); } else setTimeout(boot, 150); };
+  requestAnimationFrame(()=> requestAnimationFrame(()=>{ setRack(false, true);   /* v10.54: sliders always start CLOSED */ }));
+  let tries = 0; const boot = ()=>{ if(samples.length || tries++ > 40){ /* v10.54: no landing feed (Alex: "stupid idea") */ } else setTimeout(boot, 150); };
   setTimeout(boot, 200);
-  /* online packs (needs the maker PIN on this device) — loads quietly, feed refreshes when it lands */
-  try{ const cs = document.createElement('script'); cs.src = 'modules/cloudpacks.js?v=' + Date.now(); cs.onload = ()=>{ try{ window.CLOUDPK.load().then(n=>{ if(n && feedKind){ cloudPick = null; openFeed(feedKind); } }); }catch(e){} }; document.body.appendChild(cs); }catch(e){}
-  let lastN = 0; setInterval(()=>{ if(feedKind === 'HOME' && !gesture && samples.length !== lastN){ lastN = samples.length; openFeed('HOME'); } }, 1200);
+  /* online packs (needs the maker PIN on this device) — v10.54: loads only the first time you open PACKS, not at start (lighter, no crashes) */
+  let cloudAsked = false; const loadCloud = ()=>{ if(cloudAsked) return; cloudAsked = true; try{ const cs = document.createElement('script'); cs.src = 'modules/cloudpacks.js?v=' + Date.now(); cs.onload = ()=>{ try{ window.CLOUDPK.load(); }catch(e){} }; document.body.appendChild(cs); }catch(e){} };
+  $('packsBtn') && $('packsBtn').addEventListener('click', loadCloud, true);
+  
   function fit(){ try{ const t = $('topZone').getBoundingClientRect(), d = $('dock').getBoundingClientRect(), T = Math.round(t.bottom), B = Math.round(innerHeight - d.top); const r = document.documentElement.style; r.setProperty('--rdT', T + 'px'); r.setProperty('--rdB', B + 'px'); ['setSheet','packsSheet'].forEach(id=>{ const e = $(id); if(!e) return; e.style.setProperty('top', T + 'px', 'important'); e.style.setProperty('bottom', B + 'px', 'important'); }); r.setProperty('--packsBot', B + 'px'); }catch(e){} }
   fit(); window.addEventListener('resize', fit); setInterval(fit, 1500); ['setBtn','packsBtn','stepsBtn'].forEach(id => $(id) && $(id).addEventListener('click', fit, true));
   window.RD = { openFeed, closeFeed, setRack, version: RD_VER };
